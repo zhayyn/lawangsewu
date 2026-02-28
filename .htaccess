@@ -1,0 +1,22 @@
+# developed by zhayyn™
+
+# 1. MENGHILANGKAN EXTENSION .PHP DI URL
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+# developed by zhayyn™
+
+# 2. MEMBUNUH CACHE SECARA PAKSA DARI JANTUNG SERVER
+<FilesMatch "\.(php|html|css|js)$">
+    FileETag None
+    <IfModule mod_headers.c>
+        Header unset ETag
+        Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+    </IfModule>
+</FilesMatch>
+
+# developed by zhayyn™

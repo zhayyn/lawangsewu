@@ -1,0 +1,64 @@
+[2026-02-24 02:59:59] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 02:59:59] format_jadwal requested
+[2026-02-24 02:59:59] Fetched SIPP length: 147450
+[2026-02-24 02:59:59] Parsed rows: 75
+[2026-02-24 03:31:34] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 03:31:34] format_jadwal requested
+[2026-02-24 03:31:34] Loaded local slide_sidang.html, length=22865
+[2026-02-24 03:31:34] Parsed rows: 75
+[2026-02-24 03:55:18] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 03:55:18] format_jadwal requested
+[2026-02-24 03:55:18] Loaded local slide_sidang.html, length=22865
+[2026-02-24 03:55:18] Parsed rows: 75
+[2026-02-24 03:58:40] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 03:58:40] format_jadwal requested
+[2026-02-24 03:58:40] Loaded local slide_sidang.html, length=22865
+[2026-02-24 03:58:40] Parsed rows: 75
+[2026-02-24 03:59:08] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 03:59:08] format_jadwal requested
+[2026-02-24 03:59:08] Loaded local slide_sidang.html, length=22865
+[2026-02-24 03:59:08] Parsed rows: 75
+[2026-02-24 04:00:35] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 04:00:35] format_jadwal requested
+[2026-02-24 04:00:35] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:00:35] Parsed rows: 75
+[2026-02-24 04:00:47] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 04:00:47] format_jadwal requested
+[2026-02-24 04:00:47] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:00:47] Parsed rows: 75
+[2026-02-24 04:02:02] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 04:02:02] format_jadwal requested
+[2026-02-24 04:02:02] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:02:02] Parsed rows: 75
+[2026-02-24 04:02:09] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 04:02:09] format_jadwal requested
+[2026-02-24 04:02:09] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:02:09] Parsed rows: 75
+[2026-02-24 04:02:09] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1
+[2026-02-24 04:02:09] format_jadwal requested
+[2026-02-24 04:02:09] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:02:09] Parsed rows: 75
+[2026-02-24 04:05:59] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771880759
+[2026-02-24 04:05:59] format_jadwal requested
+[2026-02-24 04:05:59] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:05:59] Parsed rows: 75
+[2026-02-24 04:15:05] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771881305
+[2026-02-24 04:15:05] format_jadwal requested
+[2026-02-24 04:15:05] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:15:05] Parsed rows: 75
+[2026-02-24 04:16:57] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771881417
+[2026-02-24 04:16:57] format_jadwal requested
+[2026-02-24 04:16:57] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:16:57] Parsed rows: 75
+[2026-02-24 04:17:33] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771881452
+[2026-02-24 04:17:33] format_jadwal requested
+[2026-02-24 04:17:33] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:17:33] Parsed rows: 75
+[2026-02-24 04:17:41] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771881461
+[2026-02-24 04:17:41] format_jadwal requested
+[2026-02-24 04:17:41] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:17:41] Parsed rows: 75
+[2026-02-24 04:18:20] Request: GET /lawangsewu/antrian_controller.php?format_jadwal=1&t=1771881500
+[2026-02-24 04:18:20] format_jadwal requested
+[2026-02-24 04:18:20] Loaded local slide_sidang.html, length=22865
+[2026-02-24 04:18:20] Parsed rows: 75

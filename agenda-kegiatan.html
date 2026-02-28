@@ -1,0 +1,135 @@
+<style>
+/* developed by zhayyn™ */
+
+/* 1. Sembunyikan Header Bawaan Excel */
+.ninja_table_wrapper thead { 
+    display: none !important; 
+}
+
+/* 2. Mode GRID: Meretas Urutan Posisi & Menghapus Box Kaku */
+.ninja_table_wrapper tbody tr {
+    display: grid !important;
+    grid-template-columns: 75px 1fr; /* Lebar kolom tanggal 75px, sisanya untuk judul */
+    grid-template-areas: 
+        "tanggal judul"
+        "tanggal pelaksana";
+    background: transparent !important;
+    border: none !important; 
+    border-bottom: 1px solid #eaeaea !important; /* Garis pemisah antar acara */
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 15px 5px !important;
+    align-items: center;
+    column-gap: 15px;
+    row-gap: 6px;
+    transition: background 0.3s ease;
+}
+
+/* Hilangkan garis di item paling bawah */
+.ninja_table_wrapper tbody tr:last-child {
+    border-bottom: none !important;
+}
+
+/* Efek sorot halus saat kursor mendekat */
+.ninja_table_wrapper tbody tr:hover {
+    background: #fdfdfd !important;
+    cursor: pointer;
+}
+
+/* 3. TANGGAL (Kolom ke-2 dipaksa pindah ke KIRI) */
+.ninja_table_wrapper tbody td:nth-child(2) {
+    grid-area: tanggal;
+    background: transparent !important;
+    color: #444 !important;
+    border-right: 2px solid #ff6600 !important; /* Garis vertikal oranye ala referensi */
+    border-top: none !important; border-bottom: none !important; border-left: none !important;
+    padding: 0 10px 0 0 !important;
+    text-align: center !important;
+    font-weight: 800 !important;
+    font-size: 13px !important; /* Ukuran pas agar 02, Januari, 2026 tersusun rapi */
+    line-height: 1.4 !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* 4. NAMA KEGIATAN (Kolom ke-1 dipaksa ke Kanan Atas) */
+.ninja_table_wrapper tbody td:nth-child(1) {
+    grid-area: judul;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #2c3e50 !important;
+    text-align: left !important;
+    
+    /* TRICK: Memotong teks panjang menjadi max 2 baris (Titik-titik) */
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2; 
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal !important;
+}
+
+/* 5. KETERANGAN / PELAKSANA (Kolom ke-3 dipaksa ke Kanan Bawah) */
+.ninja_table_wrapper tbody td:nth-child(3) {
+    grid-area: pelaksana;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    color: #7f8c8d !important;
+    text-align: left !important;
+    
+    /* TRICK: Memotong teks menjadi 1 baris saja */
+    display: -webkit-box !important;
+    -webkit-line-clamp: 1; 
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal !important;
+}
+
+/* Tambahan Ikon Pin Lokasi di depan keterangan */
+.ninja_table_wrapper tbody td:nth-child(3)::before {
+    content: '\f041'; /* Kode Ikon Map Marker FontAwesome */
+    font-family: "Font Awesome 5 Free", "Font Awesome 6 Free";
+    font-weight: 900;
+    margin-right: 6px;
+    color: #95a5a6;
+}
+
+/* Bersihkan sisa elemen tabel asli & Atur laci detail */
+.ninja_table_wrapper table { border: none !important; background: transparent !important; }
+.ninja_table_wrapper tr.footable-detail-row {
+    grid-column: 1 / -1; 
+    background: #fafafa !important;
+    padding: 10px 15px !important;
+    border-top: 1px dashed #ddd !important;
+    display: block !important;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+/* developed by zhayyn™ */
+/* Paksa HANYA TAMPIL 3 BARIS (Baris ke-4 dan seterusnya dihanguskan) */
+.ninja_table_wrapper tbody tr:nth-child(n+4) {
+    display: none !important;
+}
+</style>
+
+<div class="agenda-kartu-zhayyn">
+    
+  <h3 style="font-size:16px; font-weight:800; color:#084228; background:#ffffff; 
+    border-bottom:1px solid #eaeaea; border-top:3px solid #ff6600; 
+    padding:15px; border-radius:8px 8px 0 0; display:flex; align-items:center; margin-bottom:0;">
+    <i class="far fa-calendar-alt" style="margin-right: 10px; font-size: 18px; color: #ff6600;"></i> 
+    Agenda Kegiatan
+</h3>
+    
+    <div style="background: #ffffff; border: 1px solid #eaeaea; border-top: none; border-radius: 0 0 8px 8px; padding: 10px 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+        
+        [ninja_tables id="4573"]
+        
+    </div>
+    
+</div>

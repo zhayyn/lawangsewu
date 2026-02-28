@@ -47,7 +47,6 @@ if (isset($_GET['format_jadwal'])) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, "https://sipp.pa-semarang.go.id/slide_sidang");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         $html_sipp = curl_exec($ch);
         $curlErr = curl_error($ch);

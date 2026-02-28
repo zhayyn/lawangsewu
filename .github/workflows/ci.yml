@@ -1,0 +1,19 @@
+name: CI - Basic checks
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  basic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show environment
+        run: |
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Commit: $GITHUB_SHA"
+      - name: PHP version (if available)
+        run: php -v || true
+      - name: List top files
+        run: ls -la

@@ -1,0 +1,458 @@
+<style>
+    .syarat-wrapper {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Styling Tabs Kategori */
+    .syarat-tabs-nav {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 25px;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 15px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .syarat-tabs-nav::-webkit-scrollbar { height: 3px; }
+    .syarat-tabs-nav::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    .syarat-tabs-nav::-webkit-scrollbar-thumb { background: #1e5631; border-radius: 10px; }
+
+    .s-tab-btn {
+        padding: 10px 18px;
+        border: none;
+        background: #f4f4f4;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #666;
+        transition: 0.3s;
+        white-space: nowrap;
+    }
+
+    .s-tab-btn:hover, .s-tab-btn.active {
+        background: linear-gradient(135deg, #1e5631, #2d824a);
+        color: white;
+        box-shadow: 0 4px 12px rgba(30, 86, 49, 0.3);
+    }
+
+    .s-tab-content { display: none; animation: fadeInSyarat 0.4s ease; }
+    .s-tab-content.active { display: block; }
+    
+    @keyframes fadeInSyarat {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Styling Accordion Elegan (Hijau Mungkid Hover) */
+    .syarat-accordion {
+        background: #ffffff;
+        border: 1px solid #eee;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .syarat-accordion:hover {
+        border-color: #9acd32;
+        box-shadow: 0 5px 15px rgba(154, 205, 50, 0.15);
+    }
+
+    .ac-header {
+        background: #fcfcfc;
+        padding: 16px 20px;
+        font-weight: 800;
+        color: #1e5631;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-left: 4px solid #1e5631;
+        transition: 0.3s;
+    }
+
+    .ac-header:hover { background: #e9f2eb; border-left-color: #9acd32; }
+    
+    .ac-header::after {
+        content: '+';
+        font-size: 1.5rem;
+        font-weight: 400;
+        color: #1e5631;
+        transition: transform 0.3s ease;
+    }
+
+    .syarat-accordion.open .ac-header::after { content: '−'; }
+    .syarat-accordion.open .ac-header { background: #e9f2eb; border-left-color: #9acd32; }
+
+    .ac-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s ease-in-out;
+        background: #ffffff;
+    }
+
+    .ac-body-inner {
+        padding: 20px;
+        color: #444;
+        line-height: 1.7;
+        font-size: 0.9rem;
+        border-top: 1px solid #eee;
+    }
+
+    .ac-body-inner ul { padding-left: 20px; list-style-type: disc; margin-bottom: 15px; }
+    .ac-body-inner li { margin-bottom: 8px; }
+    
+    .catatan-box {
+        background: #fff8e1;
+        border-left: 4px solid #f1c40f;
+        padding: 12px 15px;
+        border-radius: 4px;
+        margin-top: 15px;
+        font-size: 0.85rem;
+    }
+
+    .download-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f0f8ff;
+        color: #0984e3;
+        padding: 8px 15px;
+        border-radius: 20px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.8rem;
+        margin-top: 10px;
+        margin-right: 10px;
+        border: 1px solid #0984e3;
+        transition: 0.3s;
+    }
+    
+    .download-link:hover { background: #0984e3; color: white; }
+
+    @media (max-width: 768px) {
+        .s-tab-btn { font-size: 0.75rem; padding: 8px 12px; }
+        .ac-header { font-size: 0.9rem; padding: 12px 15px; }
+    }
+</style>
+
+<div class="kep-content-card syarat-wrapper">
+    <h2 class="elegan-title" style="text-align: center; border: none; margin-bottom: 10px;">PERSYARATAN BERPERKARA</h2>
+    <div style="width: 80px; height: 4px; background: linear-gradient(to right, #006633, #39ff14); margin: 0 auto 30px auto; border-radius: 2px;"></div>
+
+    <div class="syarat-tabs-nav">
+        <button class="s-tab-btn active" onclick="bukaTabSyarat(event, 'tab-cerai')">💍 Perceraian & Poligami</button>
+        <button class="s-tab-btn" onclick="bukaTabSyarat(event, 'tab-anak')">👨‍👩‍👧 Seputar Anak</button>
+        <button class="s-tab-btn" onclick="bukaTabSyarat(event, 'tab-harta')">💰 Harta & Waris</button>
+        <button class="s-tab-btn" onclick="bukaTabSyarat(event, 'tab-lainnya')">⚖️ Lain-Lain</button>
+    </div>
+
+    <div id="tab-cerai" class="s-tab-content active">
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Cerai Gugat & Cerai Talak</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <p><strong>Cerai Gugat</strong> diajukan oleh Istri. <strong>Cerai Talak</strong> diajukan oleh Suami.</p>
+                    <p>Syarat / Kelengkapan:</p>
+                    <ul>
+                        <li>Membuat surat gugatan/permohonan (diketik rapi, A4, Arial 12, spasi 1.5).</li>
+                        <li>Fotokopi KTP Penggugat/Pemohon, atau Asli Surat Keterangan Domisili dari Kelurahan.</li>
+                        <li>Asli dan fotokopi Kutipan Akta Nikah / Duplikat.</li>
+                        <li>Bagi pihak yang Ghoib (tidak diketahui tempat tinggalnya), melampirkan Surat Keterangan Ghoib dari Kelurahan diketahui Camat.</li>
+                        <li>Bagi Penggugat/Pemohon berstatus PNS/POLRI/TNI, melampirkan Surat Izin atasan.</li>
+                        <li>Bagi Tergugat/Termohon berstatus PNS/POLRI/TNI, melampirkan Surat Keterangan atasan.</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">
+                        <strong>Catatan Penting:</strong><br>
+                        - Semua fotokopi surat dimeteraikan dan di Nazegelen oleh Kantor Pos (A4).<br>
+                        - Menyerahkan softcopy gugatan (PDF ditandatangani & Ms. Word) ke CD/Flashdisk.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Izin Poligami</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <p>Syarat / Kelengkapan bagi Pemohon:</p>
+                    <ul>
+                        <li>Membuat surat permohonan Izin Poligami.</li>
+                        <li>Fotokopi KTP Pemohon, Istri Pertama, dan Calon Istri.</li>
+                        <li>Fotokopi KK dan Kutipan Akta Nikah Pemohon.</li>
+                        <li>Asli Surat Pernyataan berlaku adil dari Pemohon.</li>
+                        <li>Asli Surat Pernyataan Kesediaan dimadu dari istri pertama.</li>
+                        <li>Asli Surat Izin atasan (jika Pemohon PNS/POLRI/TNI).</li>
+                        <li>Fotokopi Slip Gaji / Penghasilan Pemohon.</li>
+                        <li>Asli Surat Keterangan status calon istri kedua.</li>
+                        <li>Fotokopi Akta Cerai / Kematian Suami dari calon istri (jika janda).</li>
+                        <li>Daftar Harta Bersama diketahui Kelurahan/Kepala Desa.</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">Semua bukti fotokopi wajib distempel Pos (Nazegelen) dan melampirkan softcopy (Word & PDF).</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Pembatalan Nikah</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Membuat surat gugatan Pembatalan Nikah.</li>
+                        <li>Fotokopi KTP Penggugat.</li>
+                        <li>Fotokopi Kutipan Akta Nikah Penggugat.</li>
+                        <li>Asli dan fotokopi Kutipan Akta Nikah yang akan dibatalkan.</li>
+                        <li>Surat Ijin/Keterangan Pembatalan Nikah dari Pejabat (bagi PNS/TNI/POLRI).</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">Semua bukti fotokopi wajib distempel Pos (Nazegelen) dan melampirkan softcopy (Word & PDF).</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-anak" class="s-tab-content">
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Gugatan Hak Asuh Anak (Hadlanah)</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Membuat surat gugatan Hak Asuh Anak.</li>
+                        <li>Fotokopi KTP & KK Penggugat.</li>
+                        <li>Fotokopi Akta Cerai dan/atau Salinan Putusan Pengadilan.</li>
+                        <li>Fotokopi Akta Kelahiran anak (surat kenal lahir).</li>
+                        <li>Fotokopi Slip Gaji / Penghasilan Penggugat.</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">Semua bukti fotokopi wajib distempel Pos (Nazegelen) dan melampirkan softcopy (Word & PDF).</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Dispensasi Kawin</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <p><strong>Syarat Pemohon (Orang Tua):</strong></p>
+                    <ul>
+                        <li>Surat permohonan, Fotokopi KTP suami istri, KK, Akta Nikah.</li>
+                        <li>Fotokopi KTP Anak, Akta Kelahiran, Ijazah Anak.</li>
+                        <li>Fotokopi KTP, KK, Akta Nikah calon besan.</li>
+                        <li>Fotokopi KTP, Akta Kelahiran, Ijazah Calon suami/istri.</li>
+                        <li>Fotokopi Penghasilan calon suami / Keterangan Lurah.</li>
+                        <li>Surat Keterangan Sehat/Hamil dari Bidan/Puskesmas.</li>
+                        <li>Surat Kematian/Ghoib/Akta Cerai (jika orang tua meninggal/bercerai).</li>
+                        <li>Fotokopi Penetapan Wali & Surat rekomendasi DP3AP2KB.</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">Semua bukti fotokopi wajib distempel Pos (Nazegelen) dan melampirkan softcopy.</div>
+                    <a href="#" target="_blank" class="download-link">📄 Format Anak Laki-Laki</a>
+                    <a href="#" target="_blank" class="download-link">📄 Format Anak Perempuan</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Perwalian Anak</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <p>Syarat menyesuaikan status calon wali (Keluarga, Saudara, Orang Lain, atau Badan Hukum). Beberapa syarat umum:</p>
+                    <ul>
+                        <li>WNI, KTP, Surat Keterangan Sehat & SKCK Pemohon.</li>
+                        <li>Keterangan Penghasilan & Persetujuan Suami/Istri calon wali.</li>
+                        <li>Pernyataan bersedia menjadi wali & tidak melakukan kekerasan pada anak.</li>
+                        <li>Keterangan hubungan dengan anak dari Kelurahan.</li>
+                        <li>Persetujuan tertulis orang tua anak (jika masih ada).</li>
+                        <li>Fotokopi KK, Akta Nikah Pemohon, Akta Kelahiran Anak, Akta Kematian ortu anak.</li>
+                        <li><em>(Khusus Badan Hukum/Orang Lain melampirkan Rekomendasi Dinas Sosial).</em></li>
+                    </ul>
+                    <a href="#" target="_blank" class="download-link">📄 Format Perwalian Anak</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Pengangkatan Anak</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat Permohonan, KTP, KK, Akta Nikah Pemohon (Suami Istri).</li>
+                        <li>Slip Gaji/SK Pekerjaan diketahui Lurah/Atasan.</li>
+                        <li>Surat Keterangan Kelahiran/Akta Kelahiran anak dari Rumah Sakit.</li>
+                        <li>Surat Penyerahan Anak dari orang tua aslinya kepada Pemohon.</li>
+                        <li>KTP, KK, Akta Nikah orang tua kandung anak.</li>
+                        <li>SKCK Pemohon & Surat Rekomendasi Dinas Sosial Prov. Jateng.</li>
+                    </ul>
+                    <a href="#" target="_blank" class="download-link">📄 Format Pengangkatan Anak</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Asal Usul Anak</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat permohonan Asal Usul Anak.</li>
+                        <li>Fotokopi KTP & KK Pemohon (suami istri).</li>
+                        <li>Fotokopi Akta Kelahiran/Keterangan Lahir dari bidan/RS.</li>
+                        <li>Fotokopi Keterangan Nikah di Bawah Tangan dari Lurah/Kades.</li>
+                    </ul>
+                    <a href="#" target="_blank" class="download-link">📄 Format Asal Usul Anak</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-harta" class="s-tab-content">
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Gugatan Harta Bersama</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Membuat surat gugatan Harta Bersama.</li>
+                        <li>Fotokopi KTP Penggugat.</li>
+                        <li>Fotokopi Akta Cerai dan/atau Salinan Putusan Pengadilan.</li>
+                        <li>Fotokopi bukti surat obyek dan harta sengketa (Sertifikat, BPKB, dll).</li>
+                        <li>Membayar Panjar biaya perkara.</li>
+                    </ul>
+                    <div class="catatan-box">Semua bukti fotokopi wajib distempel Pos (Nazegelen) dan melampirkan softcopy (Word & PDF).</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Penetapan Ahli Waris (PAW)</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat permohonan PAW.</li>
+                        <li>Fotokopi KTP, KK Pemohon & Pewaris.</li>
+                        <li>Fotokopi Akta Nikah Pemohon & Pewaris.</li>
+                        <li>Akta Kematian Pewaris & Orang tua Pewaris.</li>
+                        <li>Akta Kelahiran / Kenal Lahir Ahli Waris.</li>
+                        <li>Surat Keterangan silsilah ahli waris dari Kelurahan diketahui Camat.</li>
+                    </ul>
+                    <a href="#" target="_blank" class="download-link">📄 Format Penetapan Ahli Waris</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Gugatan Waris</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat gugatan Waris.</li>
+                        <li>Fotokopi KTP Penggugat, Akta Nikah Pewaris.</li>
+                        <li>Akta Kematian Pewaris, Akta Kelahiran Ahli Waris.</li>
+                        <li>Fotokopi bukti surat obyek/harta sengketa.</li>
+                        <li>Surat keterangan ahli waris & silsilah disahkan Kepala Desa/Lurah.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-lainnya" class="s-tab-content">
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Isbat Nikah</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat gugatan/permohonan Isbat Nikah.</li>
+                        <li>Fotokopi KTP & KK Penggugat/Pemohon.</li>
+                        <li>Surat Keterangan Kepala KUA bahwa pernikahan tidak tercatat.</li>
+                        <li>Akta Cerai / Surat Kematian Suami/Istri (jika ada).</li>
+                    </ul>
+                    <a href="#" target="_blank" class="download-link">📄 Format Isbat Nikah (Volunteer)</a>
+                    <a href="#" target="_blank" class="download-link">📄 Format Isbat Nikah (Berlawanan)</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Permohonan Wali Adhol (Enggan)</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <ul>
+                        <li>Surat permohonan Wali Adhol.</li>
+                        <li>Fotokopi KTP, KK, Akta Kelahiran Pemohon.</li>
+                        <li>KTP calon suami/istri & Keterangan status calon suami/istri.</li>
+                        <li>Akta Cerai / Kematian (jika calon suami/istri duda/janda).</li>
+                        <li>Asli Surat Penolakan dari KUA setempat karena wali Adhol.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="syarat-accordion">
+            <div class="ac-header" onclick="toggleAc(this)">Gugatan Sederhana (Maks Rp 500 Juta)</div>
+            <div class="ac-body">
+                <div class="ac-body-inner">
+                    <p>Syarat Utama: Gugatan materiil maksimal Rp 500 Juta, penggugat dan tergugat domisili sama, bukan sengketa tanah/khusus.</p>
+                    <ul>
+                        <li>Mengisi Formulir Surat Gugatan Asli (A4, Arial 12, Spasi 1.5). Bisa diajukan lisan jika tidak bisa menulis.</li>
+                        <li>Melampirkan Surat Kuasa (jika pakai Kuasa Hukum).</li>
+                        <li>Bukti-bukti penguat (KTP, KK, Akte, Bukti Janji/Hutang, dll).</li>
+                        <li>Membayar panjar biaya perkara & serahkan bukti transfer.</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-weight: bold; color: #1e5631;">Download Formulir & Dokumen Gugatan Sederhana:</p>
+                    <a href="https://docs.google.com/document/d/1mme_FhqQkZHIexQIf2PB2Opdf34eO8ty/edit" target="_blank" class="download-link">📄 Akta Perdamaian</a>
+                    <a href="https://docs.google.com/document/d/1ZBX9VAZ8V_Oaz16x0EST7TAyLH7YGi-u/edit" target="_blank" class="download-link">📄 Formulir L1</a>
+                    <a href="https://docs.google.com/document/d/1cRXwkJ1VIgCB9jnyN3FLqHdljtqmAunI/edit" target="_blank" class="download-link">📄 Formulir L2</a>
+                    <a href="https://docs.google.com/document/d/1rC-n7HiqvdVCyYBbuHOG6tMXRTmqxjEF/edit" target="_blank" class="download-link">📄 Formulir L3</a>
+                    <a href="https://docs.google.com/document/d/1H3VB9NlKpMrOkMa0avqpymJkjgHLVJsM/edit" target="_blank" class="download-link">📄 Formulir L3.A</a>
+                    <a href="https://docs.google.com/document/d/1sXttxGPpS8wg46UJUoj9Gv8B8goiK6--/edit" target="_blank" class="download-link">📄 Formulir L4</a>
+                    <a href="https://docs.google.com/document/d/18VD1buggoKfemGWYYSkhime9z3djVIhM/edit" target="_blank" class="download-link">📄 Formulir L5</a>
+                    <a href="https://docs.google.com/document/d/1_sHhDUSE26-GnoPwIrbqDRsOtub0nGsD/edit" target="_blank" class="download-link">📄 Formulir L6</a>
+                    <a href="https://docs.google.com/document/d/1fyWaivDRq4wSzhJw_1ZRVQugNHSuh21m/edit" target="_blank" class="download-link">📄 Formulir L7</a>
+                    <a href="https://docs.google.com/document/d/1i9FCy8HViiyyzAMpOZ2jln72aqKfAhzC/edit" target="_blank" class="download-link">📄 Formulir L8</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Mesin Pindah Tab Syarat
+    function bukaTabSyarat(evt, idTab) {
+        var i, kontenTab, tombolTab;
+        kontenTab = document.getElementsByClassName("s-tab-content");
+        for (i = 0; i < kontenTab.length; i++) {
+            kontenTab[i].className = kontenTab[i].className.replace(" active", "");
+        }
+        tombolTab = document.getElementsByClassName("s-tab-btn");
+        for (i = 0; i < tombolTab.length; i++) {
+            tombolTab[i].className = tombolTab[i].className.replace(" active", "");
+        }
+        document.getElementById(idTab).className += " active";
+        evt.currentTarget.className += " active";
+    }
+
+    // Mesin Accordion Buka Tutup
+    function toggleAc(elemenHeader) {
+        var accordion = elemenHeader.parentElement;
+        var body = elemenHeader.nextElementSibling;
+        
+        if (accordion.classList.contains("open")) {
+            accordion.classList.remove("open");
+            body.style.maxHeight = null;
+        } else {
+            // Tutup semua accordion lain di tab yang sama (opsional)
+            var semuaAccordion = accordion.parentElement.querySelectorAll('.syarat-accordion');
+            semuaAccordion.forEach(function(acc) {
+                acc.classList.remove("open");
+                acc.querySelector('.ac-body').style.maxHeight = null;
+            });
+            
+            accordion.classList.add("open");
+            body.style.maxHeight = body.scrollHeight + "px";
+        }
+    }
+</script>

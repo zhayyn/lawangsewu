@@ -35,3 +35,4 @@ id_ed25519.pub
 scripts/backup.conf
 scripts/offsite.conf
 gateway/.env
+projects/**/.env

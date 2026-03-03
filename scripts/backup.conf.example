@@ -1,0 +1,20 @@
+# Salin file ini ke scripts/backup.conf lalu isi nilainya
+
+# WAJIB: passphrase enkripsi backup
+BACKUP_PASSPHRASE="ganti-dengan-passphrase-kuat"
+
+# Opsional: lokasi penyimpanan backup terenkripsi
+BACKUP_ROOT="/var/backups/lawangsewu"
+
+# Opsional: retensi file backup (hari)
+KEEP_DAYS=14
+
+# Opsional: path file env yang ingin di-backup
+ENV_FILE="/var/www/html/lawangsewu/.env"
+
+# Opsional: aktifkan backup database dengan isi kredensial ini
+# DB_HOST="127.0.0.1"
+# DB_PORT="3306"
+# DB_NAME="nama_database"
+# DB_USER="user_database"
+# DB_PASSWORD="password_database"

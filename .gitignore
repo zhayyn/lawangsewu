@@ -36,3 +36,4 @@ scripts/backup.conf
 scripts/offsite.conf
 gateway/.env
 projects/**/.env
+projects/website-pa-semarang/lumpiapasar-s9-active/

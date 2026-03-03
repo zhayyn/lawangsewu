@@ -18,6 +18,10 @@ Audit akan mengecek:
 
 ## 2) Rotasi Secret (wajib saat ada indikasi bocor)
 
+Runbook detail copy-paste ada di:
+
+- `SECRET-ROTATION.md`
+
 Urutan aman:
 
 1. Buat credential DB baru (user + password kuat)

@@ -33,3 +33,4 @@ id_ed25519.pub
 *config.local.php
 *secret*.php
 scripts/backup.conf
+scripts/offsite.conf

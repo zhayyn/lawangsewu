@@ -1,0 +1,14 @@
+# Salin file ini ke scripts/offsite.conf lalu sesuaikan nilainya
+
+# Folder backup terenkripsi lokal
+LOCAL_BACKUP_DIR="/var/backups/lawangsewu"
+
+# Tujuan remote rclone (hasil dari `rclone config`)
+# Contoh: privatecloud:lawangsewu-backup
+OFFSITE_REMOTE="privatecloud:lawangsewu-backup"
+
+# Pola file backup
+FILE_PATTERN="lawangsewu_*.tar.enc"
+
+# Retensi file backup lokal (hari)
+KEEP_DAYS_LOCAL=14

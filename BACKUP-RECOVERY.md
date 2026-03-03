@@ -40,6 +40,33 @@ Output terenkripsi akan tersimpan di:
 
 Default schedule: `02:30` setiap hari.
 
+## 3b) Setup offsite backup ke cloud private
+
+1. Pastikan rclone terpasang dan remote sudah dibuat:
+
+```bash
+rclone config
+```
+
+2. Siapkan konfigurasi offsite:
+
+```bash
+cp /var/www/html/lawangsewu/scripts/offsite.conf.example /var/www/html/lawangsewu/scripts/offsite.conf
+nano /var/www/html/lawangsewu/scripts/offsite.conf
+```
+
+3. Test kirim offsite manual:
+
+```bash
+/var/www/html/lawangsewu/scripts/push-offsite-backup.sh
+```
+
+4. Pasang cron offsite harian (default 04:00):
+
+```bash
+/var/www/html/lawangsewu/scripts/setup-offsite-cron.sh
+```
+
 ## 4) Restore dari backup terenkripsi
 
 1. Decrypt:

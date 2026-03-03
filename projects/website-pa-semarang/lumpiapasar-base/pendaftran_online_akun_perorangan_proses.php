@@ -79,9 +79,12 @@ if(!move_uploaded_file($_FILES['scan_ktp']['tmp_name'], 'upload/' .$nama_file ))
 	$hasil=$InertKan->tambah_data_sekunder("pengguna_ecourt", $data) ;
 	//simpan
 	//kirim email
-	$smtp='smtp.gmail.com';	
-	$email_satker='ecourt.pabanjarnegara@gmail.com';	
-	$password='banjarnegara1';
+    $smtp=getenv('SMTP_HOST') ?: 'smtp.gmail.com';	
+    $email_satker=getenv('SMTP_USER') ?: '';	
+    $password=getenv('SMTP_PASS') ?: '';
+    if ($email_satker === '' || $password === '') {
+        outputJSON("Konfigurasi SMTP belum lengkap. Set SMTP_USER dan SMTP_PASS di environment server.");
+    }
 	$sebutan_email='Ecourt Pengadilan Agama Semarang';
 	$nama=$nama;
 	$email=$email;

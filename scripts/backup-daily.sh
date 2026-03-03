@@ -19,6 +19,8 @@ if [[ -z "${BACKUP_PASSPHRASE:-}" ]]; then
   exit 1
 fi
 
+export BACKUP_PASSPHRASE
+
 TIMESTAMP="$(date +%F_%H%M%S)"
 WORK_DIR="${BACKUP_ROOT}/work_${TIMESTAMP}"
 mkdir -p "${WORK_DIR}" "${BACKUP_ROOT}"

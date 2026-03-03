@@ -3,6 +3,11 @@
 # 1. MENGHILANGKAN EXTENSION .PHP DI URL
 RewriteEngine On
 
+# 0. HARDENING: blok akses langsung ke folder/file sensitif
+RewriteRule ^(?:scripts|projects|logs|server10/archive|pasarjohar/php-arsip|gateway/data)(?:/|$) - [F,L,NC]
+RewriteRule (^|/)\.(?!well-known/).* - [F,L,NC]
+RewriteRule (^|/)(?:backup\.conf|offsite\.conf|\.env(?:\..*)?)$ - [F,L,NC]
+
 # 1a. URL KANONIK: PAKSA .php -> tanpa .php (hanya request asli dari browser)
 RewriteCond %{THE_REQUEST} \.php[\s?] [NC]
 RewriteRule ^(.+)\.php$ /lawangsewu/$1 [R=301,L]

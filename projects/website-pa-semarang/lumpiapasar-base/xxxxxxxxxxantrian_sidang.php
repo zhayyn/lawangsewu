@@ -1,0 +1,353 @@
+<?php
+  include('_sys_header.php');
+  $menu_aktif="antri";
+date_default_timezone_set('Asia/Jakarta');
+
+function getUserIpAddr(){
+    if(!empty($_SERVER['HTTP_CLIENT_IP'])){
+        //ip from share internet
+        $ip = $_SERVER['HTTP_CLIENT_IP'];
+    }elseif(!empty($_SERVER['HTTP_X_FORWARDED_FOR'])){
+        //ip pass from proxy
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    }else{
+        $ip = $_SERVER['REMOTE_ADDR'];
+    }
+    return trim(substr($ip,0,50));
+}
+?>  
+<div class="loading" id="loader">Loading&#8230;</div>
+<!-- Header -->
+<div class="w3-top w3-row w3-card-2 w3-padding w3-center w3-white">
+  <div class="w3-col" style="width:30px">
+    <a href="#" onclick="goBack()" class="headerButton goBack">
+      <img src="assets/images/arrow_back-black-24dp.svg" class="w3-left w3-circle w3-margin-right" style="width:30px">
+    </a>
+  </div>
+  <div class="w3-rest w3-cell-middle"><span style="font-size: 18px">ANTRIAN SIDANG</span></div>
+</div> 
+<!-- Header -->
+<br>
+<br>
+<br>
+<!-- Isi -->
+<?php
+$sql="SELECT  waktu_mulai_antri   FROM antrian_sidang_config limit 1 "; 
+$db = new Tampil_sekunder(); 
+$arrayData = $db->tampil_data_sekunder($sql);  
+if (count($arrayData)) 
+{ 
+  foreach ($arrayData as $data) 
+  {  
+    foreach($data as $key=>$value) {$$key=$value;}
+  }
+}  
+?>
+<?php
+ $sekarang=date("H:i");
+ if($sekarang>=$waktu_mulai_antri){
+     if($sekarang<=16){
+        $gaya="w3-green"; 
+     }else{
+ 	    $gaya="w3-red";
+     }
+ }else{
+ 	$gaya="w3-red";
+ }
+ 
+   //    $gaya="w3-green"; 
+       // $gaya="w3-green"; 
+// echo $gaya;
+ //$gaya="w3-red";
+ ?>
+<div class="w3-row">
+    <div class="w3-container" id="antrian_sidang_inputan"> 
+     <div class="w3-container w3-section <?php echo $gaya?> w3-card-8">
+            <!--  <span onclick="this.parentElement.style.display='none'" class="w3-closebtn">×</span> -->
+          
+			    <center>
+
+            <p>Antrian Sidang Online memberikan layanan Pengambilan Antrian Sidang</p>
+            <!--<p>Waktu Saat ini : <?php echo date("H:i") ?></p>->
+            <!--<p>Waktu Saat ini : <?php echo isDomainAvailible($url_api) ?></p>-->
+            <p>Layanan mulai jam <?php echo substr($waktu_mulai_antri,0,5)?> WIB </p>
+            <p>Silahkan isikan <b>Nomor Perkara</b>, pilih <b>Kode Perkara</b> (Pdt.G, Pdt.P, Pdt.G.S) dan pilih <b>tahun perkara</b> </p></center>
+            
+         <!-- 
+            <p>Antrian Sidang Online dalam perbaikan</p>   -->
+      </div>
+    <div class="w3-row">
+      <input id="os" type="hidden">
+              <input id="ip" value="<?php echo getUserIpAddr()?>"  type="hidden">
+              <script type="text/javascript">
+                function getOS() {
+                  var userAgent = window.navigator.userAgent,
+                  platform = window.navigator.platform,
+                  macosPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'],
+                  windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'],
+                  iosPlatforms = ['iPhone', 'iPad', 'iPod'],
+                  os = null;
+
+                  if (macosPlatforms.indexOf(platform) !== -1) {
+                    os = 'Mac OS';
+                  } else if (iosPlatforms.indexOf(platform) !== -1) {
+                    os = 'iOS';
+                  } else if (windowsPlatforms.indexOf(platform) !== -1) {
+                    os = 'Windows';
+                  } else if (/Android/.test(userAgent)) {
+                    os = 'Android';
+                  } else if (!os && /Linux/.test(platform)) {
+                    os = 'Linux';
+                  }
+
+                  return os;
+                }
+                document.getElementById("os").value= getOS(); 
+              </script>
+               
+             
+            <table style="width: 300px" align="center" cellpadding="3">
+              <tr>
+                <td><input id="nomor_perkara_antrian_sidang" type="number" style="padding:8px 2px;width: 70px" maxlength="5" autocomplete="off" ></td>
+                <td>/</td>
+                <td>
+                  <select id="kode_perkara" style="padding:8px 2px;">
+                    <option>Pdt.G</option>
+                    <option>Pdt.P</option>
+                    <option>Pdt.G.S</option>
+                  </select>
+                </td>
+                <td>/</td>
+                <td>
+                  <select name="tahun" id="tahun"  style="padding:8px 2px;">  
+                    <?php $thn1=date("Y"); $thn2=2018; 
+                    for ($i = $thn1; $i >= $thn2; $i=$i-1)
+                      {  ?> <option value="<?php echo $i; ?>" <?php if(@$tahun==$i) {echo "selected";} ?>><?php echo $i; ?></option>'; 
+                    <?php }  
+                    ?>
+                  </select>
+                </td>
+                <td>/</td>
+                <td><?php echo $KodePN?></td>
+              </tr>
+            </table>
+          
+            <span class="w3-row w3-center" id="antrian_sidang_loading" style="display: none;"></span>
+            <br>
+            <?php
+            function isDomainAvailible($domain){
+                if(!filter_var($domain, FILTER_VALIDATE_URL)){
+                    return false;
+                }
+             
+                $curlInit = curl_init($domain);
+                curl_setopt($curlInit,CURLOPT_CONNECTTIMEOUT,10);
+                curl_setopt($curlInit,CURLOPT_HEADER,true);
+                curl_setopt($curlInit,CURLOPT_NOBODY,true);
+                curl_setopt($curlInit,CURLOPT_RETURNTRANSFER,true);
+             
+                $response = curl_exec($curlInit);
+             
+                curl_close($curlInit);
+             
+                if ($response) return true;
+             
+                return false;
+            }
+            ?>  
+            <?php  
+           
+           // echo $sekarang."<br>";
+            //if($sekarang>=$waktu_mulai_antri){
+            //	echo "YES";
+            //}
+              // Menampilkan status website
+              //echo isDomainAvailible($url_api);
+              // echo "-". $gaya."-";
+              // echo "-". isDomainAvailible($url_api)."-";
+              if(isDomainAvailible($url_api) AND $gaya=="w3-green"){
+                echo '<center><button class="w3-btn w3-green w3-card" id="antrian_sidang_tombol_cek" style="width: 250px">Cek</button></center>';
+            }
+            ?>
+           
+          </div>
+          <hr> 
+          <p> </p>
+        </div>
+
+        <div class="w3-container" id="antrian_sidang_warning" style="display: none">
+          <hr>
+            <center><button class="w3-red w3-center w3-btn w3-ripple" onclick="antrian_sidang_awal()"> <i class="fa fa-arrow-left"> </i> Kembali </button></center>
+          <hr>
+        </div> 
+        <div id="antrian_sidang_hasil" class="w3-container"></div>
+  </div>
+</div>
+
+<div id="informasi_perkara_hasil" class="w3-container"></div>
+<!-- * Isi -->
+<script type="text/javascript">
+      document.getElementById("nomor_perkara_antrian_sidang").focus();
+      function antrian_sidang_awal(){
+        document.getElementById("nomor_perkara_antrian_sidang").value="";
+        document.getElementById("antrian_sidang_inputan").style.display="block";
+        document.getElementById("antrian_sidang_loading").style.display="none";
+        document.getElementById("antrian_sidang_warning").style.display="none";
+        document.getElementById("antrian_sidang_hasil").innerHTML="";
+        document.getElementById('nomor_perkara_antrian_sidang').focus(); 
+      }
+
+        
+      antrian_sidang_modal = document.getElementById('antrian_sidang_modal'); 
+      nomor_perkara_antrian_sidang = document.getElementById('nomor_perkara_antrian_sidang'); 
+      function antrian_sidang_aksi(){
+        antrian_sidang_awal();
+        antrian_sidang_modal.style.display="block";
+        document.getElementById('nomor_perkara_antrian_sidang').focus(); 
+      }
+      function antrian_sidang_aksi_tutup(){
+        antrian_sidang_modal.style.display="none";
+      }
+      antrian_sidang_tombol_cek=document.getElementById("antrian_sidang_tombol_cek");
+      antrian_sidang_tombol_cek.addEventListener('click', function(ev){
+        antrian_sidang_cek();
+        ev.preventDefault();
+      }, false);
+      
+      function antrian_sidang_cek(){
+        var a=document.getElementById("nomor_perkara_antrian_sidang").value;
+        var os=document.getElementById("os").value;
+        var ip=document.getElementById("ip").value;
+        var kode_perkara=document.getElementById("kode_perkara").value;
+        var tahun=document.getElementById("tahun").value;
+        var nomor_perkara_antrian_sidang=a+'/'+kode_perkara+'/'+tahun+'/<?php echo $KodePN?>';
+        document.getElementById("antrian_sidang_loading").style.display="inline";
+        document.getElementById("antrian_sidang_loading").innerHTML="<h3 class=w3-text-red>Silahkan Tunggu...</h3>";
+        var b=new XMLHttpRequest();
+        b.open("POST","api",true);
+        b.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        b.onreadystatechange=function()
+        {
+          if(b.readyState==XMLHttpRequest.DONE&&b.status==200)
+          {
+            var c=JSON.parse(b.responseText);
+            if(c.status=='red')
+            {
+              var d='<div class="w3-row w3-red w3-padding w3-center">'+atob(c.message)+'</div><hr><br><br><br><br>';
+            }else
+            {
+              var d='<div class="w3-row w3-pale-green w3-padding w3-center"><p>Sebelum melanjutkan Pastikan Data Perkara Sudah Benar</p><b><p>Nomor Perkara : '+atob(c.respons.nomor_perkara)+'</p><p> Para Pihak : </b><br>'+atob(c.respons.para_pihak)+'</p><hr><p>Apabila data sudah sesuai Klik <b>Antri</b> untuk mengambil Antrian Sidang</p>    <button class="w3-btn  w3-green w3-card" onclick="proses_antrian_sidang'+"('"+atob(c.respons.nomor_perkara)+"')"+'">Antri</button>   <p>Apabila data belum sesuai, Klik Kembali (di halaman atas)</div><hr><br><br><br><br>';
+            }
+            document.getElementById("antrian_sidang_hasil").innerHTML=d;
+            document.getElementById("antrian_sidang_warning").style.display="block";
+            document.getElementById("antrian_sidang_hasil").style.display="block";
+            document.getElementById("antrian_sidang_loading").style.display="none";
+            document.getElementById("antrian_sidang_inputan").style.display="none";
+          }
+        };
+        b.send("nomor_perkara="+encodeURIComponent(btoa(nomor_perkara_antrian_sidang))+"&os="+encodeURIComponent(btoa(os))+"&ip="+encodeURIComponent(btoa(ip))+"&aksi="+btoa("antrian_sidang_validasi_nomor_perkara"));
+      }
+
+
+
+
+
+    function proses_antrian_sidang(nomor_perkara){
+        var os=document.getElementById("os").value;
+        var ip=document.getElementById("ip").value;
+        document.getElementById("antrian_sidang_loading").style.display="inline";
+        document.getElementById("antrian_sidang_loading").innerHTML="<h3 class=w3-text-red>Silahkan Tunggu...</h3>";
+        var b=new XMLHttpRequest();
+        b.open("POST","api",true);
+        b.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        b.onreadystatechange=function(){
+            if(b.readyState==XMLHttpRequest.DONE&&b.status==200){
+                //alert(b.responseText);
+                var c=JSON.parse(b.responseText);
+                if(c.status=='masuk'){
+                    proses_antrian_sidang(nomor_perkara);
+                    return false;
+                }
+                if(c.status=='red'){
+                    var d='<div class="w3-row w3-red w3-padding w3-center">'+atob(c.message)+'</div><hr><br><br><br><br>';
+                }else{
+                    var d=atob(c.respons)+"<hr><br><br><br>";
+                }
+                document.getElementById("antrian_sidang_hasil").innerHTML=d;
+                document.getElementById("antrian_sidang_warning").style.display="block";
+                document.getElementById("antrian_sidang_hasil").style.display="block";
+                document.getElementById("antrian_sidang_loading").style.display="none";
+                document.getElementById("antrian_sidang_inputan").style.display="none";
+            }
+        };
+        
+        b.send(
+            "nomor_perkara="+encodeURIComponent(btoa(nomor_perkara))+
+            "&os="+encodeURIComponent(btoa(os))+
+            "&ip="+encodeURIComponent(btoa(ip))+
+            "&aksi="+btoa("proses_antrian_sidang")
+        );
+    }
+
+
+
+
+
+      function pilih_nomor(nomor_antrian, ruangan_id){
+        document.getElementById("nomor_antrian_dipilih").value=nomor_antrian;
+        document.getElementById("nomor_antrian_dipilih_tampil").innerHTML=nomor_antrian;
+        document.getElementById("ket").focus();
+      }
+      
+      function proses_pilih_antri_sidang(ruangan_id){
+        var nomor_antrian=document.getElementById("nomor_antrian_dipilih").value;
+        var perkara_id=document.getElementById("perkara_id").value;
+        var nomor_perkara=document.getElementById("nomor_perkara").value;
+        var jumlah_perkara=document.getElementById("jumlah_perkara").value;
+        var ruangan=document.getElementById("ruangan").value;
+        if(nomor_antrian=="")
+        {
+          notifier.show('<font color=red>Perhatian!</font>' , '<font color=red>Silahkan pilih nomor antrian</font>', '', 'assets/img/high_priority-48.png', 8000);
+          return false;
+        }
+        var b=new XMLHttpRequest();
+        b.open("POST","api",true);
+        b.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        b.onreadystatechange=function()
+        {
+          if(b.readyState==XMLHttpRequest.DONE&&b.status==200)
+          {
+            var c=JSON.parse(b.responseText);
+            if(c.status=='ada')
+            {
+              notifier.show('<font color=red>Perhatian!</font>' , '<font color=red>Nomor Antrian sudah terpilih silahkan pilih Nomor Antrian lain</font>', '', 'assets/img/high_priority-48.png', 8000);
+              proses_antrian_sidang(nomor_perkara);              
+              return false;
+            }else
+            {
+              var d=atob(c.respons)+"<hr><br><br><br>";
+            }
+            document.getElementById("antrian_sidang_hasil").innerHTML=d;
+            document.getElementById("antrian_sidang_warning").style.display="block";
+            document.getElementById("antrian_sidang_hasil").style.display="block";
+            document.getElementById("antrian_sidang_loading").style.display="none";
+            document.getElementById("antrian_sidang_inputan").style.display="none";
+          }
+        };
+        b.send(
+                "perkara_id="+encodeURIComponent(perkara_id)+
+                "&ruang_id="+encodeURIComponent(btoa(ruangan_id))+
+                "&nomor_perkara="+encodeURIComponent(nomor_perkara)+
+                "&ruangan="+encodeURIComponent(ruangan)+
+                "&jumlah_perkara="+encodeURIComponent(jumlah_perkara)+
+                "&nomor_antrian="+encodeURIComponent(btoa(nomor_antrian))+
+                "&aksi="+btoa("proses_pilih_nomor_antrian_sidang"));
+                
+       // alert(ruangan_id+':::'+nomor_antrian);
+      }
+    </script>
+  <!-- Modal Antrian Sidang --> 
+
+  <link rel="stylesheet" href="assets/plugin/notifier/css/notifier.min.css">
+  <script type="text/javascript" src="assets/plugin/notifier/js/notifier.min.js"></script>
+<?php include('_sys_footer.php');?>

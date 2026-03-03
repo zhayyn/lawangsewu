@@ -2,6 +2,12 @@
 
 # 1. MENGHILANGKAN EXTENSION .PHP DI URL
 RewriteEngine On
+
+# 1a. URL KANONIK: PAKSA .php -> tanpa .php (hanya request asli dari browser)
+RewriteCond %{THE_REQUEST} \.php[\s?] [NC]
+RewriteRule ^(.+)\.php$ /lawangsewu/$1 [R=301,L]
+
+# 1b. INTERNAL REWRITE: tanpa .php -> file .php
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^([^\.]+)$ $1.php [NC,L]
@@ -18,5 +24,6 @@ RewriteRule ^([^\.]+)$ $1.php [NC,L]
         Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
     </IfModule>
 </FilesMatch>
-
+# 3. Pasang Iframe cuyyyyyyyyyyyyyyy
+Header set Content-Security-Policy "frame-ancestors 'self' https://pa-semarang.go.id https://*.pa-semarang.go.id;"
 # developed by zhayyn™

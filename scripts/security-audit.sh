@@ -24,6 +24,7 @@ echo
 echo "[2/3] Cek pola secret berisiko di tracked files..."
 PATTERN_HITS="$(git -C "${REPO_DIR}" grep -nEI '(R4h4514@|banjarnegara1|GATEWAY_API_TOKEN\s*=\s*"?[A-Za-z0-9]{24,}|\$password\s*=\s*\x27[^\x27]{6,}\x27)' -- ':!*.min.js' ':!*.min.css' || true)"
 PATTERN_HITS="$(printf '%s\n' "${PATTERN_HITS}" | grep -Ev '(DB_PASS=ganti_password_db|TOKEN_KAMU|ganti-dengan-token)' || true)"
+PATTERN_HITS="$(printf '%s\n' "${PATTERN_HITS}" | grep -Ev '^scripts/security-audit\.sh:' || true)"
 if [[ -n "${PATTERN_HITS}" ]]; then
   echo "WARN: ditemukan string yang mirip secret (review manual):"
   echo "${PATTERN_HITS}"

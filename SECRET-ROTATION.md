@@ -158,6 +158,31 @@ Expected: `HASIL: PASS`
 3. Verifikasi endpoint `200`
 4. Investigasi error log
 
+### Rollback otomatis (disarankan)
+
+Sistem sekarang punya snapshot runtime secrets di folder root-only:
+
+- `/root/lawangsewu-rollback/snapshot-YYYYmmdd-HHMMSS/`
+
+Jalankan rollback otomatis (hanya untuk komponen Lawangsewu):
+
+```bash
+sudo /var/www/html/lawangsewu/scripts/rollback-lawangsewu-secrets.sh
+```
+
+Atau pilih snapshot tertentu:
+
+```bash
+sudo /var/www/html/lawangsewu/scripts/rollback-lawangsewu-secrets.sh /root/lawangsewu-rollback/snapshot-YYYYmmdd-HHMMSS
+```
+
+Script ini hanya menyentuh:
+
+- `projects/website-pa-semarang/lumpiapasar-s9-active/.env`
+- `gateway/.env`
+
+Script **tidak** mengubah konfigurasi/DB server10 dan tidak menyentuh project lain di server9.
+
 Perintah cek cepat:
 
 ```bash

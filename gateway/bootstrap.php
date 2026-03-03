@@ -1,0 +1,103 @@
+<?php
+
+function gateway_load_env(string $filePath): array
+{
+    $values = [];
+    if (!is_readable($filePath)) {
+        return $values;
+    }
+
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return $values;
+    }
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+        $key = trim($parts[0]);
+        $value = trim($parts[1]);
+        $value = trim($value, "\"'");
+        $values[$key] = $value;
+    }
+
+    return $values;
+}
+
+function gateway_config(): array
+{
+    static $config = null;
+    if ($config !== null) {
+        return $config;
+    }
+
+    $baseDir = dirname(__DIR__);
+    $env = gateway_load_env(__DIR__ . '/.env');
+
+    $config = [
+        'app_name' => $env['GATEWAY_APP_NAME'] ?? 'Lawangsewu Gateway',
+        'api_token' => $env['GATEWAY_API_TOKEN'] ?? '',
+        'allow_commands' => (($env['GATEWAY_ALLOW_COMMANDS'] ?? 'false') === 'true'),
+        'project_root' => $env['GATEWAY_PROJECT_ROOT'] ?? ($baseDir . '/projects'),
+        'deploy_root' => $env['GATEWAY_DEPLOY_ROOT'] ?? '/var/www/html',
+        'backup_root' => $env['GATEWAY_BACKUP_ROOT'] ?? '/var/backups/lawangsewu',
+        'connections_file' => __DIR__ . '/data/connections.json',
+    ];
+
+    return $config;
+}
+
+function gateway_json(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function gateway_request_json(): array
+{
+    $raw = file_get_contents('php://input');
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function gateway_get_header_token(): string
+{
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    if (str_starts_with($auth, 'Bearer ')) {
+        return trim(substr($auth, 7));
+    }
+    return (string)($_GET['token'] ?? '');
+}
+
+function gateway_require_token(): void
+{
+    $cfg = gateway_config();
+    if ($cfg['api_token'] === '') {
+        gateway_json([
+            'ok' => false,
+            'error' => 'Token API belum diset. Isi gateway/.env pada GATEWAY_API_TOKEN',
+        ], 500);
+    }
+
+    $token = gateway_get_header_token();
+    if (!hash_equals($cfg['api_token'], $token)) {
+        gateway_json(['ok' => false, 'error' => 'Unauthorized'], 401);
+    }
+}
+
+function gateway_safe_project_name(string $name): bool
+{
+    return preg_match('/^[a-zA-Z0-9_-]+$/', $name) === 1;
+}

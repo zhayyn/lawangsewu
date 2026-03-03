@@ -1,0 +1,21 @@
+[
+  {
+    "name": "server10",
+    "type": "ssh",
+    "host": "192.168.88.10",
+    "port": 22,
+    "username": "root",
+    "notes": "CentOS 7: gunakan SSH terminal, bukan Remote-SSH GUI VS Code."
+  },
+  {
+    "name": "github-origin",
+    "type": "git",
+    "remote": "git@github.com:zhayyn/lawangsewu.git",
+    "branch": "main"
+  },
+  {
+    "name": "vscode-workflow",
+    "type": "workflow",
+    "notes": "Gunakan VS Code lokal + git/ssh untuk workflow development dan deploy."
+  }
+]

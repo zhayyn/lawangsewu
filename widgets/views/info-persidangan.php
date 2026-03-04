@@ -156,8 +156,8 @@ if (isset($_GET['format_jadwal'])) {
             
             .jadwal-table th:nth-child(1), .jadwal-table td:nth-child(1) { width: 5%; text-align: center; }
             .jadwal-table th:nth-child(2), .jadwal-table td:nth-child(2) { width: 22%; }
-            .jadwal-table th:nth-child(3), .jadwal-table td:nth-child(3) { width: 33%; }
-            .jadwal-table th:nth-child(4), .jadwal-table td:nth-child(4) { width: 20%; }
+            .jadwal-table th:nth-child(3), .jadwal-table td:nth-child(3) { width: 29%; }
+            .jadwal-table th:nth-child(4), .jadwal-table td:nth-child(4) { width: 24%; }
             .jadwal-table th:nth-child(5), .jadwal-table td:nth-child(5) { width: 20%; }
 
             .jadwal-table th { color: white; padding: 14px 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; border-bottom: 3px solid #ff6600; text-align: left; }
@@ -171,6 +171,7 @@ if (isset($_GET['format_jadwal'])) {
             
             .jadwal-table td:nth-child(1) { font-weight: 600; color: #084228; }
             .jadwal-table td:nth-child(4) { font-weight: 600; color: #ff6600; }
+            .jadwal-table td:nth-child(4) { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
             .no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }
 
             @media (max-width: 768px) {

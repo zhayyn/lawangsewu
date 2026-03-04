@@ -171,7 +171,7 @@ if (isset($_GET['format_jadwal'])) {
             
             .jadwal-table td:nth-child(1) { font-weight: 600; color: #084228; }
             .jadwal-table td:nth-child(4) { font-weight: 600; color: #ff6600; }
-            .jadwal-table td:nth-child(4) { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
+            .jadwal-table td:nth-child(4) { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; text-align: left; line-height: 1.25; }
             .no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }
 
             @media (max-width: 768px) {
@@ -197,12 +197,14 @@ if (isset($_GET['format_jadwal'])) {
                 <?php
                 if ($totalRows > 0) {
                     foreach ($allRows as $rowData) {
+                        $ruangSidangDisplay = htmlspecialchars((string)$rowData['ruangSidang']);
+                        $ruangSidangDisplay = preg_replace('/^Sidang Dalam Gedung\s+/i', 'Sidang Dalam Gedung<br>', $ruangSidangDisplay);
                         ?>
                         <tr>
                             <td><?php echo $rowData['no']; ?></td>
                             <td><?php echo htmlspecialchars($rowData['noPerkara']); ?></td>
                             <td><?php echo htmlspecialchars($rowData['agenda']); ?></td>
-                            <td><?php echo htmlspecialchars($rowData['ruangSidang']); ?></td>
+                            <td><?php echo $ruangSidangDisplay; ?></td>
                             <td><?php echo htmlspecialchars($rowData['keterangan']); ?></td>
                         </tr>
                         <?php
@@ -211,12 +213,14 @@ if (isset($_GET['format_jadwal'])) {
                     $loopCount = min(10, $totalRows);
                     for ($i = 0; $i < $loopCount; $i++) {
                         $rowData = $allRows[$i];
+                        $ruangSidangDisplay = htmlspecialchars((string)$rowData['ruangSidang']);
+                        $ruangSidangDisplay = preg_replace('/^Sidang Dalam Gedung\s+/i', 'Sidang Dalam Gedung<br>', $ruangSidangDisplay);
                         ?>
                         <tr>
                             <td><?php echo $rowData['no']; ?></td>
                             <td><?php echo htmlspecialchars($rowData['noPerkara']); ?></td>
                             <td><?php echo htmlspecialchars($rowData['agenda']); ?></td>
-                            <td><?php echo htmlspecialchars($rowData['ruangSidang']); ?></td>
+                            <td><?php echo $ruangSidangDisplay; ?></td>
                             <td><?php echo htmlspecialchars($rowData['keterangan']); ?></td>
                         </tr>
                         <?php

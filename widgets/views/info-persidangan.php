@@ -175,11 +175,17 @@ if (isset($_GET['format_jadwal'])) {
                 text-align: center;
                 line-height: 1.25;
                 white-space: normal;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
+                overflow: visible;
+                text-overflow: clip;
+            }
+            .ruang-sidang-text {
+                display: inline-block;
+                max-width: 100%;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: normal;
+                text-align: center;
+                line-height: 1.25;
             }
             .no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }
 
@@ -204,15 +210,34 @@ if (isset($_GET['format_jadwal'])) {
             </thead>
             <tbody>
                 <?php
+                $formatRuangSidang = function (string $value): string {
+                    $clean = trim(preg_replace('/\s+/', ' ', $value));
+                    if ($clean === '') {
+                        return '---';
+                    }
+
+                    if (strlen($clean) <= 30) {
+                        return htmlspecialchars($clean);
+                    }
+
+                    $prefix = 'Sidang Dalam Gedung ';
+                    if (stripos($clean, $prefix) === 0) {
+                        $suffix = trim(substr($clean, strlen($prefix)));
+                        return htmlspecialchars(trim($prefix)) . '<br>' . htmlspecialchars($suffix);
+                    }
+
+                    return htmlspecialchars($clean);
+                };
+
                 if ($totalRows > 0) {
                     foreach ($allRows as $rowData) {
-                        $ruangSidangDisplay = htmlspecialchars((string)$rowData['ruangSidang']);
+                        $ruangSidangDisplay = $formatRuangSidang((string)$rowData['ruangSidang']);
                         ?>
                         <tr>
                             <td><?php echo $rowData['no']; ?></td>
                             <td><?php echo htmlspecialchars($rowData['noPerkara']); ?></td>
                             <td><?php echo htmlspecialchars($rowData['agenda']); ?></td>
-                            <td><?php echo $ruangSidangDisplay; ?></td>
+                            <td><span class="ruang-sidang-text"><?php echo $ruangSidangDisplay; ?></span></td>
                             <td><?php echo htmlspecialchars($rowData['keterangan']); ?></td>
                         </tr>
                         <?php
@@ -221,13 +246,13 @@ if (isset($_GET['format_jadwal'])) {
                     $loopCount = min(10, $totalRows);
                     for ($i = 0; $i < $loopCount; $i++) {
                         $rowData = $allRows[$i];
-                        $ruangSidangDisplay = htmlspecialchars((string)$rowData['ruangSidang']);
+                        $ruangSidangDisplay = $formatRuangSidang((string)$rowData['ruangSidang']);
                         ?>
                         <tr>
                             <td><?php echo $rowData['no']; ?></td>
                             <td><?php echo htmlspecialchars($rowData['noPerkara']); ?></td>
                             <td><?php echo htmlspecialchars($rowData['agenda']); ?></td>
-                            <td><?php echo $ruangSidangDisplay; ?></td>
+                            <td><span class="ruang-sidang-text"><?php echo $ruangSidangDisplay; ?></span></td>
                             <td><?php echo htmlspecialchars($rowData['keterangan']); ?></td>
                         </tr>
                         <?php

@@ -8,6 +8,10 @@ RewriteRule ^(?:scripts|projects|logs|server10/archive|pasarjohar/php-arsip|gate
 RewriteRule (^|/)\.(?!well-known/).* - [F,L,NC]
 RewriteRule (^|/)(?:backup\.conf|offsite\.conf|\.env(?:\..*)?)$ - [F,L,NC]
 
+# Sembunyikan implementasi internal: blok akses URL langsung ke widgets/views
+RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?widgets/views/ [NC]
+RewriteRule ^widgets/views/ - [F,L,NC]
+
 # Legacy URL compatibility for moved HTML files
 RewriteRule ^agenda-kegiatan\.html$ widgets/views/agenda-kegiatan.html [L,NC]
 RewriteRule ^slide_sidang\.html$ widgets/views/slide_sidang.html [L,NC]

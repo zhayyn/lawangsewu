@@ -172,7 +172,7 @@ if (isset($_GET['format_jadwal'])) {
             .jadwal-table td:nth-child(1) { font-weight: 600; color: #084228; }
             .jadwal-table td:nth-child(4) { font-weight: 600; color: #ff6600; }
             .jadwal-table td:nth-child(4) {
-                text-align: center;
+                text-align: left;
                 line-height: 1.25;
                 white-space: normal;
                 overflow: visible;
@@ -184,7 +184,7 @@ if (isset($_GET['format_jadwal'])) {
                 white-space: normal;
                 overflow-wrap: anywhere;
                 word-break: normal;
-                text-align: center;
+                text-align: left;
                 line-height: 1.25;
             }
             .no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }

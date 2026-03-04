@@ -16,6 +16,16 @@ RewriteRule ^widgets/views/ - [F,L,NC]
 RewriteRule ^agenda-kegiatan\.html$ widgets/views/agenda-kegiatan.html [L,NC]
 RewriteRule ^slide_sidang\.html$ widgets/views/slide_sidang.html [L,NC]
 
+# Public endpoint mapping -> implementasi internal widgets/views
+RewriteRule ^$ widgets/views/index.php [L,NC]
+RewriteRule ^info-persidangan$ widgets/views/info-persidangan.php [L,NC]
+RewriteRule ^info-persidangan-hijautua$ widgets/views/info-persidangan-hijautua.php [L,NC]
+RewriteRule ^info-persidangan-stabilo$ widgets/views/info-persidangan-stabilo.php [L,NC]
+RewriteRule ^monitor-antrian-sidang$ widgets/views/monitor-antrian-sidang.php [L,NC]
+RewriteRule ^antrian_controller$ widgets/views/antrian_controller.php [L,NC]
+RewriteRule ^generate_slide$ widgets/views/generate_slide.php [L,NC]
+RewriteRule ^tes$ widgets/views/tes.php [L,NC]
+
 # 1a. URL KANONIK: PAKSA .php -> tanpa .php (hanya request asli dari browser)
 RewriteCond %{THE_REQUEST} \.php[\s?] [NC]
 RewriteRule ^(.+)\.php$ /lawangsewu/$1 [R=301,L]

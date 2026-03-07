@@ -1,0 +1,176 @@
+<style>
+    :root {
+        --pa-green: #1e5631;
+        --pa-accent: #f39c12;
+        --pa-light: #f4fdf4;
+        --text-dark: #2c3e50;
+    }
+
+    /* Wadah Utama Bergaya Kaca */
+    .ghaib-wrapper {
+        font-family: 'Inter', sans-serif;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-bottom: 5px solid var(--pa-green);
+        max-width: 100%;
+        margin: 0 auto;
+        transition: transform 0.3s ease;
+    }
+
+    .ghaib-wrapper:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 20px 40px rgba(30, 86, 49, 0.08);
+    }
+
+    /* Header Elegan */
+    .ghaib-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e9f2eb;
+    }
+
+    .ghaib-icon {
+        background: linear-gradient(135deg, var(--pa-green), #27ae60);
+        color: white;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.5rem;
+        box-shadow: 0 4px 10px rgba(30, 86, 49, 0.2);
+    }
+
+    .ghaib-title {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--pa-green);
+        line-height: 1.2;
+    }
+
+    .ghaib-subtitle {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        font-weight: 600;
+    }
+
+    /* Kotak Informasi Publik */
+    .ghaib-info-box {
+        background: #fffdf5;
+        border-left: 4px solid var(--pa-accent);
+        padding: 15px 20px;
+        border-radius: 0 12px 12px 0;
+        margin-bottom: 25px;
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .ghaib-info-box i {
+        color: var(--pa-accent);
+        font-size: 1.2rem;
+        margin-top: 3px;
+    }
+
+    .ghaib-info-text p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #555;
+        line-height: 1.6;
+        text-align: justify;
+    }
+
+    .ghaib-info-text strong {
+        color: var(--text-dark);
+    }
+
+    /* Pembungkus Iframe Resposif */
+    .ghaib-iframe-container {
+        position: relative;
+        width: 100%;
+        height: 700px; /* Tinggi default, bisa disesuaikan */
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e0e0e0;
+        background: #f8faf9;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.02);
+    }
+
+    .ghaib-iframe-container iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+    }
+
+    /* Animasi Loading Sederhana di balik Iframe */
+    .iframe-loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #888;
+        font-size: 0.9rem;
+        font-weight: 600;
+        z-index: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #e9f2eb;
+        border-top: 3px solid var(--pa-green);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Agar iframe berada di atas loader setelah dimuat */
+    .ghaib-iframe-container iframe {
+        position: relative;
+        z-index: 1;
+    }
+</style>
+
+<div class="ghaib-wrapper">
+    <div class="ghaib-header">
+        <div class="ghaib-icon">
+            <i class="fas fa-bullhorn"></i>
+        </div>
+        <div>
+            <h2 class="ghaib-title">Daftar Panggilan Ghaib</h2>
+            <p class="ghaib-subtitle">Pengadilan Agama Semarang Kelas I-A</p>
+        </div>
+    </div>
+
+    <div class="ghaib-info-box">
+        <i class="fas fa-info-circle"></i>
+        <div class="ghaib-info-text">
+            <p><strong>Panggilan Ghaib</strong> adalah panggilan resmi persidangan yang ditujukan kepada pihak berperkara (Tergugat/Termohon) yang tempat kediamannya <strong>tidak diketahui dengan jelas</strong> atau tidak memiliki domisili tetap di seluruh wilayah Republik Indonesia. Silakan periksa nama pihak, nomor perkara, dan unduh dokumen relaas pada tabel di bawah ini.</p>
+        </div>
+    </div>
+
+    <div class="ghaib-iframe-container">
+        <div class="iframe-loader">
+            <div class="spinner"></div>
+            <span>Menarik data dari server...</span>
+        </div>
+        <iframe src="https://infoweb.pa-semarang.go.id/ghoib.php" title="Panggilan Ghaib PA Semarang"></iframe>
+    </div>
+</div>

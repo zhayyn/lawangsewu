@@ -1,14 +1,17 @@
 <?php
 /* Antrian Controller - refactor dari antria.php */
 
+require_once __DIR__ . '/portable_config.php';
+$lwCfg = lw_config();
+
 // ANTI CACHE - PENTING UNTUK REAL-TIME MONITORING
 if (function_exists('opcache_reset')) {
     opcache_reset();
 }
 
 // Simple logging (appends to logs/antrian_controller.log)
-$lawangsewuRoot = defined('LAWANGSEWU_ROOT') ? LAWANGSEWU_ROOT : dirname(__DIR__, 2);
-$logfile = $lawangsewuRoot . '/logs/antrian_controller.log';
+$lawangsewuRoot = $lwCfg['root'];
+$logfile = $lwCfg['log_file'];
 function ac_log($msg) {
     global $logfile;
     $ts = date('Y-m-d H:i:s');
@@ -35,7 +38,7 @@ if (isset($_GET['format_jadwal'])) {
     ac_log('format_jadwal requested');
 
     // Prefer local static file when present (avoid remote cURL)
-    $localFile = $lawangsewuRoot . '/widgets/views/slide_sidang.html';
+    $localFile = $lwCfg['slide_local_file'];
     if (is_readable($localFile)) {
         $html_sipp = @file_get_contents($localFile);
         if ($html_sipp === false) {
@@ -46,7 +49,7 @@ if (isset($_GET['format_jadwal'])) {
         }
     } else {
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, "https://sipp.pa-semarang.go.id/slide_sidang");
+        curl_setopt($ch, CURLOPT_URL, $lwCfg['sipp_slide_url']);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         $html_sipp = curl_exec($ch);
@@ -82,7 +85,8 @@ if (isset($_GET['format_jadwal'])) {
             .jadwal-table thead { background: linear-gradient(135deg, #084228, #0d6b41); }
             .jadwal-table-head { border-collapse: collapse; table-layout: fixed; width: 100%; position: relative; z-index: 20; }
             .jadwal-table-head th { color: white; padding: 14px 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; border-bottom: 3px solid #ff6600; text-align: left; white-space: normal; }
-            .jadwal-scroll-area { overflow: hidden; position: relative; z-index: 1; }
+            .jadwal-scroll-area { overflow-y: auto; overflow-x: hidden; position: relative; z-index: 1; scrollbar-width: none; -ms-overflow-style: none; }
+            .jadwal-scroll-area::-webkit-scrollbar { display: none; }
             .jadwal-table-body { border-collapse: collapse; width: 100%; table-layout: fixed; }
             .jadwal-table-body tbody { display: table-row-group; vertical-align: inherit; border-color: inherit; }
             .jadwal-table-body td { box-sizing: border-box; }
@@ -211,7 +215,7 @@ if (isset($_GET['format_jadwal'])) {
                         $ruang = htmlspecialchars($rowData['ruangSidang']);
                         $ket = htmlspecialchars($rowData['keterangan']);
 
-                        $sippSearch = 'https://sipp.pa-semarang.go.id/?s=' . rawurlencode($rowData['noPerkara']);
+                        $sippSearch = $lwCfg['sipp_search_url'] . rawurlencode($rowData['noPerkara']);
                         $compactNo = "<div style='font-weight:700;font-size:14px;margin-bottom:4px'>{$no}</div>";
                         $compactNo .= "<a class='case-link' href='" . htmlspecialchars($sippSearch) . "' target='_blank' rel='noopener noreferrer' title='Klik untuk lihat detail di SIPP'><strong>" . $noPerkara . "</strong></a>";
 
@@ -238,7 +242,7 @@ if (isset($_GET['format_jadwal'])) {
                         $ruang = htmlspecialchars($rowData['ruangSidang']);
                         $ket = htmlspecialchars($rowData['keterangan']);
 
-                        $sippSearch = 'https://sipp.pa-semarang.go.id/?s=' . rawurlencode($rowData['noPerkara']);
+                        $sippSearch = $lwCfg['sipp_search_url'] . rawurlencode($rowData['noPerkara']);
                         $compactNo = "<div style='font-weight:700;font-size:14px;margin-bottom:4px'>{$no}</div>";
                         $compactNo .= "<a class='case-link' href='" . htmlspecialchars($sippSearch) . "' target='_blank' rel='noopener noreferrer' title='Klik untuk lihat detail di SIPP'><strong>" . $noPerkara . "</strong></a>";
 
@@ -275,78 +279,49 @@ if (isset($_GET['format_jadwal'])) {
         document.addEventListener('DOMContentLoaded', function() {
             const scrollArea = document.querySelector('.jadwal-scroll-area');
             const bodyTable = document.querySelector('.jadwal-table-body');
-            
-            if (!scrollArea || !bodyTable) {
-                console.error('[AUTO-SCROLL] Missing scrollArea or bodyTable');
-                return;
-            }
-            
-            const tbody = bodyTable.querySelector('tbody');
-            if (!tbody) {
-                console.error('[AUTO-SCROLL] Missing tbody');
-                return;
-            }
-            
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            if (rows.length === 0) {
-                console.error('[AUTO-SCROLL] No rows found');
-                return;
-            }
+            if (!scrollArea || !bodyTable) return;
 
-            console.log('[AUTO-SCROLL] Found', rows.length, 'rows');
-            
-            // Wait for rendering to complete
+            const tbody = bodyTable.querySelector('tbody');
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr');
+            if (rows.length === 0) return;
+
+            const bodyHTML = bodyTable.outerHTML;
+            const commentMatch = bodyHTML.match(/<!-- TOTAL_ROWS:(\d+) -->/);
+            const totalRows = commentMatch ? parseInt(commentMatch[1], 10) : rows.length;
+            if (!totalRows || totalRows <= 1) return;
+
             setTimeout(function() {
-                try {
-                    const firstRow = tbody.querySelector('tr');
-                    const rowHeight = firstRow.getBoundingClientRect().height || 50;
-                    const visibleCount = 10;
-                    const originalRowCount = rows.length;
-                    
-                    console.log('[AUTO-SCROLL] Row height:', rowHeight, 'px, Visible rows:', visibleCount, 'Total rows:', originalRowCount);
-                    
-                    // Set scroll area height
-                    scrollArea.style.height = (visibleCount * rowHeight) + 'px';
-                    scrollArea.style.overflow = 'hidden';
-                    
-                    // Clone first 10 rows for seamless loop
-                    const rowsToClone = Math.min(visibleCount, originalRowCount);
-                    for (let i = 0; i < rowsToClone; i++) {
-                        const cloned = rows[i].cloneNode(true);
-                        tbody.appendChild(cloned);
+                const firstRow = tbody.querySelector('tr');
+                if (!firstRow) return;
+
+                const rowHeight = Math.ceil(firstRow.getBoundingClientRect().height) || 40;
+                const visibleCount = 10;
+                scrollArea.style.height = (visibleCount * rowHeight) + 'px';
+
+                const durationPerRow = totalRows < 20 ? 12 : 8;
+                const pxPerSecond = rowHeight / durationPerRow;
+                const scrollDistance = totalRows * rowHeight;
+
+                let current = 0;
+                let lastTs = performance.now();
+
+                function tick(ts) {
+                    const delta = (ts - lastTs) / 1000;
+                    lastTs = ts;
+
+                    current += pxPerSecond * delta;
+                    if (current >= scrollDistance) {
+                        current = 0;
                     }
-                    
-                    const allRows = tbody.querySelectorAll('tr');
-                    console.log('[AUTO-SCROLL] After clone, total rows:', allRows.length);
-                    
-                    // Calculate animation parameters
-                    let durationPerRow = originalRowCount < 20 ? 12 : 8;
-                    const totalDuration = originalRowCount * durationPerRow;
-                    const scrollDistance = originalRowCount * rowHeight;
-                    
-                    console.log('[AUTO-SCROLL] Duration per row:', durationPerRow, 's, Total:', totalDuration, 's, Scroll distance:', scrollDistance, 'px');
-                    
-                    // Use setInterval for smooth scrolling
-                    let currentScroll = 0;
-                    const scrollStep = scrollDistance / (totalDuration * 60); // 60fps
-                    
-                    setInterval(function() {
-                        currentScroll += scrollStep;
-                        
-                        // Reset when reached end
-                        if (currentScroll >= scrollDistance) {
-                            currentScroll = 0;
-                        }
-                        
-                        tbody.style.transform = 'translateY(-' + currentScroll + 'px)';
-                    }, 1000 / 60); // 60fps
-                    
-                    console.log('[AUTO-SCROLL] Scroll animation started');
-                    
-                } catch(err) {
-                    console.error('[AUTO-SCROLL] Error during setup:', err.message);
+
+                    scrollArea.scrollTop = current;
+                    requestAnimationFrame(tick);
                 }
-            }, 500);
+
+                requestAnimationFrame(tick);
+            }, 250);
         });
     </script>
     </html>
@@ -354,4 +329,3 @@ if (isset($_GET['format_jadwal'])) {
     exit;
 }
 ?>
-            const scrollDistance = originalRowCount * rowHeight;

@@ -1,0 +1,203 @@
+<style>
+    .s10-wrap {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        border: 1px solid #dfe6ee;
+        border-radius: 12px;
+        background: #fff;
+        padding: 14px;
+    }
+    .s10-title {
+        margin: 0 0 10px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .s10-grid {
+        display: grid;
+        grid-template-columns: 140px 1fr 1fr auto;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .s10-grid input,
+    .s10-grid select,
+    .s10-body {
+        width: 100%;
+        border: 1px solid #cfd8e3;
+        border-radius: 8px;
+        padding: 9px 10px;
+        font-size: 13px;
+    }
+    .s10-body {
+        margin-bottom: 10px;
+        min-height: 90px;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    .s10-grid button {
+        border: 0;
+        border-radius: 8px;
+        background: #0ea5e9;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 9px 12px;
+        cursor: pointer;
+    }
+    .s10-note {
+        color: #64748b;
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+    .s10-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .s10-preset {
+        border: 1px solid #cfd8e3;
+        background: #f8fbff;
+        color: #1f2937;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .s10-preset:hover {
+        border-color: #38bdf8;
+        color: #0c4a6e;
+    }
+    .s10-result {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #0b1020;
+        color: #d4e2ff;
+        padding: 10px;
+        font-size: 12px;
+        white-space: pre-wrap;
+        max-height: 420px;
+        overflow: auto;
+    }
+    @media (max-width: 860px) {
+        .s10-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="s10-wrap">
+    <h3 class="s10-title">Bridge Data Server 10</h3>
+    <div class="s10-grid">
+        <select id="s10-method">
+            <option value="GET">GET</option>
+            <option value="POST" selected>POST</option>
+        </select>
+        <input id="s10-path" type="text" value="/lumpiapasar/panjar/_panjar_data_wilayah.php" placeholder="Path API, contoh: /lumpiapasar/panjar/_panjar_data_wilayah.php">
+        <input id="s10-query" type="text" value="" placeholder="Query string, contoh: limit=10&page=1">
+        <button id="s10-load" type="button">Ambil Data</button>
+    </div>
+    <div class="s10-presets">
+        <button class="s10-preset" type="button" data-preset="panjar_wilayah">Preset Panjar Wilayah</button>
+        <button class="s10-preset" type="button" data-preset="modul_panjar_perkara_ghaib">Preset Modul Panjar Perkara Ghaib</button>
+        <button class="s10-preset" type="button" data-preset="panjar_hitung">Preset Hitung Panjar</button>
+    </div>
+    <textarea id="s10-body" class="s10-body" placeholder="Body untuk POST (format key=value&key2=value2)">jenis=kota&id_provinces=JAWA%20TENGAH</textarea>
+    <div class="s10-note">Endpoint bridge: <span id="s10-endpoint">/lawangsewu/api/server10</span></div>
+    <pre id="s10-result" class="s10-result">Menunggu permintaan...</pre>
+</div>
+
+<script>
+(function () {
+    const pathInput = document.getElementById('s10-path');
+    const methodInput = document.getElementById('s10-method');
+    const queryInput = document.getElementById('s10-query');
+    const bodyInput = document.getElementById('s10-body');
+    const loadButton = document.getElementById('s10-load');
+    const resultBox = document.getElementById('s10-result');
+    const endpointLabel = document.getElementById('s10-endpoint');
+    const presetButtons = Array.from(document.querySelectorAll('[data-preset]'));
+
+    const bridgeBase = window.location.pathname.includes('/lawangsewu')
+        ? `${window.location.origin}/lawangsewu/api/server10`
+        : '/lawangsewu/api/server10';
+
+    endpointLabel.textContent = bridgeBase;
+
+    function applyPreset(presetName) {
+        if (presetName === 'panjar_wilayah') {
+            methodInput.value = 'POST';
+            pathInput.value = '/lumpiapasar/panjar/_panjar_data_wilayah.php';
+            queryInput.value = 'source=panjar_wilayah';
+            bodyInput.value = '';
+            return;
+        }
+
+        if (presetName === 'modul_panjar_perkara_ghaib') {
+            methodInput.value = 'POST';
+            pathInput.value = '/lumpiapasar/panjar/_cerai_proses.php';
+            queryInput.value = 'source=modul_panjar_perkara_ghaib';
+            bodyInput.value = '';
+            return;
+        }
+
+        if (presetName === 'panjar_hitung') {
+            methodInput.value = 'GET';
+            pathInput.value = '/lumpiapasar/panjar/hitung_panjar.php';
+            queryInput.value = 'source=panjar_hitung&jenis=1';
+            bodyInput.value = '';
+        }
+    }
+
+    async function loadData() {
+        const path = String(pathInput.value || '/api/data').trim();
+        const method = String(methodInput.value || 'GET').toUpperCase();
+        const rawQuery = String(queryInput.value || '').trim();
+        const rawBody = String(bodyInput.value || '').trim();
+
+        const query = new URLSearchParams();
+        query.set('path', path);
+        query.set('method', method);
+
+        if (rawQuery !== '') {
+            rawQuery.split('&').forEach((pair) => {
+                const chunk = pair.trim();
+                if (!chunk) return;
+                const parts = chunk.split('=');
+                const key = (parts.shift() || '').trim();
+                if (!key) return;
+                const value = parts.join('=').trim();
+                query.append(key, value);
+            });
+        }
+
+        const requestUrl = `${bridgeBase}?${query.toString()}`;
+        resultBox.textContent = `Memuat: ${method} ${requestUrl}`;
+
+        try {
+            const options = { cache: 'no-store' };
+            if (method === 'POST') {
+                options.method = 'POST';
+                options.headers = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
+                options.body = rawBody;
+            }
+
+            const response = await fetch(requestUrl, options);
+            const payload = await response.json();
+            resultBox.textContent = JSON.stringify(payload, null, 2);
+        } catch (error) {
+            resultBox.textContent = `Gagal memuat data\n${String(error && error.message ? error.message : error)}`;
+        }
+    }
+
+    loadButton.addEventListener('click', loadData);
+    presetButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const preset = button.getAttribute('data-preset');
+            applyPreset(String(preset || ''));
+            loadData();
+        });
+    });
+    loadData();
+})();
+</script>

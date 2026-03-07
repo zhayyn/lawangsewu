@@ -42,11 +42,14 @@ function gateway_config(): array
 
     $config = [
         'app_name' => $env['GATEWAY_APP_NAME'] ?? 'Lawangsewu Gateway',
+        'base_path' => rtrim($env['GATEWAY_BASE_PATH'] ?? '/lawangsewu/gateway', '/'),
         'api_token' => $env['GATEWAY_API_TOKEN'] ?? '',
         'allow_commands' => (($env['GATEWAY_ALLOW_COMMANDS'] ?? 'false') === 'true'),
         'project_root' => $env['GATEWAY_PROJECT_ROOT'] ?? ($baseDir . '/projects'),
         'deploy_root' => $env['GATEWAY_DEPLOY_ROOT'] ?? '/var/www/html',
         'backup_root' => $env['GATEWAY_BACKUP_ROOT'] ?? '/var/backups/lawangsewu',
+        'backup_file_prefix' => $env['GATEWAY_BACKUP_FILE_PREFIX'] ?? 'lawangsewu_',
+        'backup_cron_tag' => $env['GATEWAY_BACKUP_CRON_TAG'] ?? 'lawangsewu',
         'connections_file' => __DIR__ . '/data/connections.json',
     ];
 

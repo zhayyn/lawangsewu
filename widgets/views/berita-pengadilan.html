@@ -1,0 +1,552 @@
+<style>
+    :root {
+        --pa-green: #1e6a3a;
+        --pa-green-soft: #eaf7ee;
+        --pa-orange: #f59e0b;
+        --pa-orange-soft: #fff6e7;
+        --pa-ink: #1f2937;
+        --pa-muted: #64748b;
+        --pa-border: #e5ece7;
+    }
+
+    .news-wrap {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background: #fff;
+        border: 1px solid var(--pa-border);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }
+
+    .news-top {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .panel {
+        border: 1px solid var(--pa-border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 12px;
+        border-bottom: 1px solid #edf3ee;
+        background: linear-gradient(180deg, #ffffff, #fbfdfb);
+    }
+    .panel-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--pa-ink);
+    }
+
+    .meta-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--pa-muted);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .featured-link {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.32;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .featured-link:hover { color: var(--pa-green); }
+    .featured-excerpt {
+        margin: 0;
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .berita-grid {
+        padding: 10px 12px 12px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .berita-card {
+        border: 1px solid #e5edf4;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .berita-card img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        display: block;
+        background: #e9eef3;
+    }
+    .berita-body {
+        padding: 9px;
+    }
+
+    .tab-row {
+        display: flex;
+        gap: 8px;
+    }
+    .tab-btn {
+        border: 1px solid #dbe6de;
+        background: #fff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .tab-btn.active {
+        background: linear-gradient(135deg, #ff8a00, #ff6200);
+        color: #fff;
+        border-color: #ff8a00;
+        box-shadow: 0 5px 14px rgba(255, 98, 0, .25);
+    }
+
+    .tab-pane {
+        display: none;
+        padding: 10px 12px 12px;
+    }
+    .tab-pane.active {
+        display: block;
+    }
+
+    .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .list-item {
+        border: 1px dashed #dde7df;
+        border-radius: 10px;
+        background: #fbfdfb;
+        padding: 10px;
+    }
+    .list-item a {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        display: block;
+    }
+    .list-item a:hover { color: var(--pa-green); }
+    .list-meta {
+        margin-top: 5px;
+        color: var(--pa-muted);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .more-link {
+        margin-top: 10px;
+        display: inline-block;
+        text-decoration: none;
+        color: var(--pa-green);
+        border: 1px solid #c9e1cf;
+        background: var(--pa-green-soft);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 7px 10px;
+    }
+
+    .rss-panel {
+        border: 1px solid var(--pa-border);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .rss-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 12px;
+        border-bottom: 1px solid #edf3ee;
+        background: linear-gradient(180deg, #ffffff, #fbfdfb);
+    }
+    .rss-body {
+        padding: 10px 12px 12px;
+    }
+    .rss-box {
+        background: #f8fafc;
+        border: 1px solid #e4edf4;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+    .rss-item-row {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 10px;
+        align-items: start;
+    }
+    .rss-thumb {
+        width: 92px;
+        height: 68px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #dde6ef;
+        background: #e8edf3;
+    }
+    .rss-box a {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        display: block;
+    }
+    .rss-box a:hover { color: #0c5a84; }
+    .rss-mini-label {
+        display: inline-block;
+        margin-bottom: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .2px;
+        color: #0f5132;
+        background: #eaf7ef;
+        border: 1px solid #cfe7d7;
+    }
+    .rss-type-label {
+        display: inline-block;
+        margin-bottom: 6px;
+        margin-right: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .2px;
+        color: #7a4b00;
+        background: #fff4df;
+        border: 1px solid #ffd8a8;
+    }
+    .rss-source {
+        margin-top: 5px;
+        color: var(--pa-muted);
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .rss-loader {
+        color: var(--pa-muted);
+        font-size: 12px;
+        text-align: center;
+        padding: 12px 4px;
+    }
+
+    @media (max-width: 980px) {
+        .news-top { grid-template-columns: 1fr; }
+        .berita-grid { grid-template-columns: 1fr; }
+        .rss-item-row { grid-template-columns: 80px 1fr; }
+        .rss-thumb { width: 80px; height: 60px; }
+    }
+</style>
+
+<div class="news-wrap">
+    <section class="news-top">
+        <article class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">Berita PA Semarang</h3>
+            </div>
+            <div id="pa-berita-list" class="berita-grid">
+                <article class="berita-card">
+                    <img src="/lawangsewu/widgets/assets/ma-fallback.jpg" alt="Berita PA Semarang">
+                    <div class="berita-body">
+                        <div class="meta-line"><span>Berita</span><span>Memuat...</span></div>
+                        <a class="featured-link" href="#" target="_blank" rel="noopener">Memuat berita terbaru...</a>
+                        <p class="featured-excerpt">Sedang mengambil data dari server.</p>
+                    </div>
+                </article>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">Pengumuman & Artikel PA Semarang</h3>
+                <div class="tab-row" id="pa-tabs">
+                    <button class="tab-btn active" data-tab="pa-pengumuman" type="button">Pengumuman</button>
+                    <button class="tab-btn" data-tab="pa-artikel" type="button">Artikel</button>
+                </div>
+            </div>
+
+            <div id="pa-pengumuman" class="tab-pane active">
+                <ul id="pa-pengumuman-list" class="list">
+                    <li class="list-item"><a href="#" target="_blank" rel="noopener">Memuat pengumuman...</a><div class="list-meta">-</div></li>
+                </ul>
+                <a class="more-link" id="pa-pengumuman-more" href="#" data-pa-path="/kategori/pengumuman" target="_blank" rel="noopener">Lihat Semua Pengumuman</a>
+            </div>
+
+            <div id="pa-artikel" class="tab-pane">
+                <ul id="pa-artikel-list" class="list">
+                    <li class="list-item"><a href="#" target="_blank" rel="noopener">Memuat artikel...</a><div class="list-meta">-</div></li>
+                </ul>
+                <a class="more-link" id="pa-artikel-more" href="#" data-pa-path="/kategori/artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
+            </div>
+        </article>
+    </section>
+
+    <section class="rss-panel">
+        <div class="rss-head">
+            <h3 class="panel-title">RSS Feed Peradilan</h3>
+            <div class="tab-row" id="rss-tabs">
+                <button class="tab-btn active" data-rss-source="ma" type="button">MA</button>
+                <button class="tab-btn" data-rss-source="badilag" type="button">Badilag</button>
+                <button class="tab-btn" data-rss-source="pta" type="button">PTA Semarang</button>
+            </div>
+        </div>
+        <div class="rss-body" id="rss-container">
+            <div class="rss-loader">Memuat RSS feed...</div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const FALLBACK_SERVER9 = 'http://192.168.88.9';
+    const hostName = String(window.location.hostname || '').toLowerCase();
+    const PA_BASE_URL = hostName.includes('pa-semarang.go.id')
+        ? 'https://pa-semarang.go.id'
+        : hostName === '192.168.88.9'
+            ? `${window.location.origin}/pasemarang`
+            : `${FALLBACK_SERVER9}/pasemarang`;
+
+    const localApiBase = window.location.pathname.includes('/lawangsewu')
+        ? `${window.location.origin}/lawangsewu/api/pengumuman-rss`
+        : `${FALLBACK_SERVER9}/lawangsewu/api/pengumuman-rss`;
+
+    const THUMB_BADILAG_BUILDING = 'https://marinews.mahkamahagung.go.id/static/2025/12/10/dirjen-badilag-mowEv.jpg';
+    const THUMB_PTA_BUILDING = 'https://pta-semarang.go.id/wp-content/uploads/2025/11/gedung-pta-semarang.png';
+    const THUMB_LOCAL_FALLBACK = '/lawangsewu/widgets/assets/ma-fallback.jpg';
+    const RSS_SOURCE_NAMES = {
+        ma: 'Mahkamah Agung RI',
+        badilag: 'Badilag MA RI',
+        pta: 'PTA Semarang'
+    };
+    const rssFeeds = {
+        pa: `${PA_BASE_URL}/feed`,
+        berita: `${PA_BASE_URL}/kategori/berita/feed`,
+        pengumuman: `${PA_BASE_URL}/kategori/pengumuman/feed`,
+        artikel: `${PA_BASE_URL}/kategori/artikel/feed`
+    };
+
+    function escHtml(text) {
+        return String(text || '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function formatDate(input) {
+        try {
+            return new Date(input).toLocaleDateString('id-ID', {
+                day: '2-digit', month: 'short', year: 'numeric'
+            });
+        } catch (_) {
+            return '-';
+        }
+    }
+
+    function applyPaBaseUrl() {
+        document.querySelectorAll('[data-pa-path]').forEach((link) => {
+            const path = String(link.getAttribute('data-pa-path') || '').trim();
+            if (!path) return;
+            link.setAttribute('href', `${PA_BASE_URL}${path}`);
+        });
+    }
+
+    function extractImage(item) {
+        if (item && item.enclosure && item.enclosure.link) return item.enclosure.link;
+        if (item && item.thumbnail) return item.thumbnail;
+        const description = String(item && item.description ? item.description : '');
+        const match = description.match(/<img[^>]+src=["']([^"']+)["']/i);
+        return match ? match[1] : THUMB_LOCAL_FALLBACK;
+    }
+
+    function isPengumumanItem(item) {
+        const text = `${item && item.title ? item.title : ''} ${item && item.url ? item.url : ''}`.toLowerCase();
+        return /(pengumuman|pemberitahuan|edaran|seleksi|hasil|jadwal|undangan)/.test(text);
+    }
+
+    async function loadPaCategoryFeed(kind, limit = 3) {
+        const rssUrl = rssFeeds[kind];
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        if (data.status !== 'ok' || !Array.isArray(data.items)) return [];
+        return data.items.slice(0, limit).map((item) => ({
+            link: item.link,
+            title: item.title,
+            date: item.pubDate,
+            image: extractImage(item),
+            description: String(item.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        }));
+    }
+
+    async function renderPaBerita() {
+        const root = document.getElementById('pa-berita-list');
+        if (!root) return;
+        try {
+            const items = await loadPaCategoryFeed('berita', 3);
+            if (!items.length) {
+                root.innerHTML = '<div class="rss-loader">Berita PA belum tersedia.</div>';
+                return;
+            }
+            root.innerHTML = items.map((item) => `
+                <article class="berita-card">
+                    <img src="${escHtml(item.image || THUMB_LOCAL_FALLBACK)}" alt="Berita PA" loading="lazy" onerror="this.onerror=null;this.src='${THUMB_LOCAL_FALLBACK}'">
+                    <div class="berita-body">
+                        <div class="meta-line"><span>Berita</span><span>${formatDate(item.date)}</span></div>
+                        <a class="featured-link" href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+                        <p class="featured-excerpt">${escHtml((item.description || '').slice(0, 120))}${item.description && item.description.length > 120 ? '...' : ''}</p>
+                    </div>
+                </article>
+            `).join('');
+        } catch (_) {
+            root.innerHTML = '<div class="rss-loader">Gagal memuat berita PA.</div>';
+        }
+    }
+
+    async function renderPaList(kind, listId) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+        try {
+            const items = await loadPaCategoryFeed(kind, 3);
+            if (!items.length) {
+                list.innerHTML = '<li class="list-item"><a href="#" target="_blank" rel="noopener">Data belum tersedia.</a><div class="list-meta">-</div></li>';
+                return;
+            }
+            list.innerHTML = items.map((item) => `
+                <li class="list-item">
+                    <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+                    <div class="list-meta">${formatDate(item.date)}</div>
+                </li>
+            `).join('');
+        } catch (_) {
+            list.innerHTML = '<li class="list-item"><a href="#" target="_blank" rel="noopener">Gagal memuat data.</a><div class="list-meta">-</div></li>';
+        }
+    }
+
+    function setupTabs(rootId, attrName, panePrefix) {
+        const root = document.getElementById(rootId);
+        if (!root) return;
+        root.addEventListener('click', (event) => {
+            const button = event.target.closest(`[${attrName}]`);
+            if (!button) return;
+            const key = button.getAttribute(attrName);
+            root.querySelectorAll(`[${attrName}]`).forEach((btn) => btn.classList.toggle('active', btn === button));
+            document.querySelectorAll(`${panePrefix}`).forEach((pane) => pane.classList.remove('active'));
+            const targetPane = document.getElementById(key);
+            if (targetPane) targetPane.classList.add('active');
+        });
+    }
+
+    async function loadLocalSource(source) {
+        const apiUrl = `${localApiBase}?source=${encodeURIComponent(source)}&limit=20&t=${Date.now()}`;
+        const response = await fetch(apiUrl, { cache: 'no-store' });
+        const payload = await response.json();
+        if (!payload.ok || !Array.isArray(payload.items)) return [];
+        const sourceLabel = payload.sourceName || RSS_SOURCE_NAMES[source] || source.toUpperCase();
+        const filteredItems = payload.items.filter(isPengumumanItem).slice(0, 4);
+        return filteredItems.map((item) => ({
+            link: item.url,
+            title: item.title,
+            date: item.date || payload.fetchedAt,
+            source: sourceLabel,
+            thumb: source === 'badilag'
+                ? THUMB_BADILAG_BUILDING
+                : (source === 'pta' ? THUMB_PTA_BUILDING : THUMB_LOCAL_FALLBACK)
+        }));
+    }
+
+    async function loadPaRss() {
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssFeeds.pa)}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        if (data.status !== 'ok' || !Array.isArray(data.items)) return [];
+        return data.items.slice(0, 4).map((item) => ({
+            link: item.link,
+            title: item.title,
+            date: item.pubDate,
+            source: 'PA SEMARANG',
+            thumb: THUMB_LOCAL_FALLBACK
+        }));
+    }
+
+    async function loadRssFeed(source) {
+        const container = document.getElementById('rss-container');
+        if (!container) return;
+        container.innerHTML = '<div class="rss-loader">Memuat RSS feed...</div>';
+
+        try {
+            let items = [];
+            if (source === 'ma' || source === 'badilag' || source === 'pta') {
+                items = await loadLocalSource(source);
+            } else {
+                items = await loadPaRss();
+            }
+
+            if (!items.length) {
+                container.innerHTML = '<div class="rss-loader">Feed belum tersedia.</div>';
+                return;
+            }
+
+            container.innerHTML = items.map((item) => `
+                <div class="rss-box">
+                    <div class="rss-item-row">
+                        <img class="rss-thumb" src="${escHtml(item.thumb || THUMB_LOCAL_FALLBACK)}" alt="${escHtml(item.source)}" loading="lazy" onerror="this.onerror=null;this.src='${THUMB_LOCAL_FALLBACK}'">
+                        <div>
+                            <span class="rss-type-label">Pengumuman</span>
+                            ${item.source === 'PTA Semarang' ? '<span class="rss-mini-label">Sumber: PTA Semarang</span>' : ''}
+                            <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+                            <div class="rss-source">${formatDate(item.date)} • Sumber: ${escHtml(item.source)}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (_) {
+            container.innerHTML = '<div class="rss-loader">Gagal memuat RSS feed. Jika dibuka via preview editor, coba akses dari URL server langsung.</div>';
+        }
+    }
+
+    function setupRssTabs() {
+        const tabs = document.getElementById('rss-tabs');
+        if (!tabs) return;
+        tabs.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-rss-source]');
+            if (!button) return;
+            const source = button.getAttribute('data-rss-source');
+            tabs.querySelectorAll('[data-rss-source]').forEach((btn) => btn.classList.toggle('active', btn === button));
+            loadRssFeed(source);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        applyPaBaseUrl();
+        setupTabs('pa-tabs', 'data-tab', '.tab-pane');
+        setupRssTabs();
+        renderPaBerita();
+        renderPaList('pengumuman', 'pa-pengumuman-list');
+        renderPaList('artikel', 'pa-artikel-list');
+        loadRssFeed('ma');
+    });
+</script>

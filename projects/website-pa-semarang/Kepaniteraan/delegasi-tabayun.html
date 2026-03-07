@@ -1,0 +1,174 @@
+<style>
+    :root {
+        --pa-green: #1e5631;
+        --pa-accent: #f39c12;
+        --pa-light: #f4fdf4;
+        --text-dark: #2c3e50;
+    }
+
+    /* Wadah Utama Bergaya Kaca */
+    .delegasi-wrapper {
+        font-family: 'Inter', sans-serif;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-bottom: 5px solid var(--pa-green);
+        max-width: 100%;
+        margin: 0 auto;
+        transition: transform 0.3s ease;
+    }
+
+    .delegasi-wrapper:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 20px 40px rgba(30, 86, 49, 0.08);
+    }
+
+    /* Header Elegan */
+    .delegasi-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e9f2eb;
+    }
+
+    .delegasi-icon {
+        background: linear-gradient(135deg, var(--pa-green), #27ae60);
+        color: white;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.5rem;
+        box-shadow: 0 4px 10px rgba(30, 86, 49, 0.2);
+    }
+
+    .delegasi-title {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--pa-green);
+        line-height: 1.2;
+    }
+
+    .delegasi-subtitle {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        font-weight: 600;
+    }
+
+    /* */
+
+    /* Kotak Informasi Publik */
+    .delegasi-info-box {
+        background: #fffdf5;
+        border-left: 4px solid var(--pa-accent);
+        padding: 15px 20px;
+        border-radius: 0 12px 12px 0;
+        margin-bottom: 25px;
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .delegasi-info-box i {
+        color: var(--pa-accent);
+        font-size: 1.2rem;
+        margin-top: 3px;
+    }
+
+    .delegasi-info-text p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #555;
+        line-height: 1.6;
+        text-align: justify;
+    }
+
+    .delegasi-info-text strong {
+        color: var(--text-dark);
+    }
+
+    /* Pembungkus Iframe Resposif */
+    .delegasi-iframe-container {
+        position: relative;
+        width: 100%;
+        height: 700px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e0e0e0;
+        background: #f8faf9;
+        box-shadow: inset 0 0 15px rgba(0,0,0,0.02);
+    }
+
+    .delegasi-iframe-container iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Animasi Loading Sederhana di balik Iframe */
+    .iframe-loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #888;
+        font-size: 0.9rem;
+        font-weight: 600;
+        z-index: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #e9f2eb;
+        border-top: 3px solid var(--pa-green);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+
+<div class="delegasi-wrapper">
+    <div class="delegasi-header">
+        <div class="delegasi-icon">
+            <i class="fas fa-handshake"></i>
+        </div>
+        <div>
+            <h2 class="delegasi-title">Bantuan Panggilan/Pemberitahuan (Delegasi)</h2>
+            <p class="delegasi-subtitle">Pengadilan Agama Semarang Kelas I-A</p>
+        </div>
+    </div>
+
+    <div class="delegasi-info-box">
+        <i class="fas fa-info-circle"></i>
+        <div class="delegasi-info-text">
+            <p><strong>Tabayun atau Delegasi</strong> adalah bentuk kerja sama pelayanan antar peradilan untuk memberikan bantuan pemanggilan atau pemberitahuan persidangan kepada pihak yang berada di luar wilayah yurisdiksi Pengadilan Agama Semarang. Layanan ini memastikan proses hukum berjalan lancar dan hak² setiap pihak tetap terpenuhi di mana pun mereka berada.</p>
+        </div>
+    </div>
+
+    <div class="delegasi-iframe-container">
+        <div class="iframe-loader">
+            <div class="spinner"></div>
+            <span>Menyiapkan saluran data delegasi...</span>
+        </div>
+        <iframe src="https://pa-semarang.go.id/ghoib/delegasi.php" title="Tabayun Delegasi PA Semarang"></iframe>
+    </div>
+</div>

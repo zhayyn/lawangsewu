@@ -1,8 +1,10 @@
 <?php
 // Simple generator: fetch SIPP slide and write slide_sidang.html with full blocks
-$lawangsewuRoot = defined('LAWANGSEWU_ROOT') ? LAWANGSEWU_ROOT : dirname(__DIR__, 2);
-$outFile = $lawangsewuRoot . '/widgets/views/slide_sidang.html';
-$url = 'https://sipp.pa-semarang.go.id/slide_sidang';
+require_once __DIR__ . '/portable_config.php';
+$lwCfg = lw_config();
+$lawangsewuRoot = $lwCfg['root'];
+$outFile = $lwCfg['slide_local_file'];
+$url = $lwCfg['sipp_slide_url'];
 
 function fetch_html($url) {
     $ch = curl_init();

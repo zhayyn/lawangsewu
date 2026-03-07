@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/bootstrap.php';
 $cfg = gateway_config();
+$basePath = $cfg['base_path'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -26,10 +27,10 @@ $cfg = gateway_config();
     <div class="card">
         <strong>Endpoint API</strong>
         <ul>
-            <li><code>GET /lawangsewu/gateway/api/status.php</code></li>
-            <li><code>GET /lawangsewu/gateway/api/connections.php</code></li>
-            <li><code>GET /lawangsewu/gateway/api/projects.php</code></li>
-            <li><code>POST /lawangsewu/gateway/api/deploy.php</code></li>
+            <li><code>GET <?php echo htmlspecialchars($basePath); ?>/api/status.php</code></li>
+            <li><code>GET <?php echo htmlspecialchars($basePath); ?>/api/connections.php</code></li>
+            <li><code>GET <?php echo htmlspecialchars($basePath); ?>/api/projects.php</code></li>
+            <li><code>POST <?php echo htmlspecialchars($basePath); ?>/api/deploy.php</code></li>
         </ul>
     </div>
 

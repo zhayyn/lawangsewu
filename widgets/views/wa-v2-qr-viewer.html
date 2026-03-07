@@ -1,0 +1,332 @@
+<style>
+  :root {
+    --bg-0: #06090f;
+    --bg-1: #101827;
+    --bg-2: #1a2235;
+    --ink: #dfe7ff;
+    --muted: #8da0c4;
+    --line: rgba(171, 192, 255, 0.2);
+    --ok: #39d49f;
+    --warn: #ffb54a;
+    --danger: #ff6b7f;
+    --glass: rgba(17, 25, 46, 0.58);
+    --glass-soft: rgba(17, 25, 46, 0.42);
+  }
+  * { box-sizing: border-box; }
+  .wa2-stage {
+    min-height: 100vh;
+    padding: 22px;
+    background:
+      radial-gradient(1200px 500px at -8% -10%, #2f7eff2b, transparent 60%),
+      radial-gradient(900px 400px at 110% 6%, #2fffd326, transparent 60%),
+      linear-gradient(145deg, var(--bg-0), var(--bg-1) 50%, var(--bg-2));
+    color: var(--ink);
+    font-family: 'Poppins', 'Segoe UI', Tahoma, sans-serif;
+  }
+  .wa2-wrap {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  .wa2-card {
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: linear-gradient(165deg, var(--glass), var(--glass-soft));
+    box-shadow:
+      0 30px 80px rgba(5, 8, 18, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(14px);
+    padding: 18px;
+  }
+  .wa2-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .wa2-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+  }
+  .wa2-meta {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .wa2-status {
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+  }
+  .wa2-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  .wa2-qr {
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 16px;
+    border: 1px dashed var(--line);
+    background: rgba(0, 0, 0, 0.26);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    color: var(--muted);
+    padding: 10px;
+    text-align: center;
+  }
+  .wa2-qr img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px;
+  }
+  .wa2-stack {
+    display: grid;
+    gap: 10px;
+  }
+  .wa2-token {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(9, 14, 27, 0.55);
+    color: var(--ink);
+    padding: 10px 11px;
+    outline: none;
+    font-size: 12px;
+  }
+  .wa2-log {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(3, 7, 16, 0.48);
+    color: #bdd1ff;
+    min-height: 130px;
+    padding: 10px;
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow: auto;
+  }
+  .wa2-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .wa2-btn {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      inset 0 -7px 14px rgba(0, 0, 0, 0.28);
+    transform: translateY(0);
+    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  }
+  .wa2-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(171, 192, 255, 0.4);
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -8px 18px rgba(0, 0, 0, 0.32);
+  }
+  .wa2-btn:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 6px 14px rgba(0, 0, 0, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 -3px 9px rgba(0, 0, 0, 0.35);
+  }
+  .wa2-btn--danger { color: #ffd0d6; border-color: rgba(255, 120, 140, 0.35); }
+  .wa2-btn--warn { color: #ffe2bc; border-color: rgba(255, 197, 101, 0.35); }
+  .wa2-note {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  @media (max-width: 860px) {
+    .wa2-stage { padding: 12px; }
+    .wa2-grid { grid-template-columns: 1fr; }
+    .wa2-title { font-size: 20px; }
+  }
+</style>
+
+<div class="wa2-stage">
+  <div class="wa2-wrap">
+    <div class="wa2-card">
+      <div class="wa2-head">
+        <h2 class="wa2-title">WA Caraka V2 Control Center</h2>
+        <span class="wa2-status" id="wa2-status">Memeriksa service...</span>
+      </div>
+      <p class="wa2-meta">Tampilan dark ringan untuk scan QR, monitoring status, dan kontrol instance WA v2.</p>
+
+      <div class="wa2-grid">
+        <div class="wa2-qr" id="wa2-qr-box">Menunggu QR...</div>
+
+        <div class="wa2-stack">
+          <input class="wa2-token" id="wa2-token" type="password" placeholder="Opsional: isi token API (X-WA-V2-Token)">
+          <div class="wa2-actions">
+            <button type="button" class="wa2-btn" id="wa2-refresh">Refresh</button>
+            <button type="button" class="wa2-btn" id="wa2-toggle">Pause Auto</button>
+            <button type="button" class="wa2-btn wa2-btn--warn" id="wa2-restart">Restart</button>
+            <button type="button" class="wa2-btn wa2-btn--danger" id="wa2-disconnect">Disconnect</button>
+          </div>
+          <div class="wa2-log" id="wa2-log">Belum ada data.</div>
+          <div class="wa2-note">Auto refresh setiap 5 detik. Token disimpan lokal browser untuk kemudahan monitoring.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const base = window.location.pathname.includes('/lawangsewu')
+    ? window.location.origin + '/lawangsewu/api/wa-v2'
+    : '/lawangsewu/api/wa-v2';
+
+  const STORE_KEY = 'wa2_api_token';
+
+  const el = {
+    status: document.getElementById('wa2-status'),
+    qr: document.getElementById('wa2-qr-box'),
+    log: document.getElementById('wa2-log'),
+    token: document.getElementById('wa2-token'),
+    refresh: document.getElementById('wa2-refresh'),
+    toggle: document.getElementById('wa2-toggle'),
+    restart: document.getElementById('wa2-restart'),
+    disconnect: document.getElementById('wa2-disconnect')
+  };
+
+  let timer = null;
+  let auto = true;
+
+  function getToken() {
+    return (el.token.value || '').trim();
+  }
+
+  function setLog(data) {
+    try {
+      el.log.textContent = JSON.stringify(data, null, 2);
+    } catch (_) {
+      el.log.textContent = String(data);
+    }
+  }
+
+  function setStatus(text, tone) {
+    el.status.textContent = text;
+    if (tone === 'ok') el.status.style.color = '#39d49f';
+    else if (tone === 'warn') el.status.style.color = '#ffb54a';
+    else if (tone === 'danger') el.status.style.color = '#ff6b7f';
+    else el.status.style.color = '#dfe7ff';
+  }
+
+  async function api(path, method, payload) {
+    const headers = { 'Accept': 'application/json' };
+    const token = getToken();
+    if (token) headers['X-WA-V2-Token'] = token;
+    if (method === 'POST') headers['Content-Type'] = 'application/json';
+
+    const res = await fetch(base + '/' + path, {
+      method,
+      headers,
+      body: method === 'POST' ? JSON.stringify(payload || {}) : undefined,
+      cache: 'no-store'
+    });
+
+    const raw = await res.text();
+    let json;
+    try {
+      json = JSON.parse(raw);
+    } catch (_) {
+      json = { ok: false, raw };
+    }
+
+    if (!res.ok) {
+      throw new Error((json && (json.error || json.message)) || ('HTTP ' + res.status));
+    }
+    return json;
+  }
+
+  async function refresh() {
+    try {
+      const h = await api('health', 'GET');
+      if (h.connected) {
+        setStatus('Connected', 'ok');
+        el.qr.textContent = 'Perangkat sudah terhubung.';
+        setLog(h);
+        return;
+      }
+
+      setStatus(h.hasQr ? 'Menunggu Scan QR' : 'Mempersiapkan QR', 'warn');
+      const q = await api('qr', 'GET');
+      if (q.ok && q.qrDataUrl) {
+        el.qr.innerHTML = '<img src="' + q.qrDataUrl + '" alt="WA QR">';
+      } else {
+        el.qr.textContent = 'QR belum tersedia.';
+      }
+      setLog({ health: h, qr: { ok: q.ok, hasDataUrl: Boolean(q.qrDataUrl) } });
+    } catch (err) {
+      setStatus('Service Error', 'danger');
+      el.qr.textContent = 'Gagal memuat QR.';
+      setLog({ error: String(err && err.message ? err.message : err) });
+    }
+  }
+
+  async function action(path, label) {
+    try {
+      const out = await api(path, 'POST', {});
+      setLog({ action: label, result: out });
+      setStatus(label + ' berhasil', 'ok');
+      setTimeout(refresh, 1200);
+    } catch (err) {
+      setStatus(label + ' gagal', 'danger');
+      setLog({ action: label, error: String(err && err.message ? err.message : err) });
+    }
+  }
+
+  function startAuto() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(function () {
+      if (auto) refresh();
+    }, 5000);
+  }
+
+  el.token.value = localStorage.getItem(STORE_KEY) || '';
+  el.token.addEventListener('input', function () {
+    localStorage.setItem(STORE_KEY, getToken());
+  });
+
+  el.refresh.addEventListener('click', refresh);
+  el.toggle.addEventListener('click', function () {
+    auto = !auto;
+    el.toggle.textContent = auto ? 'Pause Auto' : 'Resume Auto';
+  });
+  el.restart.addEventListener('click', function () {
+    action('restart', 'Restart');
+  });
+  el.disconnect.addEventListener('click', function () {
+    action('disconnect', 'Disconnect');
+  });
+
+  refresh();
+  startAuto();
+})();
+</script>

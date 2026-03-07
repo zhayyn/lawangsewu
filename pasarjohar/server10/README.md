@@ -1,10 +1,10 @@
 # Server10 App (Arsip)
 
-Folder ini dipertahankan sebagai backup awal.
+Folder ini dipertahankan sebagai backup awal, dan sekarang diarsipkan di `pasarjohar/server10/`.
 
-Versi aktif aplikasi sekarang ada di folder `tugumuda`.
+Versi aktif aplikasi sekarang ada di folder `/var/www/html/tugumuda`.
 
-Jika membuka `server10/index.php`, akan diarahkan ke `/lawangsewu/tugumuda/`.
+Jika membuka `server10/index.php`, akan diarahkan ke `/tugumuda/`.
 
 ## Struktur arsip
 

@@ -1,10 +1,11 @@
+# developed by dubes favour-it
 # developed by zhayyn™
 
 # 1. MENGHILANGKAN EXTENSION .PHP DI URL
 RewriteEngine On
 
 # 0. HARDENING: blok akses langsung ke folder/file sensitif
-RewriteRule ^(?:scripts|projects|logs|server10/archive|pasarjohar/php-arsip|gateway/data)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:scripts|projects|logs|pasarjohar/php-arsip|pasarjohar/server10/archive|gateway/data)(?:/|$) - [F,L,NC]
 RewriteRule (^|/)\.(?!well-known/).* - [F,L,NC]
 RewriteRule (^|/)(?:backup\.conf|offsite\.conf|\.env(?:\..*)?)$ - [F,L,NC]
 
@@ -22,8 +23,33 @@ RewriteRule ^info-persidangan$ widgets/views/info-persidangan.php [L,NC]
 RewriteRule ^info-persidangan-hijautua$ widgets/views/info-persidangan-hijautua.php [L,NC]
 RewriteRule ^info-persidangan-stabilo$ widgets/views/info-persidangan-stabilo.php [L,NC]
 RewriteRule ^monitor-antrian-sidang$ widgets/views/monitor-antrian-sidang.php [L,NC]
+RewriteRule ^antrian-sidang$ widgets/views/antrian-sidang.php [L,NC]
 RewriteRule ^antrian_controller$ widgets/views/antrian_controller.php [L,NC]
 RewriteRule ^generate_slide$ widgets/views/generate_slide.php [L,NC]
+RewriteRule ^statistik-perkara$ widgets/views/statistik-perkara.php [L,NC]
+RewriteRule ^statistik-perkara-data$ widgets/views/statistik-data.php [L,NC]
+RewriteRule ^statistik-data$ widgets/views/statistik-data.php [L,NC]
+RewriteRule ^statistik-ecourt$ widgets/views/statistik-ecourt.php [L,NC]
+RewriteRule ^statistik-hakim$ widgets/views/statistik-hakim.php [L,NC]
+RewriteRule ^api/pengumuman-rss/?$ widgets/views/api-pengumuman-rss.php [L,NC,QSA]
+RewriteRule ^api/pengumuman-rss/(ma|badilag|pta)/?$ widgets/views/api-pengumuman-rss.php?source=$1 [L,NC,QSA]
+RewriteRule ^api/pengumuman/?$ widgets/views/api-pengumuman-rss.php [L,NC,QSA]
+RewriteRule ^api/pengumuman/(ma|badilag|pta)/?$ widgets/views/api-pengumuman-rss.php?source=$1 [L,NC,QSA]
+RewriteRule ^api/server10/?$ widgets/views/api-server10.php [L,NC,QSA]
+RewriteRule ^api/server10/health/?$ widgets/views/api-server10.php?mode=health [L,NC,QSA]
+RewriteRule ^api/server10/capabilities/?$ widgets/views/api-server10.php?mode=capabilities [L,NC,QSA]
+RewriteRule ^api/wa-v2/?$ widgets/views/api-wa-v2.php [L,NC,QSA]
+RewriteRule ^api/wa-v2/(health|qr|send-text|restart|disconnect)/?$ widgets/views/api-wa-v2.php?path=$1 [L,NC,QSA]
+RewriteRule ^wa-v2/qr$ widgets/views/wa-v2-qr-viewer.html [L,NC]
+RewriteRule ^pengumuman-rss-widget$ widgets/views/widget-pengumuman-rss.php [L,NC]
+RewriteRule ^berita-pengadilan$ widgets/views/berita-pengadilan.html [L,NC]
+RewriteRule ^biaya-proses-berperkara$ widgets/views/biaya-proses-berperkara.html [L,NC]
+RewriteRule ^pa-semarang-pengumuman$ widgets/views/pa-semarang-pengumuman.php [L,NC]
+RewriteRule ^pa-semarang-pengumuman-embed$ widgets/views/pa-semarang-pengumuman-embed.php [L,NC]
+RewriteRule ^pa-semarang-embed-snippet$ widgets/views/pa-semarang-embed-snippet.html [L,NC]
+RewriteRule ^server10-data$ widgets/views/server10-data-app.html [L,NC]
+RewriteRule ^biaya-radius-ghaib$ widgets/views/biaya-radius-ghaib.php [L,NC]
+RewriteRule ^tabel-radius-kecamatan$ widgets/views/tabel-radius-kecamatan.php [L,NC]
 RewriteRule ^tes$ widgets/views/tes.php [L,NC]
 
 # 1a. URL KANONIK: PAKSA .php -> tanpa .php (hanya request asli dari browser)
@@ -49,4 +75,5 @@ RewriteRule ^([^\.]+)$ $1.php [NC,L]
 </FilesMatch>
 # 3. Pasang Iframe cuyyyyyyyyyyyyyyy
 Header set Content-Security-Policy "frame-ancestors 'self' https://pa-semarang.go.id https://*.pa-semarang.go.id;"
+# developed by dubes favour-it
 # developed by zhayyn™

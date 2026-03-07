@@ -4,7 +4,7 @@ gateway_require_token();
 
 $cfg = gateway_config();
 $latest = null;
-$files = glob(rtrim($cfg['backup_root'], '/') . '/lawangsewu_*.tar.enc') ?: [];
+$files = glob(rtrim($cfg['backup_root'], '/') . '/' . $cfg['backup_file_prefix'] . '*.tar.enc') ?: [];
 if (!empty($files)) {
     rsort($files);
     $latestPath = $files[0];
@@ -15,7 +15,8 @@ if (!empty($files)) {
     ];
 }
 
-$cron = shell_exec("crontab -l 2>/dev/null | grep -E 'lawangsewu-(daily|offsite)-backup' || true");
+$cronTag = preg_quote($cfg['backup_cron_tag'], '/');
+$cron = shell_exec("crontab -l 2>/dev/null | grep -E '" . $cronTag . "-(daily|offsite)-backup' || true");
 
 gateway_json([
     'ok' => true,

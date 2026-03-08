@@ -1,5 +1,10 @@
 <?php
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_name('lawangsewu_gateway_session');
+    session_start();
+}
+
 function gateway_load_env(string $filePath): array
 {
     $values = [];
@@ -51,6 +56,7 @@ function gateway_config(): array
         'backup_file_prefix' => $env['GATEWAY_BACKUP_FILE_PREFIX'] ?? 'lawangsewu_',
         'backup_cron_tag' => $env['GATEWAY_BACKUP_CRON_TAG'] ?? 'lawangsewu',
         'connections_file' => __DIR__ . '/data/connections.json',
+        'wa_env_file' => $baseDir . '/wa-caraka/.env',
     ];
 
     return $config;
@@ -103,4 +109,131 @@ function gateway_require_token(): void
 function gateway_safe_project_name(string $name): bool
 {
     return preg_match('/^[a-zA-Z0-9_-]+$/', $name) === 1;
+}
+
+function gateway_ui_url(string $path = ''): string
+{
+    $basePath = gateway_config()['base_path'];
+    $trimmed = ltrim($path, '/');
+    return $trimmed === '' ? $basePath . '/index' : $basePath . '/' . $trimmed;
+}
+
+function gateway_login_url(): string
+{
+    return gateway_ui_url('login');
+}
+
+function gateway_logout_url(): string
+{
+    return gateway_ui_url('logout');
+}
+
+function gateway_flash_set(string $key, string $message): void
+{
+    $_SESSION['gateway_flash'][$key] = $message;
+}
+
+function gateway_flash_get(string $key): ?string
+{
+    $value = $_SESSION['gateway_flash'][$key] ?? null;
+    unset($_SESSION['gateway_flash'][$key]);
+    return is_string($value) ? $value : null;
+}
+
+function gateway_auth_user(): ?array
+{
+    $user = $_SESSION['gateway_user'] ?? null;
+    return is_array($user) ? $user : null;
+}
+
+function gateway_is_logged_in(): bool
+{
+    return gateway_auth_user() !== null;
+}
+
+function gateway_require_login(): void
+{
+    if (gateway_is_logged_in()) {
+        return;
+    }
+
+    header('Location: ' . gateway_login_url());
+    exit;
+}
+
+function gateway_logout(): void
+{
+    unset($_SESSION['gateway_user']);
+}
+
+function gateway_wa_env(): array
+{
+    static $values = null;
+    if ($values !== null) {
+        return $values;
+    }
+
+    $values = gateway_load_env(gateway_config()['wa_env_file']);
+    return $values;
+}
+
+function gateway_admin_pdo(): PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    $env = gateway_wa_env();
+    $host = $env['DB_HOST'] ?? '127.0.0.1';
+    $port = (int) ($env['DB_PORT'] ?? 3306);
+    $dbName = $env['DB_NAME'] ?? '';
+    $user = $env['DB_USER'] ?? '';
+    $password = $env['DB_PASSWORD'] ?? '';
+
+    $pdo = new PDO(
+        sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $host, $port, $dbName),
+        $user,
+        $password,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]
+    );
+
+    return $pdo;
+}
+
+function gateway_attempt_login(string $username, string $password): array
+{
+    $username = trim($username);
+    if ($username === '' || $password === '') {
+        return ['ok' => false, 'message' => 'Username dan password wajib diisi.'];
+    }
+
+    try {
+        $stmt = gateway_admin_pdo()->prepare('SELECT id, username, full_name, role, is_active, password_hash FROM admin_users WHERE username = :username LIMIT 1');
+        $stmt->execute([':username' => $username]);
+        $user = $stmt->fetch();
+    } catch (Throwable $e) {
+        return ['ok' => false, 'message' => 'Login gateway belum dapat memeriksa database admin.'];
+    }
+
+    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) {
+        return ['ok' => false, 'message' => 'Username atau password salah.'];
+    }
+
+    if (!password_verify($password, (string) ($user['password_hash'] ?? ''))) {
+        return ['ok' => false, 'message' => 'Username atau password salah.'];
+    }
+
+    $_SESSION['gateway_user'] = [
+        'id' => (int) $user['id'],
+        'username' => (string) $user['username'],
+        'full_name' => (string) $user['full_name'],
+        'role' => (string) $user['role'],
+        'login_at' => date('c'),
+    ];
+
+    return ['ok' => true, 'user' => $_SESSION['gateway_user']];
 }

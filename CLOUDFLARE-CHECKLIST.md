@@ -2,6 +2,37 @@
 
 Dokumen ini jadi checklist agar kasus `Managed Challenge / 403` pada halaman monitor tidak terulang.
 
+## 0) WA Caraka Admin juga wajib dibebaskan dari challenge
+
+Saat ini path berikut juga terdeteksi kena `Managed Challenge`:
+
+- `https://lawangsewu.pa-semarang.go.id/wa-caraka-admin/login`
+- `https://lawangsewu.pa-semarang.go.id/wa-caraka`
+
+Gunakan pola rule yang sama seperti halaman monitor, tetapi untuk path WA Caraka:
+
+- Hostname equals `lawangsewu.pa-semarang.go.id`
+- URI Path starts with `/wa-caraka-admin`
+
+Action: `Skip`
+
+Komponen yang di-skip:
+
+- All remaining custom rules
+- All managed rules
+- All rate limiting rules
+- All Super Bot Fight Mode rules
+- Browser Integrity Check
+
+Jika halaman runtime `/wa-caraka` juga masih ditantang, buat rule kedua:
+
+- Hostname equals `lawangsewu.pa-semarang.go.id`
+- URI Path starts with `/wa-caraka`
+
+Action: `Skip`
+
+Setelah itu cek lagi di `Security -> Events` bahwa action untuk kedua path ini tidak lagi `Managed Challenge`.
+
 ## 1) Rule WAF custom (Skip) untuk endpoint monitor
 
 Buat **Custom Rule** dengan kriteria:

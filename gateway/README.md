@@ -6,6 +6,7 @@ Gateway ini jadi pintu gerbang untuk:
 - daftar koneksi server/git/workflow
 - daftar project coding
 - deploy project (lokal) via API
+- dashboard operasional Dubes Prakom untuk chat website + WA Caraka
 
 ## Setup cepat
 
@@ -24,6 +25,14 @@ nano /var/www/html/lawangsewu/gateway/.env
 3. Buka dashboard:
 
 - `/lawangsewu/gateway/index.php`
+- `/lawangsewu/gateway/mas-satset.php`
+- `/lawangsewu/gateway/login`
+
+## Login UI
+
+- Login Dubes Prakom: `/lawangsewu/gateway/login`
+- Kredensial mengikuti akun admin WA Caraka yang sama (`admin_users`)
+- Setelah login, pengguna diarahkan ke dashboard Lawangsewu dan dapat membuka Dubes Prakom Ops dari sana
 
 ## Endpoint
 

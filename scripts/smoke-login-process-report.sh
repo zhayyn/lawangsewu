@@ -10,6 +10,7 @@ REPORT_FILE="${REPORT_DIR}/smoke-login-process-report-$(date +%Y%m%d-%H%M%S).txt
 AUTO_SERVE="${SMOKE_AUTO_SERVE:-1}"
 LOCAL_HOST="${SMOKE_LOCAL_HOST:-127.0.0.1}"
 LOCAL_PORT="${SMOKE_LOCAL_PORT:-8788}"
+DB_ENV_FILE="${SMOKE_DASHBOARD_ENV_FILE:-${DASH_DIR}/.env}"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -60,6 +61,52 @@ extract_csrf() {
   CSRF_NAME="$(echo "${line}" | sed -n 's/.*name="\([^"]*\)" value="\([^"]*\)".*/\1/p')"
   CSRF_VAL="$(echo "${line}" | sed -n 's/.*name="\([^"]*\)" value="\([^"]*\)".*/\2/p')"
   [[ -n "${CSRF_NAME:-}" && -n "${CSRF_VAL:-}" ]]
+}
+
+env_get() {
+  local key="$1"
+  local default_value="${2:-}"
+  if [[ ! -f "${DB_ENV_FILE}" ]]; then
+    printf '%s' "${default_value}"
+    return
+  fi
+
+  local line value
+  line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "${DB_ENV_FILE}" | tail -n1 || true)"
+  if [[ -z "${line}" ]]; then
+    printf '%s' "${default_value}"
+    return
+  fi
+
+  value="${line#*=}"
+  value="$(printf '%s' "${value}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "${value}"
+}
+
+clear_login_attempt_identifier() {
+  local identifier="$1"
+  local mysql_cmd db_host db_port db_user db_password db_name
+  mysql_cmd="$(command -v mysql || true)"
+  if [[ -z "${mysql_cmd}" || ! -f "${DB_ENV_FILE}" ]]; then
+    return 0
+  fi
+
+  db_host="$(env_get database.default.hostname 127.0.0.1)"
+  db_port="$(env_get database.default.port 3306)"
+  db_user="$(env_get database.default.username root)"
+  db_password="$(env_get database.default.password '')"
+  db_name="$(env_get database.default.database '')"
+
+  if [[ -z "${db_name}" ]]; then
+    return 0
+  fi
+
+  MYSQL_PWD="${db_password}" "${mysql_cmd}" -h "${db_host}" -P "${db_port}" -u "${db_user}" "${db_name}" \
+    -e "DELETE FROM auth_login_attempts WHERE identifier='${identifier//\'/\'\'}'" >/dev/null 2>&1 || true
 }
 
 start_local_server_if_needed() {
@@ -127,6 +174,35 @@ login_user() {
   return 4
 }
 
+post_login_expect_message() {
+  local user="$1"
+  local passw="$2"
+  local expected_text="$3"
+  local cookie login_html post_out post_hdr location
+  cookie="$(mktemp_track)"
+  login_html="$(mktemp_track)"
+  post_out="$(mktemp_track)"
+  post_hdr="$(mktemp_track)"
+
+  curl -k -sS -c "${cookie}" -b "${cookie}" "${BASE_URL}/login" -o "${login_html}" || return 1
+  extract_csrf "${login_html}" || return 2
+
+  curl -k -sS -c "${cookie}" -b "${cookie}" -D "${post_hdr}" -o /dev/null \
+    -X POST "${BASE_URL}/login" \
+    --data-urlencode "${CSRF_NAME}=${CSRF_VAL}" \
+    --data-urlencode "username=${user}" \
+    --data-urlencode "password=${passw}" || return 3
+
+  location="$(awk 'BEGIN{IGNORECASE=1}/^Location:/{print $2}' "${post_hdr}" | tr -d '\r' | tail -n1)"
+  if [[ -z "${location}" ]]; then
+    return 4
+  fi
+
+  curl -k -sS -c "${cookie}" -b "${cookie}" "${BASE_URL}/login" -o "${post_out}" || return 5
+
+  grep -q "${expected_text}" "${post_out}"
+}
+
 get_page_code() {
   local cookie="$1"
   local path="$2"
@@ -192,6 +268,29 @@ check_role_banner() {
   fi
 }
 
+check_json_endpoint() {
+  local cookie="$1"
+  local user="$2"
+  local path="$3"
+  local expected_code="$4"
+  local expected_text="$5"
+  local out code
+  out="$(mktemp_track)"
+  code="$(get_page_code "${cookie}" "${path}" "${out}")"
+
+  if [[ "${code}" != "${expected_code}" ]]; then
+    fail "${user} expected ${path} code ${expected_code} but got ${code}"
+    return
+  fi
+
+  if [[ -n "${expected_text}" ]] && ! grep -q "${expected_text}" "${out}"; then
+    fail "${user} ${path} response missing ${expected_text}"
+    return
+  fi
+
+  pass "${user} ${path} ok (${code})"
+}
+
 post_and_assert_toast() {
   local cookie="$1"
   local from_path="$2"
@@ -246,14 +345,45 @@ run_matrix_for_user() {
     check_allow "${cookie}" "${user}" '/activity'
     check_allow "${cookie}" "${user}" '/devices'
     check_allow "${cookie}" "${user}" '/operator'
+    check_json_endpoint "${cookie}" "${user}" '/dashboard/live' '200' '"stats"'
+    check_json_endpoint "${cookie}" "${user}" '/devices/live' '200' '"devices"'
     check_deny_redirect_wa "${cookie}" "${user}" '/users'
   elif [[ "${role}" == 'operator' ]]; then
     check_role_banner "${cookie}" "${user}" 'OPERATOR'
     check_allow "${cookie}" "${user}" '/operator'
+    check_json_endpoint "${cookie}" "${user}" '/dashboard/live' '200' '"stats"'
     check_deny_redirect_wa "${cookie}" "${user}" '/activity'
     check_deny_redirect_wa "${cookie}" "${user}" '/devices'
+    check_deny_redirect_wa "${cookie}" "${user}" '/devices/live'
     check_deny_redirect_wa "${cookie}" "${user}" '/users'
   fi
+}
+
+run_lockout_smoke() {
+  local username="smoke-lockout-user"
+  local wrong_password="definitely-wrong-password"
+  local identifier="${username}|127.0.0.1"
+  local i
+
+  clear_login_attempt_identifier "${identifier}"
+
+  for i in 1 2 3 4 5; do
+    if post_login_expect_message "${username}" "${wrong_password}" 'Username atau password salah\.'; then
+      pass "Lockout prep attempt ${i} returned invalid-credential message"
+    else
+      fail "Lockout prep attempt ${i} did not return invalid-credential message"
+      clear_login_attempt_identifier "${identifier}"
+      return
+    fi
+  done
+
+  if post_login_expect_message "${username}" "${wrong_password}" 'Terlalu banyak percobaan gagal\.'; then
+    pass 'Lockout activates after repeated failures'
+  else
+    fail 'Lockout message missing after repeated failures'
+  fi
+
+  clear_login_attempt_identifier "${identifier}"
 }
 
 run_ops_report_smoke() {
@@ -360,6 +490,7 @@ run_matrix_for_user 'wakilketua' 'Semakinhebat@26' 'admin'
 
 run_toast_tests
 run_ops_report_smoke 'ketua' 'Semakinhebat@26'
+run_lockout_smoke
 
 log_line ''
 log_line "TOTAL_PASS=${PASS_COUNT}"

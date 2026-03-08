@@ -49,7 +49,9 @@ Langkah migrasi (target server):
    - CI4: composer install
    - Node WA: npm ci (di folder wa-caraka)
 5. Jalankan migration/seed CI4 jika dibutuhkan.
-6. Jalankan healthcheck dan smoke test login/WA/report.
+6. Jalankan healthcheck dan smoke test:
+   - bash scripts/post-deploy-wa-caraka-smoke.sh
+   - atau minimal: bash wa-caraka/scripts/smoke-runtime-endpoints.sh dan bash scripts/smoke-login-process-report.sh
 7. Aktifkan cron backup + offsite.
 EOF
 

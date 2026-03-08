@@ -5,6 +5,7 @@ $cfg = gateway_config();
 $basePath = $cfg['base_path'];
 $gatewayUser = gateway_auth_user();
 $masSatsetUrl = gateway_dubes_prakom_url();
+$masSatsetLandingUrl = gateway_mas_satset_url();
 $waCarakaEmbedUrl = gateway_wa_admin_sso_url('dashboard?embed=1');
 $waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
 ?>
@@ -80,6 +81,10 @@ $waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
                 <a class="quick-link" href="<?php echo htmlspecialchars($masSatsetUrl); ?>">
                     <div class="link-title">Dubes Prakom Ops</div>
                     <div class="muted">Pantau website chat Mas Satset, runtime, model, sync WordPress, dan jalankan uji cepat dari satu halaman.</div>
+                </a>
+                <a class="quick-link" href="<?php echo htmlspecialchars($masSatsetLandingUrl); ?>">
+                    <div class="link-title">Mas Satset</div>
+                    <div class="muted">Landing page khusus untuk uji tanya jawab cepat website dan menambah knowledge baru sebagai basis jawaban AI.</div>
                 </a>
                 <a class="quick-link" href="<?php echo htmlspecialchars($waCarakaAdminUrl); ?>" target="_blank" rel="noopener noreferrer">
                     <div class="link-title">WA Caraka Admin via SSO</div>

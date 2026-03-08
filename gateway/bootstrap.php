@@ -138,6 +138,11 @@ function gateway_dubes_prakom_url(): string
     return gateway_ui_url('dubes-prakom');
 }
 
+function gateway_mas_satset_url(): string
+{
+    return gateway_ui_url('mas-satset-ai');
+}
+
 function gateway_sso_status_label(): string
 {
     return gateway_is_logged_in() ? 'Aktif dan siap dipakai' : 'Menunggu login portal';

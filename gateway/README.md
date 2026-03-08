@@ -26,6 +26,7 @@ nano /var/www/html/lawangsewu/gateway/.env
 
 - `/lawangsewu/gateway/index.php`
 - `/lawangsewu/gateway/dubes-prakom.php`
+- `/lawangsewu/gateway/mas-satset-ai.php`
 - `/lawangsewu/gateway/login`
 
 ## Login UI
@@ -33,6 +34,7 @@ nano /var/www/html/lawangsewu/gateway/.env
 - Login Dubes Prakom: `/lawangsewu/gateway/login`
 - Kredensial mengikuti akun admin WA Caraka yang sama (`admin_users`)
 - Setelah login, pengguna diarahkan ke dashboard Lawangsewu dan dapat membuka Dubes Prakom Ops dari sana
+- Landing page Mas Satset tersedia di `/lawangsewu/gateway/mas-satset-ai` untuk uji cepat website chat dan input knowledge ke `wacaraka_faq`
 
 ## Endpoint
 

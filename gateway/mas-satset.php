@@ -245,7 +245,7 @@ $syncBadge = mas_satset_badge($syncCron !== '', 'Cron sync aktif', 'Cron sync be
             <div class="quick-links">
                 <a href="<?php echo htmlspecialchars($websiteChatPageUrl); ?>" target="_blank" rel="noopener noreferrer">Buka halaman publik Mas Satset</a>
                 <a href="<?php echo htmlspecialchars($wordpressBaseUrl); ?>/wp-json/pa-chat/v1/ask" target="_blank" rel="noopener noreferrer">Buka endpoint website chat</a>
-                <a href="/wa-caraka-admin" target="_blank" rel="noopener noreferrer">Buka WA Caraka Admin</a>
+                <a href="<?php echo htmlspecialchars(gateway_wa_admin_sso_url('dashboard')); ?>" target="_blank" rel="noopener noreferrer">Buka WA Caraka Admin</a>
                 <a href="<?php echo htmlspecialchars($basePath); ?>/index.php">Kembali ke Gateway</a>
                 <a href="<?php echo htmlspecialchars(gateway_logout_url()); ?>">Logout dari Lawangsewu</a>
             </div>
@@ -355,7 +355,7 @@ $syncBadge = mas_satset_badge($syncCron !== '', 'Cron sync aktif', 'Cron sync be
         </div>
         <div class="chip-row">
             <?php foreach ($presetPrompts as $preset) : ?>
-                <a class="chip" href="<?php echo htmlspecialchars(gateway_ui_url('mas-satset') . '?preset=' . rawurlencode($preset)); ?>"><?php echo htmlspecialchars($preset); ?></a>
+                <a class="chip" href="<?php echo htmlspecialchars(gateway_dubes_prakom_url() . '?preset=' . rawurlencode($preset)); ?>"><?php echo htmlspecialchars($preset); ?></a>
             <?php endforeach; ?>
         </div>
         <form method="post">

@@ -25,7 +25,7 @@ nano /var/www/html/lawangsewu/gateway/.env
 3. Buka dashboard:
 
 - `/lawangsewu/gateway/index.php`
-- `/lawangsewu/gateway/mas-satset.php`
+- `/lawangsewu/gateway/dubes-prakom.php`
 - `/lawangsewu/gateway/login`
 
 ## Login UI

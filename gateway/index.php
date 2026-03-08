@@ -4,8 +4,9 @@ gateway_require_login();
 $cfg = gateway_config();
 $basePath = $cfg['base_path'];
 $gatewayUser = gateway_auth_user();
-$masSatsetUrl = gateway_ui_url('mas-satset');
-$waCarakaEmbedUrl = '/wa-caraka-admin/dashboard?embed=1';
+$masSatsetUrl = gateway_dubes_prakom_url();
+$waCarakaEmbedUrl = gateway_wa_admin_sso_url('dashboard?embed=1');
+$waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -65,14 +66,14 @@ $waCarakaEmbedUrl = '/wa-caraka-admin/dashboard?embed=1';
 <div class="wrap">
     <div class="topbar">
         <div>Login sebagai <strong><?php echo htmlspecialchars((string) ($gatewayUser['full_name'] ?: $gatewayUser['username'] ?? '-')); ?></strong></div>
-        <div><a href="<?php echo htmlspecialchars(gateway_logout_url()); ?>">Logout</a></div>
+        <div><a href="<?php echo htmlspecialchars(gateway_logout_url()); ?>">Logout Portal + WA Caraka</a></div>
     </div>
     <section class="hero">
         <div class="panel hero-main">
             <span class="eyebrow">Lawangsewu Portal</span>
             <h1><?php echo htmlspecialchars($cfg['app_name']); ?></h1>
             <p class="lead">Control center internal yang modern, bersih, dan elegan untuk mengelola WA Caraka, observabilitas website chat, knowledge sync WordPress, dan utilitas gateway Lawangsewu.</p>
-            <div class="hero-meta">Kredensial portal ini mengikuti akun WA Caraka, tetapi sesi portal tetap dipisahkan untuk keamanan operasional.</div>
+            <div class="hero-meta">Kredensial portal ini mengikuti akun WA Caraka, dan akses ke dashboard WA Caraka sekarang masuk melalui signed SSO dari portal Lawangsewu.</div>
         </div>
         <aside class="panel hero-side">
             <div class="quick-links">
@@ -80,15 +81,19 @@ $waCarakaEmbedUrl = '/wa-caraka-admin/dashboard?embed=1';
                     <div class="link-title">Dubes Prakom Ops</div>
                     <div class="muted">Pantau website chat Mas Satset, runtime, model, sync WordPress, dan jalankan uji cepat dari satu halaman.</div>
                 </a>
-                <a class="quick-link" href="/wa-caraka-admin" target="_blank" rel="noopener noreferrer">
-                    <div class="link-title">WA Caraka Admin</div>
-                    <div class="muted">Buka kontrol utama runtime WhatsApp, inbox operator, messages, devices, dan pengaturan LLM.</div>
+                <a class="quick-link" href="<?php echo htmlspecialchars($waCarakaAdminUrl); ?>" target="_blank" rel="noopener noreferrer">
+                    <div class="link-title">WA Caraka Admin via SSO</div>
+                    <div class="muted">Buka kontrol utama runtime WhatsApp, inbox operator, messages, devices, dan pengaturan LLM tanpa login ulang.</div>
                 </a>
             </div>
         </aside>
     </section>
 
     <section class="meta-grid">
+        <div class="meta-box">
+            <div class="meta-label">Status SSO</div>
+            <div class="meta-value"><?php echo htmlspecialchars(gateway_sso_status_label()); ?></div>
+        </div>
         <div class="meta-box">
             <div class="meta-label">UI Login</div>
             <div class="meta-value">Dubes Prakom</div>
@@ -131,7 +136,7 @@ $waCarakaEmbedUrl = '/wa-caraka-admin/dashboard?embed=1';
 
     <div class="panel" style="padding:20px; margin-top:18px;">
         <div class="link-title">Embed WA Caraka di Lawangsewu</div>
-        <div class="muted" style="margin-bottom:14px;">WA Caraka juga ditampilkan langsung di portal Lawangsewu. Jika sesi WA Caraka belum aktif, iframe akan menampilkan halaman login WA Caraka.</div>
+        <div class="muted" style="margin-bottom:14px;">WA Caraka ditampilkan langsung di portal Lawangsewu melalui signed SSO. Selama sesi portal aktif, iframe ini akan membuka dashboard WA Caraka tanpa login kedua.</div>
         <iframe src="<?php echo htmlspecialchars($waCarakaEmbedUrl); ?>" title="Embed WA Caraka" style="width:100%; min-height:860px; border:1px solid rgba(25,104,63,0.14); border-radius:18px; background:#fff;"></iframe>
     </div>
 </div>

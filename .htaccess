@@ -4,6 +4,12 @@
 # 1. MENGHILANGKAN EXTENSION .PHP DI URL
 RewriteEngine On
 
+# 0a. Compatibility: pada vhost lawangsewu.pa-semarang.go.id, beberapa link lama
+# masih memakai prefix /lawangsewu/... Padahal DocumentRoot sudah langsung ke
+# /var/www/html/lawangsewu. Strip prefix ini secara internal agar URL lama dan
+# baru sama-sama hidup.
+RewriteRule ^lawangsewu/(.*)$ $1 [L,NC]
+
 # 0. HARDENING: blok akses langsung ke folder/file sensitif
 RewriteRule ^(?:scripts|projects|logs|pasarjohar/php-arsip|pasarjohar/server10/archive|gateway/data)(?:/|$) - [F,L,NC]
 RewriteRule (^|/)\.(?!well-known/).* - [F,L,NC]

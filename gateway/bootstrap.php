@@ -128,6 +128,21 @@ function gateway_logout_url(): string
     return gateway_ui_url('logout');
 }
 
+function gateway_wa_admin_portal_logout_url(): string
+{
+    return '/wa-caraka-admin/index.php/portal-logout?return=' . rawurlencode(gateway_login_url());
+}
+
+function gateway_dubes_prakom_url(): string
+{
+    return gateway_ui_url('dubes-prakom');
+}
+
+function gateway_sso_status_label(): string
+{
+    return gateway_is_logged_in() ? 'Aktif dan siap dipakai' : 'Menunggu login portal';
+}
+
 function gateway_flash_set(string $key, string $message): void
 {
     $_SESSION['gateway_flash'][$key] = $message;
@@ -175,6 +190,37 @@ function gateway_wa_env(): array
 
     $values = gateway_load_env(gateway_config()['wa_env_file']);
     return $values;
+}
+
+function gateway_sso_secret(): string
+{
+    $cfg = gateway_config();
+    return $cfg['api_token'] !== '' ? (string) $cfg['api_token'] : sha1(__FILE__ . php_uname('n'));
+}
+
+function gateway_base64url_encode(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function gateway_wa_admin_sso_url(string $target = 'dashboard?embed=1'): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return '/wa-caraka-admin/login';
+    }
+
+    $payload = [
+        'uid' => (int) ($user['id'] ?? 0),
+        'username' => (string) ($user['username'] ?? ''),
+        'ts' => time(),
+        'target' => ltrim($target, '/'),
+    ];
+
+    $encoded = gateway_base64url_encode(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}');
+    $signature = hash_hmac('sha256', $encoded, gateway_sso_secret());
+
+    return '/wa-caraka-admin/index.php/sso-login?payload=' . rawurlencode($encoded) . '&sig=' . rawurlencode($signature);
 }
 
 function gateway_admin_pdo(): PDO

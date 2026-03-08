@@ -2,7 +2,7 @@
 require __DIR__ . '/bootstrap.php';
 
 if (gateway_is_logged_in()) {
-    header('Location: ' . gateway_ui_url('mas-satset'));
+    header('Location: ' . gateway_dubes_prakom_url());
     exit;
 }
 
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedUsername = trim((string) ($_POST['username'] ?? ''));
     $result = gateway_attempt_login($submittedUsername, (string) ($_POST['password'] ?? ''));
     if (!empty($result['ok'])) {
-        header('Location: ' . gateway_ui_url('mas-satset'));
+        header('Location: ' . gateway_dubes_prakom_url());
         exit;
     }
 

@@ -1,0 +1,15 @@
+# Copy to scripts/restore-drill.conf and adjust values as needed.
+# Local file is gitignored to keep webhook URLs/secrets out of repository.
+
+# Optional webhook receiver for restore drill alerts.
+# RESTORE_DRILL_ALERT_WEBHOOK_URL='https://hooks.example.internal/restore-alert'
+
+# Optional local command. Receives ALERT_LEVEL, ALERT_MESSAGE, ALERT_HOST env vars.
+RESTORE_DRILL_ALERT_COMMAND='logger -t restore-drill "[$ALERT_LEVEL][$ALERT_HOST] $ALERT_MESSAGE"'
+
+# Optional: send WA alert to superadmin list via WA Caraka API.
+# Comma-separated numbers (digits only), e.g. '628123456789,628987654321'.
+# RESTORE_DRILL_ALERT_WA_SUPERADMIN_NUMBERS='628123456789'
+# RESTORE_DRILL_ALERT_WA_MODE='error'   # error | all | off
+# RESTORE_DRILL_ALERT_WA_API_URL='http://127.0.0.1:8793/send-text'
+# RESTORE_DRILL_ALERT_WA_TOKEN=''

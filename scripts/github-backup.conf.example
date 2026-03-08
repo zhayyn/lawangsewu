@@ -1,0 +1,17 @@
+# Copy to scripts/github-backup.conf (local, gitignored if you add it).
+
+# Source repository push target.
+SOURCE_GITHUB_REMOTE='github'
+SOURCE_GITHUB_BRANCH='main'
+PUSH_SOURCE_REPO=1
+
+# Optional artifact backup repository (private).
+# If enabled, encrypted backup + migration package metadata will be committed and pushed.
+PUSH_ARTIFACTS_GITHUB=0
+BACKUP_GITHUB_ARTIFACT_REPO_URL=''
+BACKUP_GITHUB_ARTIFACT_BRANCH='main'
+BACKUP_GITHUB_ARTIFACT_SUBDIR='lawangsewu'
+
+# Operational knobs.
+AUDIT_BASE_URL='http://127.0.0.1:8792'
+RUN_SECURITY_AUDIT=1

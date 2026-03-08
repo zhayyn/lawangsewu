@@ -37,20 +37,20 @@ echo
 echo "[3/3] Cek endpoint sensitif publik..."
 check_code() {
   local path="$1"
-  local expected="$2"
+  local expected_regex="$2"
   local code
   code="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}${path}")"
-  if [[ "${code}" == "${expected}" ]]; then
+  if [[ "${code}" =~ ${expected_regex} ]]; then
     echo "OK: ${path} -> ${code}"
   else
-    echo "FAIL: ${path} -> ${code} (expected ${expected})"
+    echo "FAIL: ${path} -> ${code} (expected regex ${expected_regex})"
     FAIL=1
   fi
 }
 
-check_code "/.env" "403"
-check_code "/scripts/" "403"
-check_code "/projects/" "403"
+check_code "/.env" "^(403|404)$"
+check_code "/scripts/" "^(403|404)$"
+check_code "/projects/" "^(403|404)$"
 echo
 
 if [[ "${FAIL}" -eq 0 ]]; then

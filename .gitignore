@@ -35,6 +35,8 @@ id_ed25519.pub
 *secret*.php
 scripts/backup.conf
 scripts/offsite.conf
+scripts/restore-drill.conf
+scripts/github-backup.conf
 gateway/.env
 projects/**/.env
 projects/website-pa-semarang/lumpiapasar-s9-active/

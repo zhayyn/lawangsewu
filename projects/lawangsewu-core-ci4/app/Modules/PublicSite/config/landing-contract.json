@@ -1,0 +1,15 @@
+{
+  "module": "PublicSite",
+  "status": "staging",
+  "route": "/",
+  "mustKeepBehaviors": [
+    "fullscreen-landing",
+    "inline-login-panel",
+    "portal-redirect-on-success",
+    "branding-animation",
+    "no-direct-runtime-dependency"
+  ],
+  "source": [
+    "widgets/views/php/public/landing.php"
+  ]
+}

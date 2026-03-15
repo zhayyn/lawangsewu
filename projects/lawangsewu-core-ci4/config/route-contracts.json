@@ -1,0 +1,115 @@
+{
+  "project": "lawangsewu-core-ci4",
+  "policy": {
+    "publicRoutesMustRemainStable": true,
+    "authRoutesMustRemainStable": true,
+    "legacyAliasesMustRemainCompatible": true
+  },
+  "coreRoutes": [
+    "/",
+    "/portal",
+    "/walkthrough",
+    "/daftar-widget"
+  ],
+  "authRoutes": [
+    "/lawangsewu/gateway/index",
+    "/lawangsewu/gateway/login",
+    "/lawangsewu/gateway/logout",
+    "/lawangsewu/gateway/dubes-prakom",
+    "/lawangsewu/gateway/mas-satset-ai",
+    "/lawangsewu/gateway/sso-mapping"
+  ],
+  "publicWidgetRoutes": [
+    "/info-persidangan",
+    "/info-persidangan-hijautua",
+    "/info-persidangan-stabilo",
+    "/monitor-persidangan",
+    "/antrian-persidangan",
+    "/dashboard-perkara",
+    "/dashboard-ecourt",
+    "/dashboard-hakim",
+    "/widget-pengumuman",
+    "/berita-pengadilan",
+    "/pengumuman-peradilan",
+    "/pengumuman-peradilan-embed",
+    "/panduan-embed-pengumuman",
+    "/bridge-server10",
+    "/radius-ghaib",
+    "/radius-kecamatan",
+    "/monitor-wa"
+  ],
+  "publicApiRoutes": [
+    "/api/pengumuman-rss",
+    "/api/pengumuman",
+    "/api/server10",
+    "/api/server10/health",
+    "/api/server10/capabilities",
+    "/api/wa-v2"
+  ],
+  "legacyAliases": [
+    {
+      "from": "/pa-semarang-pengumuman",
+      "to": "/pengumuman-peradilan"
+    },
+    {
+      "from": "/pa-semarang-pengumuman-embed",
+      "to": "/pengumuman-peradilan-embed"
+    },
+    {
+      "from": "/pengumuman-rss-widget",
+      "to": "/widget-pengumuman"
+    },
+    {
+      "from": "/antrian-sidang",
+      "to": "/antrian-persidangan"
+    },
+    {
+      "from": "/monitor-antrian-sidang",
+      "to": "/monitor-persidangan"
+    },
+    {
+      "from": "/statistik-perkara",
+      "to": "/dashboard-perkara"
+    },
+    {
+      "from": "/statistik-ecourt",
+      "to": "/dashboard-ecourt"
+    },
+    {
+      "from": "/statistik-hakim",
+      "to": "/dashboard-hakim"
+    },
+    {
+      "from": "/biaya-proses-berperkara",
+      "to": "/biaya-perkara"
+    },
+    {
+      "from": "/biaya-radius-ghaib",
+      "to": "/radius-ghaib"
+    },
+    {
+      "from": "/tabel-radius-kecamatan",
+      "to": "/radius-kecamatan"
+    },
+    {
+      "from": "/server10-data",
+      "to": "/bridge-server10"
+    },
+    {
+      "from": "/wa-v2/qr",
+      "to": "/monitor-wa"
+    }
+  ],
+  "integrationContracts": [
+    {
+      "name": "wa-caraka-admin-sso",
+      "route": "/wa-caraka-admin/index.php/sso-login",
+      "status": "must-keep"
+    },
+    {
+      "name": "wa-caraka-admin-swagger",
+      "route": "/wa-caraka-admin/wa/docs/swagger",
+      "status": "must-keep"
+    }
+  ]
+}

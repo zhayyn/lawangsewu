@@ -1,0 +1,17 @@
+{
+  "module": "DocsRegistry",
+  "status": "staging",
+  "route": "/walkthrough",
+  "mustKeepBehaviors": [
+    "walkthrough-index",
+    "pdf-master-link",
+    "md-pdf-html-access",
+    "widget-directory-shortcut"
+  ],
+  "source": [
+    "Walkthrough-DBPrakom/index.html",
+    "Walkthrough-DBPrakom/html/index.html",
+    "Walkthrough-DBPrakom/md",
+    "Walkthrough-DBPrakom/pdf"
+  ]
+}

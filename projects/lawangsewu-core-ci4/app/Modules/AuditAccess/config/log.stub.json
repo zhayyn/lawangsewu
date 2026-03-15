@@ -1,0 +1,10 @@
+{
+  "module": "AuditAccess",
+  "status": "staging",
+  "logFile": "writable/logs/audit-access.jsonl",
+  "events": [
+    "request",
+    "redirect",
+    "not-found"
+  ]
+}

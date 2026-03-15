@@ -1,0 +1,7 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+fwrite(STDOUT, "Lawangsewu Core CI4 staging shell\n");
+fwrite(STDOUT, "Use: php -S 127.0.0.1:8796 -t public public/index.php\n");

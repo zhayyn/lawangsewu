@@ -1,0 +1,44 @@
+{
+  "module": "Portal",
+  "status": "staging",
+  "sections": [
+    {
+      "title": "Internal Tools",
+      "items": [
+        "WA Caraka Admin via SSO",
+        "Portal Gateway",
+        "Dubes Prakom Ops",
+        "Mas Satset AI",
+        "Swagger UI Internal"
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        "Walkthrough Lawangsewu",
+        "Daftar Link Widget",
+        "Mapping SSO Layanan",
+        "Remote Access Security"
+      ]
+    },
+    {
+      "title": "Public Views",
+      "items": [
+        "Berita Pengadilan",
+        "Pengumuman Peradilan",
+        "Widget Pengumuman",
+        "Monitor Persidangan"
+      ]
+    },
+    {
+      "title": "Data & Monitoring",
+      "items": [
+        "Dashboard Perkara",
+        "Dashboard eCourt",
+        "Dashboard Hakim",
+        "Bridge Server 10",
+        "Monitor WA"
+      ]
+    }
+  ]
+}

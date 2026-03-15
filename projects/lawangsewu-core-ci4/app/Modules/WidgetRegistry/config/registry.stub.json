@@ -1,0 +1,16 @@
+{
+  "module": "WidgetRegistry",
+  "status": "staging",
+  "route": "/daftar-widget",
+  "mustKeepBehaviors": [
+    "public-widget-directory",
+    "canonical-root-routes",
+    "embed-hints",
+    "compatibility-layer-outside-registry"
+  ],
+  "source": [
+    "Walkthrough-DBPrakom/widget-links.html",
+    "ROUTE-INVENTORY-LAWANGSEWU.md",
+    "Walkthrough-DBPrakom/README.md"
+  ]
+}

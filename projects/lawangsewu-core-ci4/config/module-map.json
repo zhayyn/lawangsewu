@@ -1,0 +1,108 @@
+{
+  "project": "lawangsewu-core-ci4",
+  "status": "staging",
+  "modules": [
+    {
+      "name": "PublicSite",
+      "purpose": "Landing and public-facing pages",
+      "migrationWave": 1,
+      "sources": [
+        "widgets/views/php/public/landing.php",
+        "widgets/views/html/public"
+      ]
+    },
+    {
+      "name": "Portal",
+      "purpose": "Main post-login portal dashboard",
+      "migrationWave": 1,
+      "sources": [
+        "widgets/views/php/public/index.php"
+      ]
+    },
+    {
+      "name": "AuthGateway",
+      "purpose": "Portal auth, session, launcher, signed access helpers",
+      "migrationWave": 1,
+      "sources": [
+        "gateway/bootstrap.php",
+        "gateway/login.php",
+        "gateway/logout.php"
+      ]
+    },
+    {
+      "name": "AppRegistry",
+      "purpose": "Sibling app metadata and launcher registry",
+      "migrationWave": 2,
+      "sources": [
+        "gateway/index.php",
+        "widgets/views/php/public/index.php"
+      ]
+    },
+    {
+      "name": "WidgetRegistry",
+      "purpose": "Widget metadata, canonical urls, compatibility aliases",
+      "migrationWave": 2,
+      "sources": [
+        ".htaccess",
+        "Walkthrough-DBPrakom/widget-links.html"
+      ]
+    },
+    {
+      "name": "DocsRegistry",
+      "purpose": "Portal-linked documentation registry",
+      "migrationWave": 2,
+      "sources": [
+        "Walkthrough-DBPrakom",
+        "README.md"
+      ]
+    },
+    {
+      "name": "PublicApiLite",
+      "purpose": "Small public endpoints and bridge routes tied to portal/widgets",
+      "migrationWave": 3,
+      "sources": [
+        "widgets/views/php/api"
+      ]
+    },
+    {
+      "name": "MonitoringLite",
+      "purpose": "Small operational summaries rendered in portal",
+      "migrationWave": 3,
+      "sources": [
+        "widgets/views/html/public/wa-v2-qr-viewer.html",
+        "gateway/mas-satset-ai.php"
+      ]
+    },
+    {
+      "name": "AuditAccess",
+      "purpose": "Audit trail for portal-level access and launcher activity",
+      "migrationWave": 3,
+      "sources": [
+        "gateway",
+        "widgets/views/php/public/index.php"
+      ]
+    }
+  ],
+  "siblingApps": [
+    {
+      "name": "wa-caraka-runtime",
+      "path": "wa-caraka",
+      "status": "stay-separate"
+    },
+    {
+      "name": "wa-caraka-admin-wrapper",
+      "path": "wa-caraka-admin",
+      "status": "stay-separate"
+    },
+    {
+      "name": "wa-caraka-admin-ci4",
+      "path": "wa-caraka/dashboard-ci4-admin",
+      "status": "stay-separate"
+    },
+    {
+      "name": "gateway-node",
+      "path": "gateway-node",
+      "status": "stay-separate"
+    }
+  ]
+}

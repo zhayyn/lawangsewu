@@ -1,0 +1,16 @@
+{
+  "module": "AppRegistry",
+  "status": "staging",
+  "route": "/app-registry",
+  "mustKeepBehaviors": [
+    "sibling-app-launchers",
+    "gateway-launchers",
+    "role-aware-access-metadata",
+    "portal-consumable-registry"
+  ],
+  "source": [
+    "widgets/views/php/public/index.php",
+    "gateway/bootstrap.php",
+    "projects/lawangsewu-core-ci4/app/Modules/AuthGateway/Services/LegacyGatewayAuthBridge.php"
+  ]
+}

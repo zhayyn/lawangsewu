@@ -156,10 +156,10 @@
   <main class="page">
     <section class="hero">
       <span class="label">Status Eksekutif</span>
-      <h1>Migrasi Lawangsewu belum selesai, tetapi fondasinya sudah matang.</h1>
-      <p class="lead">Posisi paling akurat per 2026-03-14 adalah: staging CI4 Core sudah kuat untuk eksekusi bertahap, namun cutover produksi penuh masih belum selesai dan tidak boleh diklaim final lebih cepat dari bukti runtime.</p>
-      <div class="meta">Tanggal acuan: 2026-03-14</div>
-      <div class="status">Status operasional: foundation ready, staged migration in progress, full production cutover pending.</div>
+      <h1>Migrasi Lawangsewu belum selesai, tetapi tahap publik utama sudah masuk shadow aktif yang tervalidasi.</h1>
+      <p class="lead">Posisi paling akurat per 2026-03-15 adalah: staging CI4 Core sudah kuat untuk eksekusi bertahap, family publik utama sudah aktif di jalur shadow terkontrol, namun cutover produksi penuh masih belum selesai dan tidak boleh diklaim final lebih cepat dari bukti runtime.</p>
+      <div class="meta">Tanggal acuan: 2026-03-15</div>
+      <div class="status">Status operasional: public shadow active and validated, staged migration in progress, full production cutover pending.</div>
     </section>
 
     <section class="section">
@@ -178,7 +178,8 @@
           <ul>
             <li>Shell staging CI4 Core sudah hidup untuk smoke, readiness, dan comparison.</li>
             <li>Route contract, compatibility alias, dan cutover matrix sudah tersedia.</li>
-            <li>Sejumlah family publik sudah cukup matang untuk shadow bertahap.</li>
+            <li>Family <strong>landing</strong>, <strong>widget-directory</strong>, <strong>docs</strong>, dan <strong>public-widget</strong> kanonik sudah aktif di jalur shadow.</li>
+            <li>Comparison publik terbaru bersih penuh dengan hasil <strong>safe=20</strong>, <strong>review=0</strong>, <strong>hold=0</strong>.</li>
           </ul>
         </div>
       </div>
@@ -187,8 +188,8 @@
     <section class="section">
       <h2>Yang Belum Selesai</h2>
       <ul>
-        <li>Runtime produksi utama belum resmi dipindahkan ke CI4 Core.</li>
-        <li>Cutover publik belum selesai untuk semua family route.</li>
+        <li>Runtime produksi utama belum resmi dipindahkan penuh ke CI4 Core sebagai runtime final tunggal.</li>
+        <li>Cutover publik masih berada pada mode shadow aktif, belum dinyatakan final penuh.</li>
         <li>Portal belum dinyatakan selesai cutover penuh ke runtime baru.</li>
         <li>Laravel sibling app belum menjadi implementasi final yang berjalan penuh.</li>
         <li>Compatibility layer masih harus dijaga selama migrasi bertahap.</li>
@@ -203,7 +204,7 @@
           <ul>
             <li>Fondasi migrasi sudah matang.</li>
             <li>Staging cukup kuat untuk eksekusi bertahap.</li>
-            <li>Sebagian area sudah siap shadow atau review.</li>
+            <li>Family publik utama sudah aktif di shadow dengan guardrail rollback yang jelas.</li>
           </ul>
         </div>
         <div class="card">

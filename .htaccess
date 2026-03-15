@@ -20,6 +20,8 @@ RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?walkthrough-shadow-proxy\.php[\s?
 RewriteRule ^walkthrough-shadow-proxy\.php$ - [F,L,NC]
 RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?widget-directory-shadow-proxy\.php[\s?] [NC]
 RewriteRule ^widget-directory-shadow-proxy\.php$ - [F,L,NC]
+RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?public-widget-shadow-proxy\.php[\s?] [NC]
+RewriteRule ^public-widget-shadow-proxy\.php$ - [F,L,NC]
 
 # Sembunyikan implementasi internal: blok akses URL langsung ke widgets/views
 RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?widgets/views/ [NC]
@@ -41,6 +43,10 @@ RewriteRule ^daftar-widget/?$ Walkthrough-DBPrakom/widget-links.html [L,NC]
 RewriteRule ^widget-links/?$ Walkthrough-DBPrakom/widget-links.html [L,NC]
 RewriteRule ^walkthrough/master-pdf/?$ Walkthrough-DBPrakom/pdf/Walkthrough-DBPrakom-Master.pdf [L,NC]
 RewriteRule ^walkthrough/(md|pdf|html)/(.*)$ Walkthrough-DBPrakom/$1/$2 [L,NC]
+
+# Public widget family shadow for safe canonical routes
+RewriteCond /var/www/html/lawangsewu/runtime-flags/public-widget-shadow-on.flag -f
+RewriteRule ^(info-persidangan|info-persidangan-hijautua|info-persidangan-stabilo|monitor-persidangan|antrian-persidangan|dashboard-perkara|dashboard-ecourt|dashboard-hakim|widget-pengumuman|berita-pengadilan|pengumuman-peradilan|pengumuman-peradilan-embed|panduan-embed-pengumuman|bridge-server10|radius-ghaib|radius-kecamatan|monitor-wa)/?$ public-widget-shadow-proxy.php [L,NC]
 
 # Canonical alias redirects for public branding on the final domain
 RewriteCond %{HTTP_HOST} ^(?:www\.)?lawangsewu\.pa-semarang\.go\.id$ [NC]

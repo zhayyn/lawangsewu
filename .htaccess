@@ -24,6 +24,10 @@ RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?public-widget-shadow-proxy\.php[\
 RewriteRule ^public-widget-shadow-proxy\.php$ - [F,L,NC]
 RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?landing-shadow-proxy\.php[\s?] [NC]
 RewriteRule ^landing-shadow-proxy\.php$ - [F,L,NC]
+RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?portal-shadow-proxy\.php[\s?] [NC]
+RewriteRule ^portal-shadow-proxy\.php$ - [F,L,NC]
+RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?app-registry-shadow-proxy\.php[\s?] [NC]
+RewriteRule ^app-registry-shadow-proxy\.php$ - [F,L,NC]
 
 # Sembunyikan implementasi internal: blok akses URL langsung ke widgets/views
 RewriteCond %{THE_REQUEST} \s+/(?:lawangsewu/)?widgets/views/ [NC]
@@ -51,6 +55,10 @@ RewriteCond /var/www/html/lawangsewu/runtime-flags/public-widget-shadow-on.flag 
 RewriteRule ^(info-persidangan|info-persidangan-hijautua|info-persidangan-stabilo|monitor-persidangan|antrian-persidangan|dashboard-perkara|dashboard-ecourt|dashboard-hakim|widget-pengumuman|berita-pengadilan|pengumuman-peradilan|pengumuman-peradilan-embed|panduan-embed-pengumuman|bridge-server10|radius-ghaib|radius-kecamatan|monitor-wa)/?$ public-widget-shadow-proxy.php [L,NC]
 RewriteCond /var/www/html/lawangsewu/runtime-flags/landing-shadow-on.flag -f
 RewriteRule ^$ landing-shadow-proxy.php [L,NC]
+RewriteCond /var/www/html/lawangsewu/runtime-flags/portal-shadow-on.flag -f
+RewriteRule ^portal(?:/launch)?/?$ portal-shadow-proxy.php [L,NC]
+RewriteCond /var/www/html/lawangsewu/runtime-flags/app-registry-shadow-on.flag -f
+RewriteRule ^app-registry(?:/launch)?/?$ app-registry-shadow-proxy.php [L,NC]
 
 # Canonical alias redirects for public branding on the final domain
 RewriteCond %{HTTP_HOST} ^(?:www\.)?lawangsewu\.pa-semarang\.go\.id$ [NC]

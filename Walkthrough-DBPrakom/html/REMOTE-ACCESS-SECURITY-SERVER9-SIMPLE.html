@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>REMOTE-ACCESS-SECURITY-SERVER9-SIMPLE.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>REMOTE-ACCESS-SECURITY-SERVER9-SIMPLE.md</h1><h1>Keamanan Akses Remote Server 9 (Versi Sederhana)</h1>
+<p>Dokumen ini adalah versi ringkas dan mudah dipahami dari kebijakan akses remote Server 9.</p>
+<h2>Gambaran Besar</h2>
+<p>Bayangkan Server 9 itu seperti rumah penting yang berisi dokumen negara.</p>
+<ul>
+<li>Dulu kita sempat pakai "pintu tamu online" (cloud tunnel berbasis akun).</li>
+<li>Sekarang kita pilih "jalan pribadi + kunci sendiri" (WireGuard + SSH).</li>
+</ul>
+<p>Tujuannya sederhana: kalau akun cloud seseorang dibajak, orang itu tetap tidak bisa masuk ke server lewat jalur admin utama.</p>
+<h2>Perumpamaan Sederhana</h2>
+<ul>
+<li><code>WireGuard</code> = jalan tol pribadi ke kompleks perumahan.</li>
+<li><code>SSH</code> = pintu rumah utama yang perlu kunci.</li>
+<li><code>UFW limit</code> = satpam yang membatasi orang coba-coba kunci berkali-kali.</li>
+<li><code>VS Code Tunnel</code> = pintu tamu pintar berbasis akun internet.</li>
+</ul>
+<p>Keputusan sekarang:</p>
+<ul>
+<li>Pintu tamu pintar dimatikan.</li>
+<li>Masuk hanya lewat jalan pribadi + pintu utama.</li>
+</ul>
+<h2>Kenapa Dipilih Model Ini</h2>
+<ol>
+<li>Lebih tahan jika akun cloud (misal GitHub) dicuri.</li>
+<li>Kontrol akses lebih jelas karena pakai kunci yang kita pegang sendiri.</li>
+<li>Cocok untuk operasional dari iPad tanpa membuka pintu publik tambahan.</li>
+<li>Tidak mengganggu layanan lama di server.</li>
+</ol>
+<h2>Tingkat Keamanan (Bahasa Praktis)</h2>
+<ul>
+<li>Risiko dari pembajakan akun cloud: <strong>rendah</strong> (untuk akses server), karena tunnel cloud dimatikan.</li>
+<li>Risiko percobaan login acak dari internet: <strong>lebih terkendali</strong>, karena SSH dibatasi rate limit.</li>
+<li>Risiko kehilangan akses admin: <strong>rendah-menengah</strong>, karena ada jalur cadangan yang stabil (WireGuard + SSH).</li>
+</ul>
+<p>Catatan: keamanan terbaik tetap butuh disiplin rotasi kunci dan audit log rutin.</p>
+<h2>Cara Pakai Harian (iPad)</h2>
+<ol>
+<li>Nyalakan aplikasi WireGuard.</li>
+<li>Sambungkan profil iPad.</li>
+<li>SSH ke IP VPN server (bukan IP publik).</li>
+<li>Selesai kerja, putuskan VPN.</li>
+</ol>
+<h2>Kalau Akun GitHub Dicuri, Apa yang Terjadi?</h2>
+<p>Perumpamaan:</p>
+<ul>
+<li>Dompet digital (akun GitHub) mungkin dicuri,</li>
+<li>Tapi gerbang rumah utama kita tidak pakai dompet itu.</li>
+</ul>
+<p>Dampak praktis:</p>
+<ul>
+<li>Pelaku tidak bisa masuk server lewat tunnel cloud, karena tunnel sudah ditutup.</li>
+<li>Akses server tetap aman lewat jalur WireGuard + SSH milik admin.</li>
+</ul>
+<h2>Penggunaan GitHub Copilot Tetap Aman?</h2>
+<p>Ya.</p>
+<ul>
+<li>Copilot dipakai di perangkat kamu (client), bukan membuka pintu server.</li>
+<li>Kamu tetap bisa ganti-ganti akun GitHub untuk Copilot kapan saja.</li>
+<li>Ganti akun Copilot tidak otomatis membuka akses ke Server 9.</li>
+</ul>
+<h2>Checklist Singkat (Untuk Tim Non-Teknis)</h2>
+<ul>
+<li>[ ] Tunnel cloud dimatikan.</li>
+<li>[ ] Akses admin hanya lewat WireGuard + SSH.</li>
+<li>[ ] SSH rate limit aktif.</li>
+<li>[ ] Kunci akses disimpan aman.</li>
+<li>[ ] Audit login dilakukan berkala.</li>
+</ul>
+<hr />
+<p>Intinya:</p>
+<p>Kita memilih jalur akses yang lebih "punya kita sendiri" dan lebih tahan terhadap risiko akun cloud yang dibajak.</p></body></html>

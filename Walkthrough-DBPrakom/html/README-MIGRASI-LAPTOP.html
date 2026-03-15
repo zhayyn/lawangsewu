@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>README-MIGRASI-LAPTOP.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>README-MIGRASI-LAPTOP.md</h1><h1>Checklist Migrasi Lawangsewu ke Laptop Baru (Linux)</h1>
+<p>Dokumen ini untuk pindah environment Lawangsewu ke laptop baru.</p>
+<h2>Jawaban singkat: cukup login GitHub di VS Code?</h2>
+<p>Tidak cukup.</p>
+<p>Login GitHub di VS Code hanya membantu autentikasi (<code>clone</code>, <code>pull</code>, <code>push</code>).
+Aplikasi tetap butuh runtime + konfigurasi server + environment variable + service background.</p>
+<h2>1) Prasyarat di laptop baru</h2>
+<ul>
+<li>OS Linux (Ubuntu/Debian)</li>
+<li>Akses jaringan ke host terkait (DB/SIPP/internet)</li>
+<li>Hak sudo/root</li>
+<li>GitHub access ke repository</li>
+</ul>
+<p>Install paket dasar:</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt install -y git curl unzip apache2 php php-cli php-curl php-xml php-mbstring libapache2-mod-php
+</code></pre>
+<p>Install Node.js 20+:</p>
+<pre><code class="language-bash">curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v
+npm -v
+</code></pre>
+<h2>2) Ambil source code</h2>
+<p>Contoh target folder:</p>
+<pre><code class="language-bash">sudo mkdir -p /var/www/html
+cd /var/www/html
+sudo git clone &lt;URL-REPO-ANDA&gt; lawangsewu
+sudo chown -R $USER:$USER /var/www/html/lawangsewu
+</code></pre>
+<h2>3) Konfigurasi Apache</h2>
+<p>Aktifkan module yang dibutuhkan:</p>
+<pre><code class="language-bash">sudo a2enmod rewrite headers
+sudo systemctl restart apache2
+</code></pre>
+<p>Pastikan project ada di document root Apache dan file <code>.htaccess</code> di root project ikut terbaca.</p>
+<p>Jika perlu, pastikan virtual host mengizinkan override:</p>
+<pre><code class="language-apache">&lt;Directory /var/www/html/lawangsewu&gt;
+    AllowOverride All
+    Require all granted
+&lt;/Directory&gt;
+</code></pre>
+<h2>4) Konfigurasi environment PHP</h2>
+<p>Buat file <code>.env</code> dari template:</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+cp .env.example .env
+</code></pre>
+<p>Isi minimal sesuai kebutuhan server baru, terutama endpoint SIPP/DB (jika dipakai modul statistik):
+- <code>LW_SIPP_BASE_URL</code>
+- <code>LW_SIPP_SLIDE_URL</code> (opsional)
+- <code>LW_STAT_DB_HOST</code>, <code>LW_STAT_DB_USER</code>, <code>LW_STAT_DB_PASS</code>, <code>LW_STAT_DB_NAME</code> (jika statistik pakai DB)</p>
+<h2>5) Setup Node gateway (pengumuman MA/Badilag)</h2>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu/gateway-node
+cp .env.example .env
+npm install
+npm run start
+</code></pre>
+<p>Tes endpoint lokal Node:</p>
+<pre><code class="language-bash">curl -s &quot;http://127.0.0.1:8787/health&quot;
+curl -s &quot;http://127.0.0.1:8787/api/v1/pengumuman?source=all&amp;limit=3&quot;
+</code></pre>
+<h2>6) Jalankan Node gateway sebagai service (disarankan)</h2>
+<p>Buat service systemd:</p>
+<pre><code class="language-bash">sudo tee /etc/systemd/system/lawangsewu-gateway.service &gt;/dev/null &lt;&lt;'EOF'
+[Unit]
+Description=Lawangsewu Node Gateway
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/html/lawangsewu/gateway-node
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+User=www-data
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+</code></pre>
+<p>Aktifkan service:</p>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl enable --now lawangsewu-gateway
+sudo systemctl status lawangsewu-gateway --no-pager
+</code></pre>
+<h3>(Opsional, direkomendasikan) Service fallback port 8788</h3>
+<p>Tambahkan instance kedua agar proxy tetap hidup saat gateway utama bermasalah:</p>
+<pre><code class="language-bash">sudo tee /etc/systemd/system/lawangsewu-gateway-fallback.service &gt;/dev/null &lt;&lt;'EOF'
+[Unit]
+Description=Lawangsewu Node Gateway Fallback
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/html/lawangsewu/gateway-node
+ExecStart=/usr/bin/node /var/www/html/lawangsewu/gateway-node/src/server.js
+Restart=always
+RestartSec=3
+User=root
+Group=root
+Environment=NODE_ENV=production
+Environment=NODE_HOST=127.0.0.1
+Environment=NODE_PORT=8788
+Environment=NODE_APP_NAME=Lawangsewu Node Gateway Fallback
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now lawangsewu-gateway-fallback
+sudo systemctl status lawangsewu-gateway-fallback --no-pager
+</code></pre>
+<p>Set environment proxy (jika belum):
+- <code>LW_NODE_GATEWAY_BASE=http://127.0.0.1:8787</code>
+- <code>LW_NODE_GATEWAY_FALLBACK_BASE=http://127.0.0.1:8788</code></p>
+<h3>Auto-healing cron (disarankan)</h3>
+<p>Tambahkan health-check tiap menit agar service gateway otomatis restart jika down:</p>
+<pre><code class="language-bash">chmod +x /var/www/html/lawangsewu/scripts/healthcheck-gateway.sh
+(crontab -l 2&gt;/dev/null | grep -v 'lawangsewu-gateway-health' ; echo '*/1 * * * * /var/www/html/lawangsewu/scripts/healthcheck-gateway.sh &gt;/dev/null 2&gt;&amp;1 # lawangsewu-gateway-health') | crontab -
+</code></pre>
+<p>Log restart otomatis tersimpan di:
+- <code>/var/www/html/lawangsewu/logs/gateway-health.log</code></p>
+<h2>7) Verifikasi endpoint Lawangsewu (PHP proxy)</h2>
+<pre><code class="language-bash">curl -s &quot;http://127.0.0.1/lawangsewu/api/pengumuman-rss?source=all&amp;limit=3&quot;
+curl -s &quot;http://127.0.0.1/lawangsewu/pa-semarang-pengumuman-embed?source=all&amp;limit=5&quot; | head
+</code></pre>
+<p>Jika JSON tidak keluar dari endpoint proxy, cek:
+- status service <code>lawangsewu-gateway</code>
+- aturan rewrite di <code>.htaccess</code>
+- permission file/folder</p>
+<h2>8) Opsional: cron update slide sidang</h2>
+<p>Jika butuh refresh otomatis file slide:</p>
+<pre><code class="language-bash">crontab -e
+</code></pre>
+<p>Contoh jadwal tiap 5 menit:</p>
+<pre><code class="language-cron">*/5 * * * * /usr/bin/php /var/www/html/lawangsewu/widgets/views/generate_slide.php &gt;&gt; /var/www/html/lawangsewu/logs/generate_slide.log 2&gt;&amp;1
+</code></pre>
+<h2>9) Checklist go-live cepat</h2>
+<ul>
+<li>[ ] Apache aktif (<code>systemctl status apache2</code>)</li>
+<li>[ ] Node gateway aktif (<code>systemctl status lawangsewu-gateway</code>)</li>
+<li>[ ] <code>/lawangsewu/api/pengumuman-rss</code> mengembalikan JSON <code>ok: true</code></li>
+<li>[ ] Halaman embed tampil dan item feed muncul</li>
+<li>[ ] Link kategori PA (berita/pengumuman/artikel) menuju domain/host yang benar</li>
+</ul>
+<h2>10) Saat pindah staging -&gt; production</h2>
+<p>Untuk komponen berita pengadilan, cukup ubah 1 baris di:
+- <code>widgets/views/berita-pengadilan.html</code></p>
+<p>Nilai variabel:
+- <code>PA_BASE_URL = 'http://192.168.88.9/pasemarang'</code> (staging)
+- <code>PA_BASE_URL = 'https://pa-semarang.go.id'</code> (production)</p></body></html>

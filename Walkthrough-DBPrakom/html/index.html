@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Walkthrough-DBPrakom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #15253a;
+      --muted: #61758f;
+      --line: rgba(21, 37, 58, 0.12);
+      --card: rgba(255, 255, 255, 0.88);
+      --accent: #0a7558;
+      --accent-soft: #e2f3ed;
+      --bg: linear-gradient(180deg, #f4fbf7 0%, #eef3fb 55%, #f6f3ed 100%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .wrap {
+      width: min(1080px, calc(100% - 32px));
+      margin: 28px auto 40px;
+    }
+    .hero, .section {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.82);
+      border-radius: 26px;
+      box-shadow: 0 18px 44px rgba(21, 37, 58, 0.09);
+    }
+    .hero {
+      padding: 30px;
+      margin-bottom: 18px;
+    }
+    .label {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      margin: 0;
+    }
+    h1 {
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1;
+      margin-top: 16px;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+      max-width: 780px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .actions a, .doc-list a, .widget-list a {
+      text-decoration: none;
+    }
+    .actions a {
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-weight: 700;
+    }
+    .actions .primary {
+      background: linear-gradient(135deg, #0a7558, #138967);
+      color: #fff;
+    }
+    .actions .secondary {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+    }
+    .section {
+      padding: 24px;
+      margin-top: 18px;
+    }
+    .search-box {
+      margin-top: 18px;
+    }
+    .search-box input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    .section p {
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .doc-list, .widget-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .doc-list a, .widget-list a {
+      display: block;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .doc-list span, .widget-list span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .doc-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .doc-actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #f8fbff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .doc-card {
+      display: block;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    .doc-card h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+    .doc-card p {
+      margin: 8px 0 0;
+      font-size: 13px;
+    }
+    .credit {
+      display: inline-flex;
+      margin-top: 16px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    @media (max-width: 760px) {
+      .wrap { width: min(100% - 20px, 1080px); margin-top: 14px; }
+      .hero, .section { padding: 20px; }
+      .doc-list, .widget-list { grid-template-columns: 1fr; }
+      .actions a { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <span class="label">Walkthrough-DBPrakom</span>
+      <h1>Pusat dokumentasi dan katalog widget Lawangsewu.</h1>
+      <p>Folder ini menyatukan dokumentasi top-level dalam format Markdown dan PDF, sekaligus menjadi pintu masuk cepat ke widget publik yang sekarang memakai URL kanonik root domain tanpa prefix ganda <strong>/lawangsewu</strong>.</p>
+      <div class="actions">
+        <a class="primary" href="/walkthrough/master-pdf">Buka PDF master</a>
+        <a class="secondary" href="/">Kembali ke katalog widget</a>
+      </div>
+      <div class="search-box">
+        <input id="walkthroughSearch" type="search" placeholder="Cari widget atau dokumen, misalnya: pengumuman, cloudflare, backup, statistik">
+      </div>
+      <div class="credit">developed by dbprakom</div>
+    </section>
+
+    <section class="section">
+      <h2>Widget Publik Utama</h2>
+      <p>Gunakan endpoint root berikut sebagai URL final.</p>
+      <div class="widget-list">
+        <a data-search="berita pengadilan publikasi rss peradilan" href="https://lawangsewu.pa-semarang.go.id/berita-pengadilan">/berita-pengadilan<span>Portal berita, pengumuman, artikel, dan RSS peradilan.</span></a>
+        <a data-search="pengumuman peradilan feed resmi mahkamah agung badilag" href="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan">/pengumuman-peradilan<span>Halaman penuh pengumuman resmi.</span></a>
+        <a data-search="pengumuman embed iframe" href="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed">/pengumuman-peradilan-embed<span>Versi embed ringan untuk iframe.</span></a>
+        <a data-search="widget pengumuman rss ringkas" href="https://lawangsewu.pa-semarang.go.id/widget-pengumuman">/widget-pengumuman<span>Widget singkat dengan refresh manual.</span></a>
+        <a data-search="dashboard statistik perkara" href="https://lawangsewu.pa-semarang.go.id/dashboard-perkara">/dashboard-perkara<span>Dashboard statistik perkara.</span></a>
+        <a data-search="dashboard ecourt statistik" href="https://lawangsewu.pa-semarang.go.id/dashboard-ecourt">/dashboard-ecourt<span>Dashboard perkara eCourt.</span></a>
+        <a data-search="dashboard hakim performansi" href="https://lawangsewu.pa-semarang.go.id/dashboard-hakim">/dashboard-hakim<span>Dashboard performansi hakim.</span></a>
+        <a data-search="monitor persidangan antrian ruang" href="https://lawangsewu.pa-semarang.go.id/monitor-persidangan">/monitor-persidangan<span>Monitor ruang sidang dan antrian.</span></a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Dokumen Utama</h2>
+      <p>Salinan Markdown top-level disimpan di subfolder <strong>md</strong>. PDF existing dan hasil export walkthrough disimpan di subfolder <strong>pdf</strong>.</p>
+      <div class="doc-list">
+        <div class="doc-card" data-search="pengumuman berita pengadilan embed widget publikasi">
+          <h3>README-PA-SEMARANG-PENGUMUMAN</h3>
+          <p>Panduan berita pengadilan, feed pengumuman, embed, dan perbedaan fungsi halaman publikasi.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough/md/README-PA-SEMARANG-PENGUMUMAN.md">Lihat MD</a>
+            <a href="/walkthrough/pdf/README-PA-SEMARANG-PENGUMUMAN.pdf">Unduh PDF</a>
+          </div>
+        </div>
+        <div class="doc-card" data-search="cloudflare checklist access admin playbook">
+          <h3>CLOUDFLARE-CHECKLIST</h3>
+          <p>Checklist operasional Cloudflare untuk domain dan kontrol akses.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough/md/CLOUDFLARE-CHECKLIST.md">Lihat MD</a>
+            <a href="/walkthrough/pdf/CLOUDFLARE-CHECKLIST.pdf">Unduh PDF</a>
+          </div>
+        </div>
+        <div class="doc-card" data-search="security hardening keamanan server aplikasi">
+          <h3>SECURITY-HARDENING</h3>
+          <p>Ringkasan hardening server dan aplikasi Lawangsewu.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough/md/SECURITY-HARDENING.md">Lihat MD</a>
+            <a href="/walkthrough/pdf/SECURITY-HARDENING.pdf">Unduh PDF</a>
+          </div>
+        </div>
+        <div class="doc-card" data-search="backup recovery pemulihan restore offsite">
+          <h3>BACKUP-RECOVERY</h3>
+          <p>Panduan backup lokal, offsite, dan restore drill.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough/md/BACKUP-RECOVERY.md">Lihat MD</a>
+            <a href="/walkthrough/pdf/BACKUP-RECOVERY.pdf">Unduh PDF</a>
+          </div>
+        </div>
+        <div class="doc-card" data-search="remote access security server9 official onepage">
+          <h3>REMOTE-ACCESS-SECURITY-SERVER9</h3>
+          <p>Dokumentasi keamanan remote access dan briefing versi ringkas.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough/md/REMOTE-ACCESS-SECURITY-SERVER9.md">Lihat MD</a>
+            <a href="/walkthrough/pdf/REMOTE-ACCESS-SECURITY-SERVER9.pdf">Unduh PDF</a>
+          </div>
+        </div>
+        <div class="doc-card" data-search="walkthrough master pdf dbprakom">
+          <h3>WALKTHROUGH MASTER</h3>
+          <p>Versi PDF ringkas hasil konsolidasi bundle dokumentasi publik.</p>
+          <div class="doc-actions">
+            <a href="/walkthrough">Buka halaman</a>
+            <a href="/walkthrough/master-pdf">Unduh PDF</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      const input = document.getElementById('walkthroughSearch');
+      if (!input) return;
+      const items = Array.from(document.querySelectorAll('[data-search]'));
+      input.addEventListener('input', function () {
+        const query = String(input.value || '').toLowerCase().trim();
+        items.forEach((item) => {
+          const hay = String(item.getAttribute('data-search') || '').toLowerCase();
+          const visible = query === '' || hay.includes(query);
+          item.style.display = visible ? '' : 'none';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>E-BOOK WA-CARAKA.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>E-BOOK WA-CARAKA.md</h1><h1>E-BOOK WA-CARAKA</h1>
+<p>Manual book terpadu operasional WA Caraka (dashboard admin + runtime WA + backup + migrasi).</p>
+<p>Versi dokumen: 2026-03-08
+Lokasi proyek: <code>/var/www/html/lawangsewu</code></p>
+<h2>Daftar Isi</h2>
+<ol>
+<li>Ringkasan Arsitektur</li>
+<li>Prasyarat Server</li>
+<li>Struktur Komponen Utama</li>
+<li>Menjalankan Service</li>
+<li>Manual Penggunaan Dashboard</li>
+<li>Operator Inbox (Human Reply)</li>
+<li>Smoke Test End-to-End</li>
+<li>Backup Harian Terenkripsi</li>
+<li>Restore Drill Bulanan + Alert (Webhook/WA)</li>
+<li>Full Backup ke GitHub (Source + Artefak)</li>
+<li>Migrasi ke Server Baru</li>
+<li>Instalasi untuk Pengadilan Lain</li>
+<li>Troubleshooting Cepat</li>
+<li>Checklist Operasional Harian/Mingguan/Bulanan</li>
+</ol>
+<hr />
+<h2>1) Ringkasan Arsitektur</h2>
+<p>WA Caraka terdiri dari:</p>
+<ul>
+<li>Runtime WA API (Node): <code>wa-caraka/server.mjs</code></li>
+<li>Dashboard Admin (CodeIgniter 4): <code>wa-caraka/dashboard-ci4-admin</code></li>
+<li>Script operasional: <code>scripts/</code></li>
+<li>Data/log runtime: <code>logs/</code></li>
+<li>Artefak rilis/migrasi: <code>releases/</code></li>
+</ul>
+<p>Fungsi utama:</p>
+<ul>
+<li>Kelola WA Console dari dashboard web.</li>
+<li>Kirim message/manual ops/report dari admin.</li>
+<li>Backup terenkripsi + verifikasi restore.</li>
+<li>Migrasi lintas server/pengadilan dengan pipeline standar.</li>
+</ul>
+<hr />
+<h2>2) Prasyarat Server</h2>
+<p>Pastikan tersedia:</p>
+<ul>
+<li>Linux server</li>
+<li>Git</li>
+<li>Node.js + npm</li>
+<li>PHP + Composer</li>
+<li>MySQL/MariaDB</li>
+<li><code>curl</code>, <code>openssl</code>, <code>tar</code>, <code>flock</code></li>
+</ul>
+<p>Direktori kerja standar:</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+</code></pre>
+<hr />
+<h2>3) Struktur Komponen Utama</h2>
+<ul>
+<li>Runtime WA:</li>
+<li><code>wa-caraka/.env</code></li>
+<li><code>wa-caraka/server.mjs</code></li>
+<li>Dashboard CI4:</li>
+<li><code>wa-caraka/dashboard-ci4-admin/.env</code></li>
+<li><code>wa-caraka/dashboard-ci4-admin/app/*</code></li>
+<li>Script penting:</li>
+<li><code>scripts/start-wa-caraka.sh</code></li>
+<li><code>scripts/start-wa-caraka-admin.sh</code></li>
+<li><code>scripts/backup-daily.sh</code></li>
+<li><code>scripts/verify-backup.sh</code></li>
+<li><code>scripts/restore-drill-monthly.sh</code></li>
+<li><code>scripts/backup-github-full.sh</code></li>
+<li><code>scripts/install-court-instance.sh</code></li>
+</ul>
+<hr />
+<h2>4) Menjalankan Service</h2>
+<h3>4.1 Start WA Runtime</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/start-wa-caraka.sh
+bash scripts/status-wa-caraka.sh
+</code></pre>
+<h3>4.2 Start Dashboard Admin</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/start-wa-caraka-admin.sh
+bash scripts/status-wa-caraka-admin.sh
+</code></pre>
+<h3>4.3 Stop Service</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/stop-wa-caraka.sh
+bash scripts/stop-wa-caraka-admin.sh
+</code></pre>
+<hr />
+<h2>5) Manual Penggunaan Dashboard</h2>
+<p>File rujukan UI lengkap:
+<code>wa-caraka/dashboard-ci4-admin/README-OPERATOR-WA-CONSOLE.md</code></p>
+<p>Alur operator utama:</p>
+<ol>
+<li>Login dashboard.</li>
+<li>Buka menu WA Console.</li>
+<li>Cek <code>Runtime Observability</code> (PID, uptime, status).</li>
+<li>Lakukan perubahan konfigurasi.</li>
+<li>Gunakan <code>Simpan + Restart WA Caraka</code> bila perlu aktivasi langsung.</li>
+<li>Cek <code>Activity Log</code> untuk audit perubahan.</li>
+<li>Cek report intent mingguan jika update knowledge dibutuhkan.</li>
+</ol>
+<p>Kebijakan user operator:</p>
+<ul>
+<li>Maksimal operator aktif dibatasi 5 user.</li>
+<li>Batas ini diberlakukan saat membuat operator baru dan saat aktivasi ulang user operator.</li>
+</ul>
+<hr />
+<h2>6) Operator Inbox (Human Reply)</h2>
+<p>Fitur baru untuk role <code>superadmin</code>, <code>admin</code>, dan <code>operator</code>:</p>
+<ul>
+<li>Route dashboard operator: <code>/operator</code></li>
+<li>Tujuan: balas chat masuk secara human (manual), cepat, dan fokus ke percakapan terbaru.</li>
+</ul>
+<p>Komponen halaman:</p>
+<ul>
+<li>Panel kontak masuk terbaru (50 kontak).</li>
+<li>Form balas human:</li>
+<li><code>Nomor Tujuan</code></li>
+<li><code>Pesan Balasan</code></li>
+<li><code>Device Token</code> opsional (wajib diisi jika runtime mengaktifkan <code>WA_CARAKA_REQUIRE_DEVICE_TOKEN=true</code>).</li>
+<li>Riwayat chat masuk 200 terbaru + tombol <code>Balas</code> untuk auto-isi nomor.</li>
+</ul>
+<p>Alur pakai:</p>
+<ol>
+<li>Buka menu <code>Operator Inbox</code> dari Dashboard.</li>
+<li>Pilih kontak dari panel kiri atau klik tombol <code>Balas</code> pada tabel.</li>
+<li>Tulis balasan manual di form.</li>
+<li>Klik <code>Kirim Balasan Human</code>.</li>
+</ol>
+<p>Endpoint backend yang dipakai:</p>
+<ul>
+<li>POST <code>/operator/reply</code> di dashboard CI4.</li>
+<li>Diteruskan ke runtime WA Caraka endpoint <code>/send-text</code>.</li>
+</ul>
+<hr />
+<h2>7) Smoke Test End-to-End</h2>
+<p>Untuk test login -&gt; proses WA -&gt; report:</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/smoke-login-process-report.sh http://127.0.0.1:8792
+</code></pre>
+<p>Mode trusted internal (untuk pengujian lokal deterministik):</p>
+<pre><code class="language-bash">SMOKE_TRUSTED_INTERNAL=1 SMOKE_LOCAL_BASE_URL='http://127.0.0.1:8792/' \
+bash scripts/smoke-login-process-report.sh
+</code></pre>
+<hr />
+<h2>8) Backup Harian Terenkripsi</h2>
+<h3>7.1 Siapkan konfigurasi backup</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+cp -n scripts/backup.conf.example scripts/backup.conf
+</code></pre>
+<p>Isi minimal <code>scripts/backup.conf</code>:</p>
+<ul>
+<li><code>BACKUP_PASSPHRASE</code> (WAJIB)</li>
+<li>opsional DB config (<code>DB_HOST</code>, <code>DB_NAME</code>, dll)</li>
+</ul>
+<h3>7.2 Jalankan backup</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/backup-daily.sh
+</code></pre>
+<h3>7.3 Verifikasi backup dapat dipulihkan</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/verify-backup.sh
+</code></pre>
+<hr />
+<h2>9) Restore Drill Bulanan + Alert (Webhook/WA)</h2>
+<h3>8.1 Jalankan restore drill manual</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/restore-drill-monthly.sh
+</code></pre>
+<h3>8.2 Pasang cron restore drill bulanan</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/setup-restore-drill-cron.sh
+</code></pre>
+<p>Default cron: <code>30 3 1 * *</code>.</p>
+<h3>8.3 Konfigurasi alert permanen</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+cp -n scripts/restore-drill.conf.example scripts/restore-drill.conf
+</code></pre>
+<p>Contoh isi <code>scripts/restore-drill.conf</code>:</p>
+<pre><code class="language-bash">RESTORE_DRILL_ALERT_WEBHOOK_URL='https://hooks.example.internal/restore-alert'
+RESTORE_DRILL_ALERT_COMMAND='logger -t restore-drill &quot;[$ALERT_LEVEL][$ALERT_HOST] $ALERT_MESSAGE&quot;'
+
+# WA alert ke superadmin
+RESTORE_DRILL_ALERT_WA_SUPERADMIN_NUMBERS='6281317361689,628123456789'
+RESTORE_DRILL_ALERT_WA_MODE='error'   # error | all | off
+RESTORE_DRILL_ALERT_WA_API_URL='http://127.0.0.1:8793/send-text'
+# RESTORE_DRILL_ALERT_WA_TOKEN=''      # isi jika WA_CARAKA_REQUIRE_DEVICE_TOKEN=true
+</code></pre>
+<h3>8.4 Cara isi nomor WA superadmin</h3>
+<p>Aturan pengisian <code>RESTORE_DRILL_ALERT_WA_SUPERADMIN_NUMBERS</code>:</p>
+<ul>
+<li>Pisahkan dengan koma.</li>
+<li>Gunakan format angka internasional Indonesia: <code>62xxxxxxxxxx</code>.</li>
+<li>Jangan pakai spasi, tanda plus, atau karakter lain.</li>
+</ul>
+<p>Contoh benar:</p>
+<pre><code class="language-bash">RESTORE_DRILL_ALERT_WA_SUPERADMIN_NUMBERS='6281317361689,628123456789'
+</code></pre>
+<p>Contoh tidak dianjurkan:</p>
+<ul>
+<li><code>+6281317361689</code></li>
+<li><code>081317361689</code></li>
+<li><code>6281317361689, 628123456789</code> (ada spasi)</li>
+</ul>
+<h3>8.5 Verifikasi cepat alert command</h3>
+<pre><code class="language-bash">ALERT_LEVEL='test' ALERT_HOST='localhost' ALERT_MESSAGE='restore-drill alert test' \
+bash -lc &quot;source /var/www/html/lawangsewu/scripts/restore-drill.conf; eval \&quot;\$RESTORE_DRILL_ALERT_COMMAND\&quot;&quot;
+</code></pre>
+<hr />
+<h2>10) Full Backup ke GitHub (Source + Artefak)</h2>
+<p>Pipeline ini menjalankan:</p>
+<ol>
+<li>Security audit (opsional)</li>
+<li>Backup terenkripsi</li>
+<li>Verifikasi restore</li>
+<li>Pembuatan paket migrasi</li>
+<li>Push source ke GitHub</li>
+<li>Opsional push artefak backup terenkripsi ke repo private</li>
+</ol>
+<h3>9.1 Siapkan config</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+cp -n scripts/github-backup.conf.example scripts/github-backup.conf
+</code></pre>
+<p>Isi sesuai kebutuhan, contoh:</p>
+<pre><code class="language-bash">SOURCE_GITHUB_REMOTE='github'
+SOURCE_GITHUB_BRANCH='main'
+PUSH_SOURCE_REPO=1
+
+PUSH_ARTIFACTS_GITHUB=1
+BACKUP_GITHUB_ARTIFACT_REPO_URL='git@github.com:org/backup-wa-caraka.git'
+BACKUP_GITHUB_ARTIFACT_BRANCH='main'
+BACKUP_GITHUB_ARTIFACT_SUBDIR='lawangsewu'
+
+AUDIT_BASE_URL='http://127.0.0.1:8792'
+RUN_SECURITY_AUDIT=1
+</code></pre>
+<h3>9.2 Jalankan pipeline</h3>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/backup-github-full.sh
+</code></pre>
+<hr />
+<h2>11) Migrasi ke Server Baru</h2>
+<p>Dokumen rujukan detail:
+<code>MIGRASI-GITHUB-SERVER.md</code></p>
+<p>Ringkas migrasi:</p>
+<ol>
+<li>Push source repo private ke GitHub.</li>
+<li>Clone di server target.</li>
+<li>Install dependency (CI4 + Node).</li>
+<li>Restore file konfigurasi lokal (<code>.env</code>, <code>backup.conf</code>, <code>offsite.conf</code>).</li>
+<li>Jalankan migrate/seed.</li>
+<li>Jalankan smoke test + security audit.</li>
+</ol>
+<hr />
+<h2>12) Instalasi untuk Pengadilan Lain</h2>
+<p>Gunakan bootstrap script:</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/install-court-instance.sh \
+  --court-code pa-contoh \
+  --base-url 'https://contoh.go.id/wa-caraka-admin/' \
+  --db-host 127.0.0.1 --db-port 3306 \
+  --db-name db_wacaraka --db-user root --db-password 'ganti-password'
+</code></pre>
+<p>Hasil script:</p>
+<ul>
+<li>Menyiapkan/menulis <code>wa-caraka/.env</code></li>
+<li>Menyiapkan/menulis <code>wa-caraka/dashboard-ci4-admin/.env</code></li>
+<li>Mengatur <code>ADMIN_DEFAULT_USERNAME</code> dan <code>ADMIN_DEFAULT_PASSWORD</code></li>
+<li>Menampilkan langkah lanjutan install dependency + start service</li>
+</ul>
+<hr />
+<h2>13) Troubleshooting Cepat</h2>
+<h3>12.1 WA belum connected</h3>
+<ul>
+<li>Cek endpoint health:</li>
+</ul>
+<pre><code class="language-bash">curl http://127.0.0.1:8793/health
+</code></pre>
+<ul>
+<li>Cek QR endpoint:</li>
+</ul>
+<pre><code class="language-bash">curl -I http://127.0.0.1:8793/qr/image
+</code></pre>
+<h3>12.2 Dashboard tidak bisa login</h3>
+<ul>
+<li>Cek service CI4 aktif di port admin.</li>
+<li>Cek lockout login pada policy keamanan.</li>
+<li>Jalankan smoke test untuk diagnosis cepat.</li>
+</ul>
+<h3>12.3 Backup gagal</h3>
+<ul>
+<li>Pastikan <code>BACKUP_PASSPHRASE</code> di <code>scripts/backup.conf</code> terisi.</li>
+<li>Pastikan folder <code>BACKUP_ROOT</code> writable.</li>
+<li>Jalankan <code>bash scripts/verify-backup.sh</code> untuk validasi hasil backup.</li>
+</ul>
+<h3>12.4 Alert WA tidak terkirim</h3>
+<ul>
+<li>Cek <code>RESTORE_DRILL_ALERT_WA_SUPERADMIN_NUMBERS</code> format.</li>
+<li>Cek WA runtime connect (<code>/health</code>).</li>
+<li>Jika token wajib, isi <code>RESTORE_DRILL_ALERT_WA_TOKEN</code>.</li>
+<li>Uji manual endpoint send-text:</li>
+</ul>
+<pre><code class="language-bash">curl -sS -X POST http://127.0.0.1:8793/send-text \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;to&quot;:&quot;6281317361689&quot;,&quot;text&quot;:&quot;tes notifikasi&quot;}'
+</code></pre>
+<hr />
+<h2>14) Checklist Operasional</h2>
+<h3>Harian</h3>
+<ul>
+<li>Cek status WA runtime dan dashboard.</li>
+<li>Cek log error utama.</li>
+<li>Jalankan backup harian (jika belum via cron).</li>
+</ul>
+<h3>Mingguan</h3>
+<ul>
+<li>Jalankan report intent mingguan.</li>
+<li>Evaluasi knowledge miss/error.</li>
+<li>Review activity log perubahan kritis.</li>
+</ul>
+<h3>Bulanan</h3>
+<ul>
+<li>Jalankan restore drill.</li>
+<li>Pastikan alert (syslog/webhook/WA) terkirim.</li>
+<li>Review paket migrasi terbaru dan checksum.</li>
+</ul>
+<hr />
+<h2>Lampiran Perintah Penting</h2>
+<pre><code class="language-bash"># Status service
+bash scripts/status-wa-caraka.sh
+bash scripts/status-wa-caraka-admin.sh
+
+# Backup + verify
+bash scripts/backup-daily.sh
+bash scripts/verify-backup.sh
+
+# Restore drill + setup cron
+bash scripts/restore-drill-monthly.sh
+bash scripts/setup-restore-drill-cron.sh
+
+# Full backup pipeline github
+bash scripts/backup-github-full.sh
+
+# Bootstrap court instance
+bash scripts/install-court-instance.sh --help
+</code></pre>
+<p>Selesai.</p></body></html>

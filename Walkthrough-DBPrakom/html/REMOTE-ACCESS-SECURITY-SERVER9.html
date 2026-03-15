@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>REMOTE-ACCESS-SECURITY-SERVER9.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>REMOTE-ACCESS-SECURITY-SERVER9.md</h1><h1>Remote Access Security Server 9</h1>
+<p>Dokumen ini menjelaskan keputusan arsitektur akses jarak jauh Server 9 setelah evaluasi risiko akun cloud (GitHub/Microsoft), kebutuhan operasional dari iPad, dan target keamanan lingkungan produksi yang tidak boleh mengganggu ekosistem existing.</p>
+<h2>1) Latar Belakang</h2>
+<p>Sebelumnya, akses remote editor menggunakan VS Code Tunnel berbasis akun cloud. Model ini nyaman, tetapi ada risiko berikut:</p>
+<ul>
+<li>Akun cloud dicuri (account takeover) -&gt; potensi penyalahgunaan tunnel.</li>
+<li>Session/token lama tertinggal di server -&gt; akses tetap hidup walau user lupa mencabut.</li>
+<li>Ketergantungan pada satu identitas eksternal untuk masuk ke server.</li>
+</ul>
+<p>Kebutuhan operasional:</p>
+<ul>
+<li>Tetap bisa mengelola server dari iPad.</li>
+<li>Tidak mengganggu layanan produksi yang sudah berjalan di Server 9.</li>
+<li>Memiliki jalur akses cadangan yang tidak tergantung akun GitHub tertentu.</li>
+</ul>
+<h2>2) Keputusan Arsitektur Akhir</h2>
+<p>Dipilih model:</p>
+<ul>
+<li>Jalur utama: <code>WireGuard + SSH</code>.</li>
+<li>Jalur cloud tunnel: dinonaktifkan total (untuk mode hardening saat ini).</li>
+</ul>
+<p>Alasan:</p>
+<ul>
+<li>WireGuard memberikan private network terkontrol (IP VPN khusus).</li>
+<li>SSH dapat diperketat dengan kebijakan host/firewall dan audit log standar Linux.</li>
+<li>Tidak ada akses server langsung yang bergantung akun cloud yang bisa dibajak.</li>
+</ul>
+<h2>3) Implementasi yang Sudah Diterapkan</h2>
+<h3>3.1 WireGuard</h3>
+<ul>
+<li>Interface aktif: <code>wg0</code>.</li>
+<li>Port: <code>51830/udp</code>.</li>
+<li>Subnet VPN: <code>10.19.9.0/24</code>.</li>
+<li>Peer admin aktif saat ini menggunakan alokasi subnet VPN <code>10.19.9.0/24</code>.</li>
+<li>Profil client disimpan di luar repo pada server: <code>/root/secure/wireguard-server9/</code>.</li>
+<li>Endpoint client WireGuard harus mengarah ke IP publik server atau hostname DNS-only, bukan hostname yang diproxy Cloudflare.</li>
+</ul>
+<h3>3.2 SSH + Firewall</h3>
+<ul>
+<li>SSH service aktif.</li>
+<li>UFW rule untuk SSH diubah menjadi rate-limited:</li>
+<li><code>LIMIT IN 22/tcp</code> (IPv4 + IPv6).</li>
+<li>Rule WireGuard aktif:</li>
+<li><code>ALLOW IN 51830/udp</code>.</li>
+</ul>
+<h3>3.3 VS Code Tunnel (Dinonaktifkan)</h3>
+<ul>
+<li>Service lama (<code>vscode-tunnel-lawangsewu.service</code>) sudah:</li>
+<li><code>masked</code> (symlink ke <code>/dev/null</code>).</li>
+<li>login tunnel user lama dicabut.</li>
+<li>Service ms (<code>vscode-tunnel-lawangsewu-ms.service</code>) sudah:</li>
+<li><code>masked</code> (symlink ke <code>/dev/null</code>).</li>
+<li>login tunnel user ms dicabut.</li>
+<li>Cache tunnel lama dibersihkan pada user lama dan user ms.</li>
+</ul>
+<p>Implikasi: tidak ada tunnel cloud aktif yang dapat dipakai untuk akses server.</p>
+<h2>4) Tingkat Keamanan Saat Ini</h2>
+<p>Penilaian kualitatif untuk remote access:</p>
+<ul>
+<li>Kerahasiaan: <strong>Tinggi</strong></li>
+<li>Akses melalui kanal terenkripsi WireGuard + SSH.</li>
+<li>Tidak ada endpoint tunnel cloud aktif.</li>
+<li>Integritas: <strong>Tinggi</strong></li>
+<li>Akses hanya lewat identitas VPN/SSH yang dikontrol admin.</li>
+<li>Ketahanan terhadap kompromi akun GitHub: <strong>Tinggi</strong></li>
+<li>Karena jalur tunnel berbasis akun cloud sudah diputus.</li>
+<li>Ketahanan terhadap brute-force publik: <strong>Menengah-Tinggi</strong></li>
+<li>SSH rate limit aktif.</li>
+<li>Rekomendasi tambahan: batasi SSH hanya dari subnet VPN.</li>
+</ul>
+<p>Catatan penting:</p>
+<ul>
+<li>Sistem tidak pernah 100% bebas risiko.</li>
+<li>Keamanan akhir tetap bergantung pada:</li>
+<li>keamanan private key WireGuard/SSH,</li>
+<li>disiplin rotasi kredensial,</li>
+<li>monitoring log dan patch rutin.</li>
+</ul>
+<h2>5) Kenapa Akhirnya Menggunakan Model Ini</h2>
+<p>Model <code>WireGuard + SSH</code> dipilih karena:</p>
+<ul>
+<li>Paling konsisten dengan prinsip least dependency (minim ketergantungan pihak ketiga untuk jalur admin).</li>
+<li>Memisahkan akses operasional server dari risiko takeover akun cloud.</li>
+<li>Tetap nyaman untuk iPad (bisa lewat WireGuard app + SSH client).</li>
+<li>Stabil untuk server produksi, tidak perlu membuka service baru ke internet selain port VPN yang sudah terkontrol.</li>
+</ul>
+<h2>6) Dampak ke Penggunaan GitHub Copilot</h2>
+<ul>
+<li>GitHub Copilot tetap bisa dipakai normal di device user (VS Code lokal/remote client).</li>
+<li>User bisa ganti-ganti akun GitHub Copilot kapan saja di sisi client.</li>
+<li>Pergantian akun Copilot tidak membuka akses baru ke Server 9 selama tunnel cloud tetap dimatikan.</li>
+</ul>
+<h2>7) SOP Operasional Harian</h2>
+<ol>
+<li>Aktifkan WireGuard di iPad.</li>
+<li>Pastikan mendapat IP VPN admin yang aktif.</li>
+<li>SSH ke IP VPN server (contoh <code>10.19.9.1</code>), bukan IP publik.</li>
+<li>Lakukan administrasi dari sesi SSH.</li>
+<li>Putuskan VPN saat selesai.</li>
+</ol>
+<h2>8) SOP Insiden (Jika Akun Cloud Dicuri)</h2>
+<p>Walau saat ini tunnel cloud sudah nonaktif, prosedur minimum tetap:</p>
+<ol>
+<li>Revoke semua session akun cloud dari device yang tidak dikenal.</li>
+<li>Ganti password dan aktifkan 2FA kuat.</li>
+<li>Revoke OAuth/PAT mencurigakan.</li>
+<li>Verifikasi di server:</li>
+<li>kedua service tunnel harus <code>masked</code>.</li>
+<li>user tunnel harus <code>not logged in</code>.</li>
+<li>Audit log SSH dan firewall untuk anomali.</li>
+</ol>
+<h2>9) Checklist Verifikasi Cepat</h2>
+<p>Gunakan perintah berikut:</p>
+<pre><code class="language-bash">systemctl is-enabled vscode-tunnel-lawangsewu.service
+systemctl is-enabled vscode-tunnel-lawangsewu-ms.service
+sudo -u lawangsewu-vscode -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+sudo -u lawangsewu-vscode-ms -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+systemctl status wg-quick@wg0 --no-pager
+wg show
+ufw status numbered
+</code></pre>
+<p>Ekspektasi:</p>
+<ul>
+<li>kedua service tunnel: <code>masked</code>.</li>
+<li>kedua user tunnel: <code>not logged in</code>.</li>
+<li><code>wg0</code> aktif.</li>
+<li>rule <code>LIMIT 22/tcp</code> dan <code>ALLOW 51830/udp</code> tersedia.</li>
+</ul>
+<h2>10) Opsi Masa Depan (Jika Tunnel Diperlukan Lagi)</h2>
+<p>Jika suatu saat butuh tunnel lagi untuk kasus khusus:</p>
+<ul>
+<li>Gunakan akun khusus organisasi, bukan akun personal utama.</li>
+<li>Aktifkan tunnel hanya sementara (time-boxed), lalu matikan kembali.</li>
+<li>Audit log setelah sesi selesai.</li>
+<li>Jangan hapus jalur WireGuard+SSH sebagai fallback utama.</li>
+</ul>
+<hr />
+<p>Dokumen ini merefleksikan posture keamanan remote access Server 9 per 2026-03-09.</p></body></html>

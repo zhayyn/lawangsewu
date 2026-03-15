@@ -1,0 +1,43 @@
+<h1>lawangsewu</h1>
+<p>Project for lawangsewu</p>
+<h2>Deploy lumpiapasar-s9</h2>
+<p>Gunakan script berikut untuk sinkronisasi source ke folder active:</p>
+<ul>
+<li>Cek perubahan (aman): <code>./scripts/deploy-lumpiapasar-s9.sh</code></li>
+<li>Eksekusi deploy: <code>./scripts/deploy-lumpiapasar-s9.sh --apply</code></li>
+</ul>
+<h2>Struktur endpoint Lawangsewu</h2>
+<ul>
+<li>URL publik tetap sama (contoh: <code>/info-persidangan</code>, <code>/monitor-antrian-sidang</code>)</li>
+<li>Implementasi file sekarang dipusatkan di <code>widgets/views/</code></li>
+<li>Akses URL langsung ke <code>widgets/views/*</code> diblokir (<code>403</code>)</li>
+<li>Untuk eksekusi CLI generator: <code>php widgets/views/generate_slide.php</code></li>
+<li>Dokumentasi pengumuman dan berita pengadilan: <code>README-PA-SEMARANG-PENGUMUMAN.md</code></li>
+<li>Katalog dokumentasi terpusat: <code>Walkthrough-DBPrakom/</code></li>
+<li>Halaman dokumentasi publik: <code>/walkthrough</code></li>
+<li>developed by dbprakom</li>
+</ul>
+<h2>Smoke WA Caraka</h2>
+<ul>
+<li>Runner pasca-deploy: <code>bash scripts/post-deploy-wa-caraka-smoke.sh</code></li>
+<li>Installer cron smoke harian: <code>bash scripts/setup-wa-caraka-smoke-cron.sh</code></li>
+<li>Smoke host publik/staging: <code>bash scripts/smoke-login-process-production.sh</code></li>
+<li>Report terbaru: <code>logs/post-deploy-smoke/wa-caraka-post-deploy-latest.log</code></li>
+</ul>
+<h2>OpenAPI WA Caraka</h2>
+<ul>
+<li>Spesifikasi: <code>wa-caraka/docs/openapi.yaml</code></li>
+<li>Swagger UI statis: <code>wa-caraka/docs/swagger-ui.html</code></li>
+<li>Swagger UI internal admin: <code>wa-caraka-admin/wa/docs/swagger</code></li>
+</ul>
+<h2>Remote Access Security</h2>
+<ul>
+<li>Dokumen arsitektur, alasan, dan SOP keamanan remote access Server 9: <code>REMOTE-ACCESS-SECURITY-SERVER9.md</code></li>
+<li>Versi 1 halaman (bahasa sederhana + perumpamaan): <code>REMOTE-ACCESS-SECURITY-SERVER9-SIMPLE.md</code></li>
+<li>Versi 1 halaman PDF-friendly (briefing pimpinan): <code>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE.md</code></li>
+<li>Versi HTML siap print ke PDF (A4): <code>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE.html</code></li>
+<li>Versi resmi (header instansi + kolom persetujuan): <code>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE-OFFICIAL.html</code></li>
+</ul>
+<!-- autocommit test -->
+<!-- autocommit test 2 -->
+<!-- autocommit test 3 -->

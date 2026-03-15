@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>MIGRASI-GITHUB-SERVER.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>MIGRASI-GITHUB-SERVER.md</h1><h1>Migrasi WA Caraka via GitHub ke Server Baru</h1>
+<h2>Tujuan</h2>
+<p>Dokumen ini menyiapkan alur migrasi aman: source dari GitHub, secret tetap lokal, dan verifikasi pasca-migrasi.</p>
+<h2>1. Persiapan dari server asal</h2>
+<p>Jalankan:</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/prepare-github-migration.sh http://127.0.0.1:8792
+</code></pre>
+<p>Output ada di <code>releases/migration/lawangsewu-migration-&lt;timestamp&gt;/</code>:
+- <code>repo-&lt;timestamp&gt;.bundle</code>
+- <code>source-&lt;timestamp&gt;.tar.gz</code>
+- <code>SHA256SUMS</code>
+- <code>README-MIGRATION.txt</code></p>
+<p>Alternatif pipeline penuh (backup terenkripsi + verifikasi + migrasi + push GitHub):</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/backup-github-full.sh
+</code></pre>
+<h2>2. Upload kode ke GitHub</h2>
+<ol>
+<li>Buat repository private di GitHub.</li>
+<li>Tambahkan remote:</li>
+</ol>
+<pre><code class="language-bash">git remote add github &lt;url-repo-private&gt;
+</code></pre>
+<ol>
+<li>Push branch utama dan tag:</li>
+</ol>
+<pre><code class="language-bash">git push github main --tags
+</code></pre>
+<h2>3. Pull ke server target</h2>
+<pre><code class="language-bash">cd /var/www/html
+git clone &lt;url-repo-private&gt; lawangsewu
+cd lawangsewu
+</code></pre>
+<h2>4. Restore konfigurasi lokal (wajib)</h2>
+<p>Secret tidak ikut ke GitHub. Siapkan ulang file berikut:
+- <code>scripts/backup.conf</code>
+- <code>scripts/offsite.conf</code>
+- <code>gateway/.env</code>
+- <code>.env</code> untuk project CI4/Node terkait</p>
+<h2>5. Install dependency</h2>
+<ul>
+<li>CI4 admin:</li>
+</ul>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu/wa-caraka/dashboard-ci4-admin
+composer install --no-dev --optimize-autoloader
+</code></pre>
+<ul>
+<li>WA runtime:</li>
+</ul>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu/wa-caraka
+npm ci --omit=dev
+</code></pre>
+<h2>6. Validasi pasca-migrasi</h2>
+<ol>
+<li>Jalankan healthcheck script dan cek service status.</li>
+<li>Verifikasi login dashboard, akses WA Console, dan generate report.</li>
+<li>Jalankan security audit:</li>
+</ol>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/security-audit.sh http://127.0.0.1:8792
+</code></pre>
+<h2>7. Aktifkan backup dan offsite</h2>
+<ul>
+<li>Backup harian terenkripsi:</li>
+</ul>
+<pre><code class="language-bash">bash scripts/setup-backup-cron.sh
+</code></pre>
+<ul>
+<li>Offsite backup (rclone):</li>
+</ul>
+<pre><code class="language-bash">bash scripts/setup-offsite-cron.sh
+</code></pre>
+<ul>
+<li>Verifikasi backup terbaru:</li>
+</ul>
+<pre><code class="language-bash">bash scripts/verify-backup.sh
+</code></pre>
+<h2>8. Bootstrap untuk Pengadilan Lain</h2>
+<p>Untuk setup instance pengadilan baru secara cepat (env WA + env CI4):</p>
+<pre><code class="language-bash">cd /var/www/html/lawangsewu
+bash scripts/install-court-instance.sh --court-code pa-contoh --base-url 'https://contoh.go.id/wa-caraka-admin/'
+</code></pre></body></html>

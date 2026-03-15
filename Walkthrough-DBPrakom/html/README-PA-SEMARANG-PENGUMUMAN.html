@@ -1,0 +1,190 @@
+<h1>Panduan Halaman Pengumuman dan Berita Pengadilan</h1>
+<p>developed by dbprakom</p>
+<p>Dokumen ini menjelaskan komponen publik Lawangsewu yang dipakai untuk menampilkan pengumuman dan berita, cara membukanya dari jaringan <code>192.168.88.9</code>, perbedaan fungsi tiap halaman, serta cara integrasi ke halaman lain seperti IIS <code>pa-semarang.go.id</code>.</p>
+<h2>1) Halaman yang tersedia</h2>
+<h3>A. Berita Pengadilan</h3>
+<ul>
+<li>URL: <code>http://192.168.88.9/berita-pengadilan</code></li>
+<li>Route: <code>/berita-pengadilan</code></li>
+<li>Fungsi: halaman agregasi berita dan publikasi peradilan dalam satu tampilan.</li>
+</ul>
+<p>Isi halaman ini:
+- Blok <code>Berita PA Semarang</code>: mengambil 3 berita terbaru dari feed kategori berita situs PA Semarang.
+- Blok <code>Pengumuman &amp; Artikel PA Semarang</code>: tab untuk kategori pengumuman dan artikel dari situs PA Semarang.
+- Blok <code>RSS Feed Peradilan</code>: tab sumber <code>MA</code>, <code>Badilag</code>, dan <code>PTA Semarang</code>.</p>
+<p>Karakter halaman ini:
+- Lebih kaya konten.
+- Cocok untuk halaman portal atau dashboard informasi.
+- Menggabungkan sumber internal PA Semarang dan sumber RSS peradilan.
+- Tidak ditujukan sebagai embed iframe kecil yang super-ringkas.</p>
+<h3>B. Feed Pengumuman Lengkap</h3>
+<ul>
+<li>URL final domain: <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan?source=all&amp;limit=8</code></li>
+<li>URL LAN/staging: <code>http://192.168.88.9/lawangsewu/pa-semarang-pengumuman?source=all&amp;limit=8</code></li>
+<li>Route kanonik domain final: <code>/pengumuman-peradilan</code></li>
+<li>Route kompatibilitas existing: <code>/pa-semarang-pengumuman</code></li>
+<li>Fungsi: menampilkan daftar pengumuman resmi dalam format halaman penuh.</li>
+</ul>
+<p>Karakter halaman ini:
+- Fokus pada pengumuman saja.
+- Sumber utama: <code>Mahkamah Agung</code> dan <code>Badilag</code>.
+- Ada tab sumber dan tampilan list yang lebih formal.
+- Cocok untuk halaman khusus pengumuman.</p>
+<h3>C. Feed Pengumuman Embed</h3>
+<ul>
+<li>URL final domain: <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed?source=all&amp;limit=5</code></li>
+<li>URL LAN/staging: <code>http://192.168.88.9/lawangsewu/pa-semarang-pengumuman-embed?source=all&amp;limit=5</code></li>
+<li>Route kanonik domain final: <code>/pengumuman-peradilan-embed</code></li>
+<li>Route kompatibilitas existing: <code>/pa-semarang-pengumuman-embed</code></li>
+<li>Fungsi: versi embed ringan untuk dipasang ke halaman parent dengan iframe.</li>
+</ul>
+<p>Karakter halaman ini:
+- Fokus pada pengumuman saja.
+- Dirancang untuk auto-height iframe.
+- Cocok untuk homepage atau panel samping situs lain.</p>
+<h3>D. Widget Pengumuman Ringkas</h3>
+<ul>
+<li>URL final domain: <code>https://lawangsewu.pa-semarang.go.id/widget-pengumuman</code></li>
+<li>URL LAN/staging: <code>http://192.168.88.9/lawangsewu/pengumuman-rss-widget</code></li>
+<li>Route kanonik domain final: <code>/widget-pengumuman</code></li>
+<li>Route kompatibilitas existing: <code>/pengumuman-rss-widget</code></li>
+<li>Fungsi: widget pengumuman sederhana dengan tombol refresh.</li>
+</ul>
+<p>Karakter halaman ini:
+- Lebih ringan dari versi penuh.
+- Tetap fokus hanya pada item pengumuman.
+- Cocok untuk tampilan cepat atau eksperimen internal.</p>
+<h2>2) API JSON yang dipakai</h2>
+<ul>
+<li><code>GET /api/pengumuman-rss?source=all|ma|badilag|pta&amp;limit=1..30</code></li>
+<li><code>GET /api/pengumuman-rss/ma?limit=...</code></li>
+<li><code>GET /api/pengumuman-rss/badilag?limit=...</code></li>
+<li><code>GET /api/pengumuman-rss/pta?limit=...</code></li>
+</ul>
+<p>Contoh:
+- <code>http://192.168.88.9/api/pengumuman-rss?source=all&amp;limit=5</code>
+- <code>http://192.168.88.9/api/pengumuman-rss?source=pta&amp;limit=3</code></p>
+<h2>3) Perbedaan Berita Pengadilan vs Feed Pengumuman</h2>
+<h3>A. Dari sisi tujuan</h3>
+<ul>
+<li><code>berita-pengadilan</code> dipakai untuk menampilkan campuran berita, pengumuman, artikel, dan RSS peradilan dalam satu halaman.</li>
+<li><code>pengumuman-peradilan</code> dan <code>pengumuman-peradilan-embed</code> dipakai khusus untuk pengumuman resmi.</li>
+</ul>
+<h3>B. Dari sisi isi konten</h3>
+<ul>
+<li><code>berita-pengadilan</code> berisi beberapa blok konten sekaligus.</li>
+<li><code>feed pengumuman</code> hanya menampilkan daftar item pengumuman.</li>
+</ul>
+<h3>C. Dari sisi sumber data</h3>
+<ul>
+<li><code>berita-pengadilan</code> mengambil data dari feed situs PA Semarang untuk berita, pengumuman, dan artikel, lalu menggabungkannya dengan RSS MA, Badilag, dan PTA Semarang.</li>
+<li><code>feed pengumuman</code> terutama mengambil data dari API proxy Lawangsewu <code>/api/pengumuman-rss</code>, yang difokuskan untuk sumber pengumuman peradilan.</li>
+</ul>
+<h3>D. Dari sisi penggunaan</h3>
+<ul>
+<li><code>berita-pengadilan</code> cocok jika ingin halaman portal informasi yang lebih hidup dan lebih kaya.</li>
+<li><code>feed pengumuman lengkap</code> cocok jika ingin halaman khusus pengumuman resmi.</li>
+<li><code>feed pengumuman embed</code> cocok jika ingin disisipkan ke website lain via iframe.</li>
+<li><code>widget pengumuman ringkas</code> cocok jika hanya perlu daftar pendek yang cepat tampil.</li>
+</ul>
+<h3>E. Dari sisi tampilan</h3>
+<ul>
+<li><code>berita-pengadilan</code> tampil seperti portal atau dashboard.</li>
+<li><code>feed pengumuman</code> tampil seperti daftar resmi yang lebih fokus.</li>
+</ul>
+<h2>4) Kapan memakai yang mana</h2>
+<ul>
+<li>Gunakan <code>berita-pengadilan</code> jika yang dibutuhkan adalah halaman publikasi terpadu.</li>
+<li>Gunakan <code>pengumuman-peradilan</code> jika yang dibutuhkan adalah halaman pengumuman formal.</li>
+<li>Gunakan <code>pengumuman-peradilan-embed</code> jika konten harus ditempel ke halaman IIS atau CMS lain.</li>
+<li>Gunakan <code>widget-pengumuman</code> jika butuh widget ringkas tanpa layout portal penuh.</li>
+</ul>
+<h2>5) Cara membuka dari VS Code</h2>
+<p>Untuk workspace ini, jangan mengandalkan klik file sumber lalu preview file.</p>
+<p>Alasannya:
+- Implementasi file ada di <code>widgets/views/</code>.
+- Akses langsung ke <code>widgets/views/*</code> diblokir <code>403</code>.
+- Halaman publik dibuka lewat route rewrite Apache.</p>
+<p>Cara yang benar dari VS Code:</p>
+<ol>
+<li>Buka <code>Command Palette</code>.</li>
+<li>Jalankan <code>Simple Browser: Show</code>.</li>
+<li>Masukkan URL yang ingin dilihat, misalnya:</li>
+<li><code>https://lawangsewu.pa-semarang.go.id/berita-pengadilan</code></li>
+<li><code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan</code></li>
+<li><code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed</code></li>
+<li><code>https://lawangsewu.pa-semarang.go.id/widget-pengumuman</code></li>
+</ol>
+<p>Alternatif lewat terminal VS Code:</p>
+<p><code>bash
+xdg-open https://lawangsewu.pa-semarang.go.id/berita-pengadilan
+xdg-open https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan</code></p>
+<h2>6) Snippet aman untuk IIS</h2>
+<p>Tempel kode berikut di halaman IIS <code>pa-semarang.go.id</code> jika ingin menampilkan feed pengumuman versi embed:</p>
+<p>```html</p>
+<p><iframe
+  id="lwPengumumanFrame"
+  src="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed?source=all&limit=5"
+  style="width:100%;height:560px;border:0;overflow:hidden;"
+  scrolling="no"
+  loading="lazy"
+  referrerpolicy="strict-origin-when-cross-origin">
+</iframe>
+</p>
+<script>
+(function () {
+  var iframe = document.getElementById('lwPengumumanFrame');
+  var CHILD_ORIGIN = 'http://192.168.88.9';
+
+  window.addEventListener('message', function (event) {
+    if (!event || !event.data) return;
+    if (event.data.type !== 'LAWANGSEWU_IFRAME_RESIZE') return;
+    if (event.origin !== CHILD_ORIGIN) return;
+
+    var nextHeight = parseInt(event.data.height, 10);
+    if (!isNaN(nextHeight) && nextHeight > 100 && nextHeight < 4000) {
+      iframe.style.height = (nextHeight + 8) + 'px';
+    }
+  });
+})();
+</script>
+<p>```</p>
+<h2>7) Parameter feed pengumuman</h2>
+<ul>
+<li><code>source=all</code> berarti gabungan MA dan Badilag.</li>
+<li><code>source=ma</code> berarti hanya Mahkamah Agung.</li>
+<li><code>source=badilag</code> berarti hanya Badilag.</li>
+<li><code>limit=5</code> berarti jumlah item yang ditampilkan.</li>
+</ul>
+<p>Contoh:
+- <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed?source=ma&amp;limit=5</code>
+- <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed?source=badilag&amp;limit=8</code></p>
+<h2>8) Troubleshooting</h2>
+<h3>A. Halaman tidak tampil</h3>
+<ul>
+<li>Uji langsung lewat browser: <code>http://192.168.88.9/berita-pengadilan</code></li>
+<li>Uji langsung feed pengumuman: <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan</code></li>
+<li>Jika gagal, cek Apache dan rewrite route.</li>
+</ul>
+<h3>B. Embed kosong</h3>
+<ul>
+<li>Cek URL embed langsung: <code>https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed?source=all&amp;limit=5</code></li>
+<li>Cek jaringan antara IIS dan server Lawangsewu.</li>
+</ul>
+<h3>C. Data pengumuman tidak tampil</h3>
+<ul>
+<li>Uji API langsung: <code>http://192.168.88.9/api/pengumuman-rss?source=all&amp;limit=3</code></li>
+<li>Jika API gagal, cek service Node Lawangsewu di <code>127.0.0.1:8787</code>.</li>
+</ul>
+<h3>D. Berita pengadilan kosong saat dibuka dari preview file</h3>
+<ul>
+<li>Jangan buka file sumber langsung dari editor.</li>
+<li>Buka lewat URL server karena halaman ini mengandalkan route Apache dan fetch ke endpoint server.</li>
+</ul>
+<h2>9) Rekomendasi operasional</h2>
+<ul>
+<li>Untuk homepage situs lain: gunakan <code>pengumuman-peradilan-embed</code>.</li>
+<li>Untuk halaman informasi campuran: gunakan <code>berita-pengadilan</code>.</li>
+<li>Untuk halaman pengumuman resmi yang fokus: gunakan <code>pengumuman-peradilan</code>.</li>
+<li>Saat go-live domain production, ganti <code>192.168.88.9</code> ke domain final yang berlaku.</li>
+</ul>

@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>AUDIT-WA-CARAKA-20260307.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>AUDIT-WA-CARAKA-20260307.md</h1><h1>Audit WA Caraka (2026-03-07)</h1>
+<h2>Scope</h2>
+<ul>
+<li>Login/auth flow (CI4 admin)</li>
+<li>Dashboard + WA Console process actions</li>
+<li>Report pipeline (intent report + knowledge alert)</li>
+<li>Backup and migration readiness</li>
+</ul>
+<h2>Findings</h2>
+<h3>High</h3>
+<ol>
+<li>Host-mismatch risk on redirect URL (fixed)</li>
+<li>Dampak: setelah submit action bisa terlempar ke host/domain yang tidak sesuai (potensi 404/no-response pada deployment proxy/domain campuran).</li>
+<li>Lokasi: <code>wa-caraka/dashboard-ci4-admin/app/Controllers/AuthController.php</code>, <code>wa-caraka/dashboard-ci4-admin/app/Controllers/DashboardController.php</code>, <code>wa-caraka/dashboard-ci4-admin/app/Controllers/MessageController.php</code>, <code>wa-caraka/dashboard-ci4-admin/app/Controllers/DeviceController.php</code>.</li>
+<li>
+<p>Perbaikan: redirect dibuat path-based.</p>
+</li>
+<li>
+<p>Account enumeration melalui pesan login berbeda (fixed)</p>
+</li>
+<li>Dampak: attacker bisa membedakan akun valid/nonaktif vs password salah.</li>
+<li>Lokasi: <code>wa-caraka/dashboard-ci4-admin/app/Controllers/AuthController.php</code>.</li>
+<li>Perbaikan: pesan gagal login diseragamkan menjadi "Username atau password salah.".</li>
+</ol>
+<h3>Medium</h3>
+<ol>
+<li>False-positive pada audit endpoint sensitif (fixed)</li>
+<li>Dampak: script audit menandai FAIL meski endpoint tidak dapat diakses (404).</li>
+<li>Lokasi: <code>scripts/security-audit.sh</code>.</li>
+<li>
+<p>Perbaikan: validasi endpoint sensitif menerima <code>403</code> atau <code>404</code>.</p>
+</li>
+<li>
+<p>Parsing <code>.env</code> raw berisiko saat nilai dikutip (fixed)</p>
+</li>
+<li>Dampak: script report/alert dapat gagal jika nilai <code>.env</code> ditulis dengan <code>'...'</code> atau <code>"..."</code>.</li>
+<li>Lokasi: <code>wa-caraka/scripts/generate-weekly-intent-report.sh</code>, <code>wa-caraka/scripts/check-knowledge-alert.sh</code>.</li>
+<li>Perbaikan: parser env menormalkan dan menghapus quote pembungkus.</li>
+</ol>
+<h3>Operational Gaps</h3>
+<ol>
+<li>Belum ada verifikasi restore backup terenkripsi (fixed)</li>
+<li>Dampak: backup ada, tapi validitas restore tidak teruji rutin.</li>
+<li>
+<p>Perbaikan: tambah <code>scripts/verify-backup.sh</code>.</p>
+</li>
+<li>
+<p>Belum ada paket migrasi standar GitHub -&gt; server (fixed)</p>
+</li>
+<li>Dampak: migrasi lintas server rawan manual error.</li>
+<li>Perbaikan: tambah <code>scripts/prepare-github-migration.sh</code> + <code>MIGRASI-GITHUB-SERVER.md</code>.</li>
+</ol>
+<h2>Test Evidence</h2>
+<ul>
+<li><code>bash scripts/security-audit.sh http://127.0.0.1:8792</code> -&gt; PASS.</li>
+<li><code>bash wa-caraka/scripts/generate-weekly-intent-report.sh 1 5</code> -&gt; report berhasil dibuat.</li>
+<li><code>bash scripts/prepare-github-migration.sh http://127.0.0.1:8792</code> -&gt; artefak migrasi berhasil dibuat di <code>releases/migration/</code>.</li>
+</ul>
+<h2>Remaining Recommendations</h2>
+<ol>
+<li>Aktifkan CSP dan secure headers di production (min. <code>script-src</code>, <code>frame-ancestors</code>, <code>upgrade-insecure-requests</code>).</li>
+<li>Evaluasi <code>forceGlobalSecureRequests</code> + reverse proxy trust config agar konsisten HTTPS end-to-end.</li>
+<li>Tambahkan smoke test authenticated berbasis host produksi (atau staging) untuk menghindari mismatch cookie domain saat uji lokal.</li>
+<li>Jalankan drill restore bulanan: decrypt -&gt; verify -&gt; bootstrap service di host uji.</li>
+</ol></body></html>

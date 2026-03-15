@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>SECURITY-HARDENING.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>SECURITY-HARDENING.md</h1><h1>Security Hardening Runbook (Lawangsewu)</h1>
+<p>Dokumen ini untuk memastikan server <code>lawangsewu</code> dan repository GitHub tetap aman secara operasional.</p>
+<h2>1) Quick Audit (otomatis)</h2>
+<p>Jalankan:</p>
+<pre><code class="language-bash">/var/www/html/lawangsewu/scripts/security-audit.sh
+</code></pre>
+<p>Audit akan mengecek:</p>
+<ul>
+<li>file sensitif yang tidak boleh ter-track Git</li>
+<li>pola secret berisiko di tracked files</li>
+<li>endpoint sensitif publik (<code>/.env</code>, <code>/scripts/</code>, <code>/projects/</code>) sudah <code>403</code></li>
+</ul>
+<h2>2) Rotasi Secret (wajib saat ada indikasi bocor)</h2>
+<p>Runbook detail copy-paste ada di:</p>
+<ul>
+<li><code>SECRET-ROTATION.md</code></li>
+</ul>
+<p>Urutan aman:</p>
+<ol>
+<li>Buat credential DB baru (user + password kuat)</li>
+<li>Update runtime env di server (jangan commit):</li>
+<li><code>projects/website-pa-semarang/lumpiapasar-s9-active/.env</code></li>
+<li><code>gateway/.env</code></li>
+<li>Reload service yang relevan (jika perlu)</li>
+<li>Verifikasi endpoint utama tetap <code>200</code></li>
+<li>Cabut credential lama</li>
+</ol>
+<h2>3) Hardening GitHub (manual di web UI)</h2>
+<p>Aktifkan untuk repo <code>zhayyn/lawangsewu</code>:</p>
+<ul>
+<li>Branch protection untuk <code>main</code></li>
+<li>Require pull request sebelum merge</li>
+<li>Require status checks (minimal CI)</li>
+<li>Block force push dan branch deletion</li>
+<li>Security</li>
+<li>Enable secret scanning</li>
+<li>Enable push protection</li>
+<li>Enable Dependabot alerts + security updates</li>
+<li>Akun admin</li>
+<li>Wajib 2FA</li>
+<li>Gunakan personal access token dengan scope minimal</li>
+</ul>
+<h2>4) Hardening Cloudflare</h2>
+<p>Ikuti checklist di file:</p>
+<ul>
+<li><code>CLOUDFLARE-CHECKLIST.md</code></li>
+</ul>
+<p>Fokus: hindari challenge tidak perlu di endpoint monitor sambil tetap menjaga proteksi global.</p>
+<h2>5) Backup &amp; Recovery</h2>
+<p>Ikuti SOP di:</p>
+<ul>
+<li><code>BACKUP-RECOVERY.md</code></li>
+</ul>
+<p>Minimal yang wajib aktif:</p>
+<ul>
+<li>backup harian terenkripsi</li>
+<li>offsite backup harian</li>
+<li>uji restore berkala</li>
+</ul>
+<h2>6) Monitoring Rutin</h2>
+<p>Jadwal minimum (disarankan mingguan):</p>
+<ul>
+<li>jalankan <code>scripts/security-audit.sh</code></li>
+<li>review <code>git log --since='7 days ago' --name-status</code></li>
+<li>review Cloudflare Security Events</li>
+<li>review auth log server (<code>/var/log/auth.log</code> atau ekuivalen)</li>
+</ul></body></html>

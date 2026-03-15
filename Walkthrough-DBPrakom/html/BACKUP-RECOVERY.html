@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>BACKUP-RECOVERY.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>BACKUP-RECOVERY.md</h1><h1>Backup &amp; Recovery</h1>
+<p>Panduan ini untuk backup harian terenkripsi dan proses restore saat darurat.</p>
+<h2>1) Konfigurasi awal</h2>
+<ol>
+<li>Salin template konfigurasi:</li>
+</ol>
+<pre><code class="language-bash">cp /var/www/html/lawangsewu/scripts/backup.conf.example /var/www/html/lawangsewu/scripts/backup.conf
+</code></pre>
+<ol>
+<li>Edit file konfigurasi:</li>
+</ol>
+<pre><code class="language-bash">nano /var/www/html/lawangsewu/scripts/backup.conf
+</code></pre>
+<ol>
+<li>
+<p>Isi minimal:</p>
+</li>
+<li>
+<p><code>BACKUP_PASSPHRASE</code> (wajib)</p>
+</li>
+<li>
+<p>(Opsional) Isi parameter database (<code>DB_NAME</code>, <code>DB_USER</code>, dst) jika ingin dump database otomatis.</p>
+</li>
+</ol>
+<h2>2) Test backup manual</h2>
+<pre><code class="language-bash">/var/www/html/lawangsewu/scripts/backup-daily.sh
+</code></pre>
+<p>Output terenkripsi akan tersimpan di:</p>
+<ul>
+<li><code>/var/backups/lawangsewu/lawangsewu_YYYY-MM-DD_HHMMSS.tar.enc</code></li>
+</ul>
+<h2>3) Aktifkan jadwal harian (cron)</h2>
+<pre><code class="language-bash">/var/www/html/lawangsewu/scripts/setup-backup-cron.sh
+</code></pre>
+<p>Default schedule: <code>02:30</code> setiap hari.</p>
+<h2>3b) Setup offsite backup ke cloud private</h2>
+<ol>
+<li>Pastikan rclone terpasang dan remote sudah dibuat:</li>
+</ol>
+<pre><code class="language-bash">rclone config
+</code></pre>
+<ol>
+<li>Siapkan konfigurasi offsite:</li>
+</ol>
+<pre><code class="language-bash">cp /var/www/html/lawangsewu/scripts/offsite.conf.example /var/www/html/lawangsewu/scripts/offsite.conf
+nano /var/www/html/lawangsewu/scripts/offsite.conf
+</code></pre>
+<ol>
+<li>Test kirim offsite manual:</li>
+</ol>
+<pre><code class="language-bash">/var/www/html/lawangsewu/scripts/push-offsite-backup.sh
+</code></pre>
+<ol>
+<li>Pasang cron offsite harian (default 04:00):</li>
+</ol>
+<pre><code class="language-bash">/var/www/html/lawangsewu/scripts/setup-offsite-cron.sh
+</code></pre>
+<h2>4) Restore dari backup terenkripsi</h2>
+<ol>
+<li>Decrypt:</li>
+</ol>
+<pre><code class="language-bash">export BACKUP_PASSPHRASE='isi-passphrase-kamu'
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+  -in /var/backups/lawangsewu/lawangsewu_YYYY-MM-DD_HHMMSS.tar.enc \
+  -out /tmp/lawangsewu_restore.tar \
+  -pass env:BACKUP_PASSPHRASE
+</code></pre>
+<ol>
+<li>Extract:</li>
+</ol>
+<pre><code class="language-bash">mkdir -p /tmp/lawangsewu_restore
+tar -xf /tmp/lawangsewu_restore.tar -C /tmp/lawangsewu_restore
+</code></pre>
+<ol>
+<li>Restore source code:</li>
+</ol>
+<pre><code class="language-bash">tar -xzf /tmp/lawangsewu_restore/source_*.tar.gz -C /var/www/html/lawangsewu
+</code></pre>
+<ol>
+<li>Restore git history (opsional):</li>
+</ol>
+<pre><code class="language-bash">git clone /tmp/lawangsewu_restore/repo_*.bundle /var/www/html/lawangsewu_git_restore
+</code></pre>
+<ol>
+<li>Restore database (jika ada file <code>db_*.sql</code>):</li>
+</ol>
+<pre><code class="language-bash">mysql -u USER -p NAMA_DB &lt; /tmp/lawangsewu_restore/db_*.sql
+</code></pre></body></html>

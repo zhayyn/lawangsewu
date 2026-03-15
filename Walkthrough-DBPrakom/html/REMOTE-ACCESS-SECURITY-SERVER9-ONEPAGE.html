@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE.md</h1><h1>Ringkasan 1 Halaman</h1>
+<h2>Keamanan Akses Remote Server 9</h2>
+<p>Tanggal: 2026-03-09<br />
+Status: Aktif (diterapkan di server)</p>
+<h3>Tujuan</h3>
+<p>Menjaga akses admin Server 9 tetap aman, tetap bisa dipakai dari iPad, dan tidak bergantung pada satu akun cloud yang bisa dibajak.</p>
+<h3>Masalah Awal</h3>
+<p>Model awal memakai VS Code Tunnel berbasis akun cloud. Risiko utamanya:</p>
+<ul>
+<li>Jika akun cloud dicuri, ada peluang penyalahgunaan akses remote.</li>
+<li>Sesi/token bisa tertinggal di server bila tidak dicabut dengan benar.</li>
+<li>Ketergantungan tinggi pada identitas eksternal.</li>
+</ul>
+<h3>Keputusan Arsitektur</h3>
+<p>Dipilih arsitektur:</p>
+<ul>
+<li>Jalur utama admin: <code>WireGuard + SSH</code></li>
+<li>Jalur cloud tunnel: <code>dinonaktifkan total</code> (masked)</li>
+</ul>
+<p>Perumpamaan:</p>
+<ul>
+<li>WireGuard = jalan privat ke area internal.</li>
+<li>SSH = pintu utama dengan kunci admin.</li>
+<li>UFW limit = satpam yang membatasi percobaan masuk berulang.</li>
+<li>Tunnel cloud = pintu tamu online (saat ini ditutup).</li>
+</ul>
+<h3>Implementasi yang Sudah Berjalan</h3>
+<ol>
+<li>WireGuard aktif di <code>wg0</code>, port <code>51830/udp</code>.</li>
+<li>Peer admin aktif menggunakan subnet VPN <code>10.19.9.0/24</code>.</li>
+<li>SSH tetap aktif, dengan <code>LIMIT IN 22/tcp</code> pada UFW.</li>
+<li>Seluruh service tunnel sudah dikunci:</li>
+<li><code>vscode-tunnel-lawangsewu.service</code> -&gt; <code>masked</code></li>
+<li><code>vscode-tunnel-lawangsewu-ms.service</code> -&gt; <code>masked</code></li>
+<li>Login user tunnel dicabut (<code>not logged in</code>).</li>
+</ol>
+<h3>Penilaian Keamanan (Praktis)</h3>
+<ul>
+<li>Risiko dari pembajakan akun cloud untuk akses server: <strong>rendah</strong>.</li>
+<li>Risiko brute-force SSH publik: <strong>terkendali</strong> (rate limit aktif).</li>
+<li>Ketersediaan akses admin: <strong>baik</strong> (jalur utama VPN + SSH).</li>
+</ul>
+<h3>Dampak Operasional</h3>
+<ul>
+<li>Admin tetap bisa bekerja dari iPad melalui WireGuard + SSH.</li>
+<li>Layanan produksi tidak perlu perubahan besar.</li>
+<li>Tidak ada ketergantungan akses server ke akun GitHub tertentu.</li>
+</ul>
+<h3>Tentang GitHub Copilot</h3>
+<ul>
+<li>Copilot tetap dapat dipakai normal di perangkat pengguna.</li>
+<li>Akun GitHub untuk Copilot bisa diganti kapan saja di sisi client.</li>
+<li>Pergantian akun Copilot tidak otomatis membuka akses ke server.</li>
+</ul>
+<h3>SOP Harian Singkat</h3>
+<ol>
+<li>Connect WireGuard di iPad.</li>
+<li>SSH ke IP VPN server (bukan IP publik).</li>
+<li>Kerja administrasi.</li>
+<li>Disconnect VPN saat selesai.</li>
+</ol>
+<h3>SOP Insiden Singkat</h3>
+<p>Jika akun cloud dicurigai dibajak:</p>
+<ol>
+<li>Revoke session/token akun cloud.</li>
+<li>Ubah password dan aktifkan 2FA.</li>
+<li>Verifikasi server tetap pada kondisi:</li>
+<li>kedua tunnel <code>masked</code></li>
+<li>user tunnel <code>not logged in</code></li>
+<li><code>wg0</code> aktif</li>
+</ol>
+<h3>Checklist Verifikasi Cepat</h3>
+<pre><code class="language-bash">systemctl is-enabled vscode-tunnel-lawangsewu.service
+systemctl is-enabled vscode-tunnel-lawangsewu-ms.service
+sudo -u lawangsewu-vscode -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+sudo -u lawangsewu-vscode-ms -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+systemctl status wg-quick@wg0 --no-pager
+wg show
+ufw status numbered
+</code></pre>
+<p>Ekspektasi:
+- kedua service tunnel: <code>masked</code>
+- kedua user tunnel: <code>not logged in</code>
+- WireGuard aktif (<code>wg0 up</code>)</p>
+<hr />
+<p>Dokumen ini ditujukan untuk kebutuhan briefing cepat pimpinan dan audit internal.</p></body></html>

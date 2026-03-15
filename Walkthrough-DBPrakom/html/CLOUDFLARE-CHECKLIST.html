@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>CLOUDFLARE-CHECKLIST.md</title><style>
+body{font-family:Arial,sans-serif;color:#1b2a3a;margin:36px;line-height:1.6}
+h1,h2,h3{color:#0d6b41}code,pre{background:#f4f7fb}pre{padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8e2ec;padding:8px;text-align:left}a{color:#0b6f56}
+</style></head><body><h1>CLOUDFLARE-CHECKLIST.md</h1><h1>Checklist Rule Cloudflare Wajib (Lawangsewu)</h1>
+<p>Dokumen ini jadi checklist agar kasus <code>Managed Challenge / 403</code> pada halaman monitor tidak terulang.</p>
+<h2>0) WA Caraka Admin juga wajib dibebaskan dari challenge</h2>
+<p>Saat ini path berikut juga terdeteksi kena <code>Managed Challenge</code>:</p>
+<ul>
+<li><code>https://lawangsewu.pa-semarang.go.id/wa-caraka-admin/login</code></li>
+<li><code>https://lawangsewu.pa-semarang.go.id/wa-caraka</code></li>
+</ul>
+<p>Gunakan pola rule yang sama seperti halaman monitor, tetapi untuk path WA Caraka:</p>
+<ul>
+<li>Hostname equals <code>lawangsewu.pa-semarang.go.id</code></li>
+<li>URI Path starts with <code>/wa-caraka-admin</code></li>
+</ul>
+<p>Action: <code>Skip</code></p>
+<p>Komponen yang di-skip:</p>
+<ul>
+<li>All remaining custom rules</li>
+<li>All managed rules</li>
+<li>All rate limiting rules</li>
+<li>All Super Bot Fight Mode rules</li>
+<li>Browser Integrity Check</li>
+</ul>
+<p>Jika halaman runtime <code>/wa-caraka</code> juga masih ditantang, buat rule kedua:</p>
+<ul>
+<li>Hostname equals <code>lawangsewu.pa-semarang.go.id</code></li>
+<li>URI Path starts with <code>/wa-caraka</code></li>
+</ul>
+<p>Action: <code>Skip</code></p>
+<p>Setelah itu cek lagi di <code>Security -&gt; Events</code> bahwa action untuk kedua path ini tidak lagi <code>Managed Challenge</code>.</p>
+<h2>1) Rule WAF custom (Skip) untuk endpoint monitor</h2>
+<p>Buat <strong>Custom Rule</strong> dengan kriteria:</p>
+<ul>
+<li>Hostname equals <code>lawangsewu.pa-semarang.go.id</code></li>
+<li>URI Path starts with <code>/info-persidangan</code></li>
+</ul>
+<p>Action: <code>Skip</code></p>
+<p>Komponen yang di-skip (centang):</p>
+<ul>
+<li>All remaining custom rules</li>
+<li>All managed rules</li>
+<li>All rate limiting rules</li>
+<li>All Super Bot Fight Mode rules</li>
+<li>Browser Integrity Check</li>
+</ul>
+<p>Prioritas: taruh rule ini di urutan paling atas.</p>
+<h2>2) Configuration Rule untuk Security Level (jika challenge masih muncul)</h2>
+<p>Karena sumber challenge sebelumnya dari service <code>Security level</code> (rule id <code>iuam</code>), maka perlu override:</p>
+<ul>
+<li>Hostname equals <code>lawangsewu.pa-semarang.go.id</code></li>
+<li>URI Path starts with <code>/info-persidangan</code></li>
+</ul>
+<p>Set konfigurasi:</p>
+<ul>
+<li>Security Level: <code>Essentially Off</code></li>
+<li>Browser Integrity Check: <code>Off</code> (jika tersedia)</li>
+<li>Under Attack Mode: <code>Off</code> (jika tersedia)</li>
+</ul>
+<p>Jika slot Configuration Rules penuh, gunakan rule nonaktif yang ada lalu ubah match dan setting untuk path ini.</p>
+<h2>3) Cek Security Events setiap ada error</h2>
+<p>Di Cloudflare <code>Security -&gt; Events</code>, filter:</p>
+<ul>
+<li>Host: <code>lawangsewu.pa-semarang.go.id</code></li>
+<li>Path: <code>/info-persidangan</code></li>
+<li>(opsional) Ray ID dari header response</li>
+</ul>
+<p>Pastikan action tidak lagi <code>Managed Challenge</code> untuk path tersebut.</p>
+<h2>4) URL kanonik (tanpa .php)</h2>
+<p>Server sudah dikonfigurasi agar URL <code>.php</code> di-redirect ke URL tanpa <code>.php</code> (301).</p>
+<p>Gunakan URL utama:</p>
+<ul>
+<li><code>https://lawangsewu.pa-semarang.go.id/info-persidangan</code></li>
+</ul>
+<h2>5) Uji cepat setelah perubahan</h2>
+<p>Jalankan dari server:</p>
+<pre><code class="language-bash">curl -I https://lawangsewu.pa-semarang.go.id/info-persidangan
+curl -I https://lawangsewu.pa-semarang.go.id/info-persidangan.php
+</code></pre>
+<p>Expected:</p>
+<ul>
+<li>URL tanpa <code>.php</code> -&gt; <code>200</code></li>
+<li>URL dengan <code>.php</code> -&gt; <code>301</code> ke URL tanpa <code>.php</code></li>
+<li>Tidak ada header <code>cf-mitigated: challenge</code></li>
+</ul></body></html>

@@ -196,9 +196,11 @@
 
 <script>
 (function () {
-    const bridge = window.location.pathname.includes('/lawangsewu')
-        ? `${window.location.origin}/lawangsewu/api/server10`
-        : '/lawangsewu/api/server10';
+    const bridge = `${window.location.origin}/api/server10`;
+    const DEFAULT_CITY = {
+        value: 'KOTA SEMARANG',
+        label: 'Kota Semarang'
+    };
 
     const node = {
         health: document.getElementById('lr-health'),
@@ -235,6 +237,28 @@
             .filter((option) => option.value && option.label);
     }
 
+    function setLoadingState(select, placeholder) {
+        setOptions(select, [], placeholder);
+    }
+
+    function pickDefaultCity(options) {
+        const preferred = options.find((item) => String(item.value).toUpperCase() === DEFAULT_CITY.value);
+        if (preferred) {
+            return preferred;
+        }
+        return options[0] || DEFAULT_CITY;
+    }
+
+    function pickFirstOption(options) {
+        return options[0] || null;
+    }
+
+    function applyAlamat(value) {
+        const text = value || 'SEMARANG';
+        node.alamat.value = text;
+        node.alamat.setAttribute('value', text);
+    }
+
     async function callBridge(params, body) {
         const url = `${bridge}?${new URLSearchParams(params).toString()}`;
         const response = await fetch(url, {
@@ -264,25 +288,59 @@
     }
 
     async function loadKota() {
-        const payload = await callBridge(
-            { source: 'panjar_wilayah' },
-            { jenis: 'kota', id_provinces: 'JAWA TENGAH' }
-        );
-        const options = parseOptions(payload.raw || '');
+        let options = [];
+
+        try {
+            const payload = await callBridge(
+                { path: '/lumpiapasar/panjar/_panjar_data_wilayah.php', method: 'POST' },
+                { jenis: 'kota', id_provinces: 'JAWA TENGAH' }
+            );
+            options = parseOptions(payload.raw || '');
+        } catch (_) {
+            options = [];
+        }
+
+        if (!options.length) {
+            options = [DEFAULT_CITY];
+        }
+
         setOptions(node.kota, options, 'Pilih kota/kabupaten');
+
+        const chosenCity = pickDefaultCity(options);
+        node.kota.value = chosenCity.value;
+        await loadKecamatan(chosenCity.value);
     }
 
     async function loadKecamatan(kota) {
+        setLoadingState(node.kecamatan, 'Memuat kecamatan...');
+        setLoadingState(node.kelurahan, 'Pilih kecamatan dulu');
+
         const payload = await callBridge(
             { path: '/lumpiapasar/panjar/_panjar_data_wilayah.php', method: 'POST' },
             { jenis: 'kecamatan', id_regencies: kota }
         );
         const options = parseOptions(payload.raw || '');
+
+        if (!options.length) {
+            setOptions(node.kecamatan, [], 'Kecamatan tidak tersedia');
+            setOptions(node.kelurahan, [], 'Kelurahan belum tersedia');
+            node.result.innerHTML = '<div class="lr-loading">Daftar kecamatan belum tersedia. Silakan coba lagi beberapa saat.</div>';
+            return;
+        }
+
         setOptions(node.kecamatan, options, 'Pilih kecamatan');
         setOptions(node.kelurahan, [], 'Pilih kecamatan dulu');
+
+        const chosenKecamatan = pickFirstOption(options);
+        if (chosenKecamatan) {
+            node.kecamatan.value = chosenKecamatan.value;
+            await loadKelurahan(chosenKecamatan.value);
+        }
     }
 
     async function loadKelurahan(kecamatan) {
+        setLoadingState(node.kelurahan, 'Memuat kelurahan...');
+
         const payload = await callBridge(
             { path: '/lumpiapasar/panjar/_panjar_data_wilayah.php', method: 'POST' },
             { jenis: 'kelurahan', id_district: kecamatan }
@@ -292,7 +350,23 @@
             label: item.label,
             meta: item.value
         }));
+
+        if (!options.length) {
+            setOptions(node.kelurahan, [], 'Kelurahan tidak tersedia');
+            node.result.innerHTML = '<div class="lr-loading">Daftar kelurahan belum tersedia. Pilih kecamatan lain atau coba lagi.</div>';
+            return;
+        }
+
         setOptions(node.kelurahan, options, 'Pilih kelurahan');
+
+        const chosenKelurahan = pickFirstOption(options);
+        if (chosenKelurahan) {
+            node.kelurahan.value = chosenKelurahan.value;
+            const meta = extractKelMeta(chosenKelurahan.value);
+            if (meta.alamat) {
+                applyAlamat(meta.alamat);
+            }
+        }
     }
 
     function extractKelMeta(value) {
@@ -308,8 +382,23 @@
     async function hitung() {
         node.result.innerHTML = '<div class="lr-loading">Menghitung panjar perkara ghaib...</div>';
         try {
+            if (!node.kota.value) {
+                node.result.innerHTML = '<div class="lr-loading">Kota/kabupaten belum terpilih.</div>';
+                return;
+            }
+
+            if (!node.kecamatan.value) {
+                node.result.innerHTML = '<div class="lr-loading">Pilih kecamatan terlebih dahulu.</div>';
+                return;
+            }
+
+            if (!node.kelurahan.value) {
+                node.result.innerHTML = '<div class="lr-loading">Pilih kelurahan terlebih dahulu agar radius dan panjar bisa dihitung.</div>';
+                return;
+            }
+
             const kelMeta = extractKelMeta(node.kelurahan.value);
-            node.alamat.value = kelMeta.alamat;
+            applyAlamat(kelMeta.alamat);
 
             const payload = await callBridge(
                 { source: 'modul_panjar_perkara_ghaib' },
@@ -337,7 +426,7 @@
     function resetForm() {
         node.namaP.value = 'PENGGUGAT';
         node.namaT.value = 'TERGUGAT';
-        node.alamat.value = 'SEMARANG';
+        applyAlamat('SEMARANG');
         node.result.innerHTML = '<div class="lr-loading">Form direset. Klik Hitung Panjar Ghaib.</div>';
     }
 
@@ -363,7 +452,7 @@
     node.kelurahan.addEventListener('change', () => {
         const meta = extractKelMeta(node.kelurahan.value);
         if (meta.alamat) {
-            node.alamat.value = meta.alamat;
+            applyAlamat(meta.alamat);
         }
     });
 
@@ -371,9 +460,13 @@
     node.reset.addEventListener('click', resetForm);
 
     (async () => {
-        await loadHealth();
-        await loadKota();
-        node.result.innerHTML = '<div class="lr-loading">Siap digunakan. Lengkapi data lalu klik Hitung Panjar Ghaib.</div>';
+        try {
+            await loadHealth();
+            await loadKota();
+            node.result.innerHTML = '<div class="lr-loading">Kota, kecamatan, dan kelurahan awal sudah dipilih otomatis. Ubah bila perlu, lalu klik Hitung Panjar Ghaib.</div>';
+        } catch (error) {
+            node.result.textContent = `Error: ${String(error && error.message ? error.message : error)}`;
+        }
     })();
 })();
 </script>

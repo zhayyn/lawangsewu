@@ -334,9 +334,7 @@
 
 <script>
 (function () {
-    const bridgeBase = window.location.pathname.includes('/lawangsewu')
-        ? `${window.location.origin}/lawangsewu/api/server10`
-        : '/lawangsewu/api/server10';
+    const bridgeBase = `${window.location.origin}/api/server10`;
 
     const AUTO_CITY = 'KOTA SEMARANG';
     const MIN_EXPECTED_KECAMATAN = 17;

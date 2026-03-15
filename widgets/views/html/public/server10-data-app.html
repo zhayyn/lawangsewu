@@ -103,7 +103,7 @@
         <button class="s10-preset" type="button" data-preset="panjar_hitung">Preset Hitung Panjar</button>
     </div>
     <textarea id="s10-body" class="s10-body" placeholder="Body untuk POST (format key=value&key2=value2)">jenis=kota&id_provinces=JAWA%20TENGAH</textarea>
-    <div class="s10-note">Endpoint bridge: <span id="s10-endpoint">/lawangsewu/api/server10</span></div>
+    <div class="s10-note">Endpoint bridge: <span id="s10-endpoint">/api/server10</span></div>
     <pre id="s10-result" class="s10-result">Menunggu permintaan...</pre>
 </div>
 
@@ -118,9 +118,7 @@
     const endpointLabel = document.getElementById('s10-endpoint');
     const presetButtons = Array.from(document.querySelectorAll('[data-preset]'));
 
-    const bridgeBase = window.location.pathname.includes('/lawangsewu')
-        ? `${window.location.origin}/lawangsewu/api/server10`
-        : '/lawangsewu/api/server10';
+    const bridgeBase = `${window.location.origin}/api/server10`;
 
     endpointLabel.textContent = bridgeBase;
 

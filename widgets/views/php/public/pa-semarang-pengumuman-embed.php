@@ -16,7 +16,7 @@ if ($limit > 20) {
     $limit = 20;
 }
 
-$apiUrl = '/lawangsewu/api/pengumuman-rss?source=' . rawurlencode($source) . '&limit=' . $limit;
+$apiUrl = '/api/pengumuman-rss?source=' . rawurlencode($source) . '&limit=' . $limit;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -93,8 +93,8 @@ const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
 let activeSource = '<?php echo $uiSource; ?>';
 const THUMB_MA = 'https://www.mahkamahagung.go.id/assets/img/gedung.jpg';
 const THUMB_MA_FALLBACK = 'https://www.mahkamahagung.go.id/files/templates/post_1.jpg';
-const THUMB_MA_LOCAL = '/lawangsewu/widgets/assets/ma-fallback.jpg';
-const THUMB_BADILAG = '/lawangsewu/widgets/assets/badilag-thumb.svg';
+const THUMB_MA_LOCAL = '/widgets/assets/ma-fallback.jpg';
+const THUMB_BADILAG = '/widgets/assets/badilag-thumb.svg';
 
 function escHtml(text) {
     return String(text || '').replace(/[&<>"']/g, (char) => ({
@@ -219,7 +219,7 @@ function postFrameHeight() {
 
 async function loadEmbedFeed() {
     try {
-        const seed = feed.getAttribute('data-api') || '/lawangsewu/api/pengumuman-rss?source=all&limit=5';
+        const seed = feed.getAttribute('data-api') || '/api/pengumuman-rss?source=all&limit=5';
         const url = new URL(seed, window.location.origin);
         url.searchParams.set('source', activeSource);
         url.searchParams.set('t', Date.now().toString());

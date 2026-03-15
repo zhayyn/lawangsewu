@@ -16,7 +16,7 @@ if ($limit > 20) {
     $limit = 20;
 }
 
-$apiBase = '/lawangsewu/api/pengumuman-rss';
+$apiBase = '/api/pengumuman-rss';
 $apiUrl = $apiBase . '?source=' . rawurlencode($source) . '&limit=' . $limit;
 ?>
 <!DOCTYPE html>
@@ -288,8 +288,8 @@ let activeSource = '<?php echo $uiSource; ?>';
 
 const THUMB_MA = 'https://www.mahkamahagung.go.id/assets/img/gedung.jpg';
 const THUMB_MA_FALLBACK = 'https://www.mahkamahagung.go.id/files/templates/post_1.jpg';
-const THUMB_MA_LOCAL = '/lawangsewu/widgets/assets/ma-fallback.jpg';
-const THUMB_BADILAG = '/lawangsewu/widgets/assets/badilag-thumb.svg';
+const THUMB_MA_LOCAL = '/widgets/assets/ma-fallback.jpg';
+const THUMB_BADILAG = '/widgets/assets/badilag-thumb.svg';
 
 function escHtml(text) {
     return String(text || '').replace(/[&<>"']/g, (char) => ({
@@ -422,7 +422,7 @@ async function loadFeed() {
     metaInfo.textContent = 'Memuat data...';
 
     try {
-        const seed = card.getAttribute('data-api') || '/lawangsewu/api/pengumuman-rss?source=all&limit=8';
+        const seed = card.getAttribute('data-api') || '/api/pengumuman-rss?source=all&limit=8';
         const urlObj = new URL(seed, window.location.origin);
         urlObj.searchParams.set('source', activeSource);
         urlObj.searchParams.set('t', Date.now().toString());
@@ -435,7 +435,8 @@ async function loadFeed() {
 
         const rows = flatten(payload).slice(0, <?php echo $limit; ?>);
         render(rows);
-        metaInfo.textContent = `Menampilkan ${rows.length} item • sumber: ${activeSource === 'ma' ? 'MAHKAMAH AGUNG' : 'BADILAG'}`;
+        const sourceLabel = activeSource === 'ma' ? 'MAHKAMAH AGUNG' : 'BADILAG';
+        metaInfo.textContent = `Menampilkan ${rows.length} item | sumber: ${sourceLabel}`;
     } catch (err) {
         list.innerHTML = '<li class="empty">Data pengumuman tidak tersedia.</li>';
         errBox.textContent = err.message;

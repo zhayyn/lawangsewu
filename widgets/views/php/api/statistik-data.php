@@ -40,7 +40,7 @@ function sd_env(string $key, string $default = ''): string
 
 function sd_log(string $msg): void
 {
-    $root = dirname(__DIR__, 2);
+    $root = dirname(__DIR__, 4);
     $logPath = $root . '/logs/statistik-data.log';
     @file_put_contents($logPath, '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
@@ -52,9 +52,9 @@ function sd_db(): PDO
         return $pdo;
     }
 
-    $root = dirname(__DIR__, 2);
+    $root = dirname(__DIR__, 4);
     sd_load_env($root . '/.env');
-    sd_load_env(__DIR__ . '/.env');
+    sd_load_env(dirname(__DIR__, 2) . '/config/.env');
 
     $host = sd_env('LW_STAT_DB_HOST', 'localhost');
     $user = sd_env('LW_STAT_DB_USER', 'admin');

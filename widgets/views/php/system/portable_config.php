@@ -40,10 +40,12 @@ if (!function_exists('lw_config')) {
             return $config;
         }
 
-        $root = defined('LAWANGSEWU_ROOT') ? LAWANGSEWU_ROOT : dirname(__DIR__, 2);
+        $root = defined('LAWANGSEWU_ROOT') ? LAWANGSEWU_ROOT : dirname(__DIR__, 4);
+        $viewsRoot = dirname(__DIR__, 2);
         $appEnv = lw_load_env_file($root . '/.env');
-        $viewEnv = lw_load_env_file(__DIR__ . '/.env');
-        $env = array_merge($appEnv, $viewEnv);
+        $legacyViewEnv = lw_load_env_file($viewsRoot . '/.env');
+        $viewEnv = lw_load_env_file($viewsRoot . '/config/.env');
+        $env = array_merge($appEnv, $legacyViewEnv, $viewEnv);
 
         $sippBase = rtrim($env['LW_SIPP_BASE_URL'] ?? 'https://sipp.pa-semarang.go.id', '/');
         $server10Base = rtrim($env['LW_SERVER10_BASE_URL'] ?? 'http://192.168.88.10', '/');
@@ -65,7 +67,7 @@ if (!function_exists('lw_config')) {
             'sipp_base_url' => $sippBase,
             'sipp_slide_url' => $env['LW_SIPP_SLIDE_URL'] ?? ($sippBase . '/slide_sidang'),
             'sipp_search_url' => $env['LW_SIPP_SEARCH_URL'] ?? ($sippBase . '/?s='),
-            'slide_local_file' => $env['LW_SLIDE_LOCAL_FILE'] ?? ($root . '/widgets/views/slide_sidang.html'),
+            'slide_local_file' => $env['LW_SLIDE_LOCAL_FILE'] ?? ($root . '/widgets/views/html/public/slide_sidang.html'),
             'log_file' => $env['LW_LOG_FILE'] ?? ($root . '/logs/antrian_controller.log'),
             'server10_base_url' => $server10Base,
             'server10_token' => (string)($env['LW_SERVER10_TOKEN'] ?? ''),

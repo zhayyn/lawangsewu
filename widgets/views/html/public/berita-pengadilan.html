@@ -268,7 +268,7 @@
             </div>
             <div id="pa-berita-list" class="berita-grid">
                 <article class="berita-card">
-                    <img src="/lawangsewu/widgets/assets/ma-fallback.jpg" alt="Berita PA Semarang">
+                    <img src="/widgets/assets/ma-fallback.jpg" alt="Berita PA Semarang">
                     <div class="berita-body">
                         <div class="meta-line"><span>Berita</span><span>Memuat...</span></div>
                         <a class="featured-link" href="#" target="_blank" rel="noopener">Memuat berita terbaru...</a>
@@ -298,7 +298,7 @@
                 <ul id="pa-artikel-list" class="list">
                     <li class="list-item"><a href="#" target="_blank" rel="noopener">Memuat artikel...</a><div class="list-meta">-</div></li>
                 </ul>
-                <a class="more-link" id="pa-artikel-more" href="#" data-pa-path="/kategori/artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
+                <a class="more-link" id="pa-artikel-more" href="#" data-pa-path="/kategori/arsip-artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
             </div>
         </article>
     </section>
@@ -327,13 +327,11 @@
             ? `${window.location.origin}/pasemarang`
             : `${FALLBACK_SERVER9}/pasemarang`;
 
-    const localApiBase = window.location.pathname.includes('/lawangsewu')
-        ? `${window.location.origin}/lawangsewu/api/pengumuman-rss`
-        : `${FALLBACK_SERVER9}/lawangsewu/api/pengumuman-rss`;
+    const localApiBase = `${window.location.origin}/api/pengumuman-rss`;
 
     const THUMB_BADILAG_BUILDING = 'https://marinews.mahkamahagung.go.id/static/2025/12/10/dirjen-badilag-mowEv.jpg';
     const THUMB_PTA_BUILDING = 'https://pta-semarang.go.id/wp-content/uploads/2025/11/gedung-pta-semarang.png';
-    const THUMB_LOCAL_FALLBACK = '/lawangsewu/widgets/assets/ma-fallback.jpg';
+    const THUMB_LOCAL_FALLBACK = '/widgets/assets/ma-fallback.jpg';
     const RSS_SOURCE_NAMES = {
         ma: 'Mahkamah Agung RI',
         badilag: 'Badilag MA RI',
@@ -518,7 +516,7 @@
                             <span class="rss-type-label">Pengumuman</span>
                             ${item.source === 'PTA Semarang' ? '<span class="rss-mini-label">Sumber: PTA Semarang</span>' : ''}
                             <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
-                            <div class="rss-source">${formatDate(item.date)} • Sumber: ${escHtml(item.source)}</div>
+                            <div class="rss-source">${formatDate(item.date)} | Sumber: ${escHtml(item.source)}</div>
                         </div>
                     </div>
                 </div>

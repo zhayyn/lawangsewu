@@ -30,7 +30,7 @@
     </style>
 </head>
 <body>
-<div class="widget" id="pengumumanWidget" data-endpoint="/lawangsewu/api/pengumuman-rss?source=all&limit=5">
+<div class="widget" id="pengumumanWidget" data-endpoint="/api/pengumuman-rss?source=all&limit=5">
     <div class="head">
         <h3>Pengumuman MA & Badilag</h3>
         <div class="tools">
@@ -87,7 +87,7 @@ async function loadPengumuman() {
     metaText.textContent = 'Memuat data...';
 
     try {
-        const base = widgetEl.getAttribute('data-endpoint') || '/lawangsewu/api/pengumuman-rss?source=all&limit=5';
+        const base = widgetEl.getAttribute('data-endpoint') || '/api/pengumuman-rss?source=all&limit=5';
         const connector = base.includes('?') ? '&' : '?';
         const endpoint = `${base}${connector}t=${Date.now()}`;
         const res = await fetch(endpoint, { cache: 'no-store' });

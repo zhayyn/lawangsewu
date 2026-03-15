@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daftar Widget Lawangsewu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #15253a;
+      --muted: #5f728b;
+      --line: rgba(21, 37, 58, 0.12);
+      --card: rgba(255, 255, 255, 0.9);
+      --accent: #0a7558;
+      --accent-soft: #e3f4ed;
+      --warn-soft: #fdf4e4;
+      --warn: #b97816;
+      --bg: linear-gradient(180deg, #f3fbf7 0%, #ecf2fb 52%, #f7f3eb 100%);
+      --shadow: 0 18px 44px rgba(21, 37, 58, 0.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .wrap {
+      width: min(1180px, calc(100% - 32px));
+      margin: 28px auto 40px;
+    }
+    .hero, .section {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.84);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 30px;
+      margin-bottom: 18px;
+    }
+    .label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    h1 {
+      margin-top: 14px;
+      font-size: clamp(36px, 5vw, 60px);
+      line-height: 1;
+    }
+    .hero p, .section p {
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .actions .primary {
+      background: linear-gradient(135deg, #0a7558, #138967);
+      color: #fff;
+    }
+    .actions .secondary {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+    }
+    .search {
+      margin-top: 18px;
+    }
+    .search input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    .meta {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .pill {
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .pill strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .section {
+      padding: 24px;
+      margin-top: 18px;
+    }
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .section-head span {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .badge.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+    .path {
+      display: block;
+      border-radius: 14px;
+      background: #f8fbff;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #31506e;
+      word-break: break-all;
+    }
+    .snippet {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: #132238;
+      color: #eef4fb;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .actions-row a,
+    .actions-row button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .actions-row a.primary,
+    .actions-row button.primary {
+      background: linear-gradient(135deg, #0a7558, #138967);
+      border-color: transparent;
+      color: #fff;
+    }
+    .foot {
+      margin-top: 18px;
+      padding: 18px 20px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.84);
+      border: 1px solid rgba(255,255,255,0.82);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .credit {
+      display: inline-flex;
+      margin-top: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    @media (max-width: 900px) {
+      .grid, .meta { grid-template-columns: 1fr; }
+      .section-head { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 760px) {
+      .wrap { width: min(100% - 20px, 1180px); margin-top: 14px; }
+      .hero, .section { padding: 20px; }
+      .actions a { width: 100%; }
+      .grid { grid-template-columns: 1fr; }
+      .top { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <span class="label">Daftar Widget Lawangsewu</span>
+      <h1>Satu halaman untuk semua link widget final dan snippet iframe.</h1>
+      <p>Gunakan halaman ini sebagai direktori resmi widget publik Lawangsewu. Setiap kartu menampilkan URL final <strong>lawangsewu.pa-semarang.go.id/nama-widget</strong> dan snippet iframe yang bisa langsung disalin untuk kebutuhan embed.</p>
+      <div class="actions">
+        <a class="primary" href="https://lawangsewu.pa-semarang.go.id/berita-pengadilan">Buka contoh widget</a>
+        <a class="secondary" href="/">Katalog utama</a>
+        <a class="secondary" href="/walkthrough">Walkthrough</a>
+      </div>
+      <div class="search">
+        <input id="widgetSearch" type="search" placeholder="Cari widget, misalnya: pengumuman, iframe, persidangan, radius, whatsapp">
+      </div>
+      <div class="meta">
+        <div class="pill"><strong>URL final</strong>Semua tautan memakai root domain tanpa prefix ganda /lawangsewu.</div>
+        <div class="pill"><strong>Siap embed</strong>Gunakan tombol salin iframe untuk menempelkan widget ke portal lain.</div>
+        <div class="pill"><strong>Publik rapi</strong>Link klik langsung membuka widget final yang sama seperti dipakai user publik.</div>
+      </div>
+      <div class="credit">developed by dbprakom</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Publikasi</h2>
+          <span>Feed, widget, dan halaman embed pengumuman</span>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card" data-search="berita pengadilan publikasi rss berita artikel pengumuman">
+          <div class="top">
+            <div>
+              <h3>Berita Pengadilan</h3>
+              <p>Portal agregasi berita, artikel, pengumuman, dan RSS peradilan.</p>
+            </div>
+            <span class="badge">Full page</span>
+          </div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/berita-pengadilan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/berita-pengadilan" width="100%" height="900" style="border:0;" loading="lazy" title="Berita Pengadilan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row">
+            <a class="primary" href="https://lawangsewu.pa-semarang.go.id/berita-pengadilan" target="_blank" rel="noopener">Buka widget</a>
+            <button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/berita-pengadilan">Salin URL</button>
+            <button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/berita-pengadilan&quot; width=&quot;100%&quot; height=&quot;900&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Berita Pengadilan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button>
+          </div>
+        </article>
+
+        <article class="card" data-search="pengumuman peradilan resmi mahkamah agung badilag">
+          <div class="top">
+            <div>
+              <h3>Pengumuman Peradilan</h3>
+              <p>Halaman penuh daftar pengumuman resmi Mahkamah Agung dan Badilag.</p>
+            </div>
+            <span class="badge">Full page</span>
+          </div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan" width="100%" height="860" style="border:0;" loading="lazy" title="Pengumuman Peradilan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row">
+            <a class="primary" href="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan" target="_blank" rel="noopener">Buka widget</a>
+            <button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan">Salin URL</button>
+            <button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Pengumuman Peradilan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button>
+          </div>
+        </article>
+
+        <article class="card" data-search="pengumuman peradilan embed iframe ringan">
+          <div class="top">
+            <div>
+              <h3>Pengumuman Peradilan Embed</h3>
+              <p>Versi ringan yang memang paling cocok untuk iframe pada situs lain.</p>
+            </div>
+            <span class="badge">Embed disarankan</span>
+          </div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed" width="100%" height="760" style="border:0;" loading="lazy" title="Pengumuman Peradilan Embed"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row">
+            <a class="primary" href="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed" target="_blank" rel="noopener">Buka widget</a>
+            <button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed">Salin URL</button>
+            <button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/pengumuman-peradilan-embed&quot; width=&quot;100%&quot; height=&quot;760&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Pengumuman Peradilan Embed&quot;&gt;&lt;/iframe&gt;">Salin iframe</button>
+          </div>
+        </article>
+
+        <article class="card" data-search="widget pengumuman rss ringkas iframe kecil">
+          <div class="top">
+            <div>
+              <h3>Widget Pengumuman</h3>
+              <p>Widget ringkas untuk sidebar, halaman depan, atau panel kecil.</p>
+            </div>
+            <span class="badge">Compact</span>
+          </div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/widget-pengumuman</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/widget-pengumuman" width="100%" height="500" style="border:0;" loading="lazy" title="Widget Pengumuman"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row">
+            <a class="primary" href="https://lawangsewu.pa-semarang.go.id/widget-pengumuman" target="_blank" rel="noopener">Buka widget</a>
+            <button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/widget-pengumuman">Salin URL</button>
+            <button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/widget-pengumuman&quot; width=&quot;100%&quot; height=&quot;500&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Widget Pengumuman&quot;&gt;&lt;/iframe&gt;">Salin iframe</button>
+          </div>
+        </article>
+
+        <article class="card" data-search="panduan embed pengumuman snippet contoh iframe">
+          <div class="top">
+            <div>
+              <h3>Panduan Embed Pengumuman</h3>
+              <p>Halaman panduan untuk implementasi embed pengumuman di portal lain.</p>
+            </div>
+            <span class="badge warn">Panduan</span>
+          </div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/panduan-embed-pengumuman</div>
+          <div class="snippet">&lt;a href="https://lawangsewu.pa-semarang.go.id/panduan-embed-pengumuman" target="_blank" rel="noopener"&gt;Buka panduan embed pengumuman&lt;/a&gt;</div>
+          <div class="actions-row">
+            <a class="primary" href="https://lawangsewu.pa-semarang.go.id/panduan-embed-pengumuman" target="_blank" rel="noopener">Buka panduan</a>
+            <button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/panduan-embed-pengumuman">Salin URL</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Persidangan</h2>
+          <span>Monitor, antrian, dan varian display layar</span>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card" data-search="info persidangan jadwal antrian layar informasi">
+          <div class="top"><div><h3>Info Persidangan</h3><p>Widget utama jadwal dan antrian sidang untuk layar informasi.</p></div><span class="badge">Display</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/info-persidangan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/info-persidangan" width="100%" height="860" style="border:0;" loading="lazy" title="Info Persidangan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/info-persidangan" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/info-persidangan">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/info-persidangan&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Info Persidangan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="info persidangan hijautua tema hijau tua">
+          <div class="top"><div><h3>Info Persidangan Hijautua</h3><p>Varian tampilan hijautua untuk display informasi persidangan.</p></div><span class="badge">Varian tema</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/info-persidangan-hijautua</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/info-persidangan-hijautua" width="100%" height="860" style="border:0;" loading="lazy" title="Info Persidangan Hijautua"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/info-persidangan-hijautua" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/info-persidangan-hijautua">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/info-persidangan-hijautua&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Info Persidangan Hijautua&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="info persidangan stabilo warna alternatif">
+          <div class="top"><div><h3>Info Persidangan Stabilo</h3><p>Varian tampilan stabilo untuk kebutuhan layar alternatif.</p></div><span class="badge">Varian tema</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/info-persidangan-stabilo</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/info-persidangan-stabilo" width="100%" height="860" style="border:0;" loading="lazy" title="Info Persidangan Stabilo"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/info-persidangan-stabilo" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/info-persidangan-stabilo">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/info-persidangan-stabilo&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Info Persidangan Stabilo&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="monitor persidangan ruang sidang antrian">
+          <div class="top"><div><h3>Monitor Persidangan</h3><p>Monitor ruang sidang dan status antrian untuk display publik.</p></div><span class="badge">Monitor</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/monitor-persidangan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/monitor-persidangan" width="100%" height="860" style="border:0;" loading="lazy" title="Monitor Persidangan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/monitor-persidangan" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/monitor-persidangan">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/monitor-persidangan&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Monitor Persidangan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="antrian persidangan publik nomor antrian">
+          <div class="top"><div><h3>Antrian Persidangan</h3><p>Tampilan antrian sidang publik yang lebih fokus pada panggilan nomor.</p></div><span class="badge">Display</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/antrian-persidangan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/antrian-persidangan" width="100%" height="860" style="border:0;" loading="lazy" title="Antrian Persidangan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/antrian-persidangan" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/antrian-persidangan">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/antrian-persidangan&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Antrian Persidangan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="slide sidang html helper display">
+          <div class="top"><div><h3>Slide Sidang</h3><p>Output slide sidang hasil generate untuk display atau rotasi layar.</p></div><span class="badge warn">Output helper</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/slide_sidang.html</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/slide_sidang.html" width="100%" height="860" style="border:0;" loading="lazy" title="Slide Sidang"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/slide_sidang.html" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/slide_sidang.html">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/slide_sidang.html&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Slide Sidang&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Statistik</h2>
+          <span>Dashboard analitik perkara, eCourt, dan hakim</span>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card" data-search="dashboard perkara statistik tren tahunan">
+          <div class="top"><div><h3>Dashboard Perkara</h3><p>Dashboard statistik perkara dan tren tahunan.</p></div><span class="badge">Dashboard</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/dashboard-perkara</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/dashboard-perkara" width="100%" height="860" style="border:0;" loading="lazy" title="Dashboard Perkara"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/dashboard-perkara" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/dashboard-perkara">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/dashboard-perkara&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Dashboard Perkara&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="dashboard ecourt statistik perkara elektronik">
+          <div class="top"><div><h3>Dashboard eCourt</h3><p>Dashboard perkara eCourt untuk monitoring layanan elektronik.</p></div><span class="badge">Dashboard</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/dashboard-ecourt</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/dashboard-ecourt" width="100%" height="860" style="border:0;" loading="lazy" title="Dashboard eCourt"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/dashboard-ecourt" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/dashboard-ecourt">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/dashboard-ecourt&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Dashboard eCourt&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="dashboard hakim performansi produktivitas">
+          <div class="top"><div><h3>Dashboard Hakim</h3><p>Dashboard performansi hakim berbasis data perkara.</p></div><span class="badge">Dashboard</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/dashboard-hakim</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/dashboard-hakim" width="100%" height="860" style="border:0;" loading="lazy" title="Dashboard Hakim"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/dashboard-hakim" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/dashboard-hakim">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/dashboard-hakim&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Dashboard Hakim&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Layanan dan Utility</h2>
+          <span>Halaman pelayanan, bridge, dan utilitas operasional</span>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card" data-search="biaya perkara estimasi proses berperkara panjar">
+          <div class="top"><div><h3>Biaya Perkara</h3><p>Informasi biaya proses berperkara dan akses ke kalkulator panjar resmi.</p></div><span class="badge">Layanan</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/biaya-perkara</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/biaya-perkara" width="100%" height="920" style="border:0;" loading="lazy" title="Biaya Perkara"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/biaya-perkara" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/biaya-perkara">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/biaya-perkara&quot; width=&quot;100%&quot; height=&quot;920&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Biaya Perkara&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="radius ghaib panjar ghaib">
+          <div class="top"><div><h3>Radius Ghaib</h3><p>Modul hitung panjar perkara ghaib berbasis wilayah Semarang.</p></div><span class="badge">Utility</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/radius-ghaib</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/radius-ghaib" width="100%" height="760" style="border:0;" loading="lazy" title="Radius Ghaib"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/radius-ghaib" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/radius-ghaib">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/radius-ghaib&quot; width=&quot;100%&quot; height=&quot;760&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Radius Ghaib&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="radius kecamatan kelurahan biaya panggilan">
+          <div class="top"><div><h3>Radius Kecamatan</h3><p>Tabel radius kelurahan dan kecamatan untuk biaya panggilan.</p></div><span class="badge">Utility</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/radius-kecamatan</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/radius-kecamatan" width="100%" height="860" style="border:0;" loading="lazy" title="Radius Kecamatan"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/radius-kecamatan" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/radius-kecamatan">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/radius-kecamatan&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Radius Kecamatan&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="bridge server10 debug utilitas api">
+          <div class="top"><div><h3>Bridge Server 10</h3><p>Halaman utilitas untuk inspeksi bridge Lawangsewu ke Server 10.</p></div><span class="badge warn">Utility dev</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/bridge-server10</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/bridge-server10" width="100%" height="860" style="border:0;" loading="lazy" title="Bridge Server 10"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/bridge-server10" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/bridge-server10">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/bridge-server10&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Bridge Server 10&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+        <article class="card" data-search="monitor wa whatsapp qr">
+          <div class="top"><div><h3>Monitor WA</h3><p>Monitor QR, status koneksi, dan utilitas WA v2.</p></div><span class="badge">Utility</span></div>
+          <div class="path">https://lawangsewu.pa-semarang.go.id/monitor-wa</div>
+          <div class="snippet">&lt;iframe src="https://lawangsewu.pa-semarang.go.id/monitor-wa" width="100%" height="860" style="border:0;" loading="lazy" title="Monitor WA"&gt;&lt;/iframe&gt;</div>
+          <div class="actions-row"><a class="primary" href="https://lawangsewu.pa-semarang.go.id/monitor-wa" target="_blank" rel="noopener">Buka widget</a><button type="button" data-copy-url="https://lawangsewu.pa-semarang.go.id/monitor-wa">Salin URL</button><button type="button" data-copy-iframe="&lt;iframe src=&quot;https://lawangsewu.pa-semarang.go.id/monitor-wa&quot; width=&quot;100%&quot; height=&quot;860&quot; style=&quot;border:0;&quot; loading=&quot;lazy&quot; title=&quot;Monitor WA&quot;&gt;&lt;/iframe&gt;">Salin iframe</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="foot">
+      <strong>Catatan:</strong> pada domain final, seluruh widget publik sudah dikonsolidasikan ke URL root seperti <strong>https://lawangsewu.pa-semarang.go.id/nama-widget</strong>. Link lama atau slug legacy tetap bisa ada untuk kompatibilitas, tetapi untuk dokumentasi, embed, dan komunikasi ke user akhir sebaiknya selalu gunakan link yang tercantum di halaman ini.
+      <div class="credit">developed by dbprakom</div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      const input = document.getElementById('widgetSearch');
+      const cards = Array.from(document.querySelectorAll('[data-search]'));
+
+      if (input) {
+        input.addEventListener('input', function () {
+          const query = String(input.value || '').toLowerCase().trim();
+          cards.forEach((card) => {
+            const haystack = String(card.getAttribute('data-search') || '').toLowerCase();
+            card.style.display = query === '' || haystack.includes(query) ? '' : 'none';
+          });
+        });
+      }
+
+      async function copyText(text, button) {
+        if (!text || !button) return;
+        const original = button.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = 'Tersalin';
+        } catch (_) {
+          const helper = document.createElement('textarea');
+          helper.value = text;
+          document.body.appendChild(helper);
+          helper.select();
+          document.execCommand('copy');
+          document.body.removeChild(helper);
+          button.textContent = 'Tersalin';
+        }
+        window.setTimeout(function () {
+          button.textContent = original;
+        }, 1400);
+      }
+
+      document.querySelectorAll('[data-copy-url]').forEach((button) => {
+        button.addEventListener('click', function () {
+          copyText(button.getAttribute('data-copy-url') || '', button);
+        });
+      });
+
+      document.querySelectorAll('[data-copy-iframe]').forEach((button) => {
+        button.addEventListener('click', function () {
+          copyText(button.getAttribute('data-copy-iframe') || '', button);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

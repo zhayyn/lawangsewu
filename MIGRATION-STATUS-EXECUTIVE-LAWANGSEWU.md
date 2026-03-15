@@ -4,9 +4,9 @@ Tanggal acuan: 2026-03-15
 
 ## Jawaban Singkat
 
-Migrasi Lawangsewu belum selesai, tetapi tahap publik utama sudah masuk shadow aktif yang tervalidasi.
+Migrasi Lawangsewu belum selesai, tetapi family utama tahap awal sudah masuk shadow aktif yang tervalidasi.
 
-Yang sudah ada saat ini adalah fondasi arsitektur, boundary modul, staging CI4 Core, guardrail operasional, dan aktivasi shadow terkontrol untuk family publik utama tanpa gangguan fungsi dasar yang terukur.
+Yang sudah ada saat ini adalah fondasi arsitektur, boundary modul, staging CI4 Core, guardrail operasional, dan aktivasi shadow terkontrol untuk family publik serta registry inti tanpa gangguan fungsi dasar yang terukur.
 
 ## Yang Sudah Selesai atau Terbukti
 
@@ -16,16 +16,17 @@ Yang sudah ada saat ini adalah fondasi arsitektur, boundary modul, staging CI4 C
 - peta modul Core sudah dibentuk untuk `PublicSite`, `Portal`, `AuthGateway`, `AppRegistry`, `WidgetRegistry`, `DocsRegistry`, dan audit ringan
 - route contract, compatibility alias, dan matriks readiness sudah tersedia
 - shell staging CI4 Core sudah hidup dan bisa dipakai untuk smoke, readiness, dan comparison
-- family `landing`, `widget-directory`, `docs`, dan `public-widget` kanonik sudah punya jalur shadow yang aktif dan tervalidasi
+- family `landing`, `docs`, `widget-directory`, `public-widget`, `portal`, dan `app-registry` sudah punya jalur shadow yang aktif dan tervalidasi sesuai scope masing-masing
 - comparison publik terbaru sudah bersih penuh dengan hasil `safe=20`, `review=0`, `hold=0`
 - smoke pasca-aktivasi tetap normal: route kanonik publik `200`, alias kompatibilitas tetap `302`
+- gap Apache live yang sebelumnya masih `404` pada `portal/launch` dan `app-registry` kini sudah tertutup oleh shadow staging yang tervalidasi
 - portal auth staging sudah naik ke level review yang lebih kuat dibanding tahap awal
 
 ## Yang Belum Selesai
 
 - runtime produksi utama belum resmi dipindahkan penuh ke CI4 Core sebagai runtime final tunggal
 - cutover publik masih berada pada mode shadow aktif, belum dinyatakan final penuh
-- portal belum dinyatakan selesai cutover penuh ke runtime baru
+- portal dan app-registry sudah aktif di shadow, tetapi belum dinyatakan sebagai cutover final tunggal
 - Laravel sibling app belum menjadi implementasi final yang berjalan penuh
 - compatibility layer masih harus dipertahankan selama migrasi bertahap berlangsung
 - masih ada pekerjaan hardening, rollout bertahap, validasi visual, dan verifikasi integrasi nyata
@@ -38,7 +39,7 @@ Status yang paling akurat adalah:
 
 - fondasi migrasi sudah matang
 - staging sudah cukup kuat untuk eksekusi bertahap
-- family publik utama sudah berhasil masuk shadow aktif dengan guardrail rollback yang jelas
+- family publik utama, portal, dan app-registry sudah berhasil masuk shadow aktif dengan guardrail rollback yang jelas
 - produksi penuh masih harus dipindah dengan disiplin per family, bukan sekaligus
 
 ## Posisi Tiap Komponen
@@ -85,6 +86,6 @@ Jangan mengklaim AI sudah tersambung ke DB, API, atau RAG jika belum terbukti di
 
 Kesimpulan paling aman dan paling jujur saat ini:
 
-Migrasi Lawangsewu sudah jauh berjalan, fondasinya sudah matang, dan tahap publik utama sudah masuk shadow aktif yang tervalidasi, tetapi prosesnya belum selesai.
+Migrasi Lawangsewu sudah jauh berjalan, fondasinya sudah matang, dan family utama tahap awal sudah masuk shadow aktif yang tervalidasi, tetapi prosesnya belum selesai.
 
 Langkah berikutnya harus tetap berupa verifikasi nyata yang berulang, compatibility yang dijaga, penyelesaian portal dan integrasi terkait, lalu cutover final per family ketika bukti teknisnya cukup.

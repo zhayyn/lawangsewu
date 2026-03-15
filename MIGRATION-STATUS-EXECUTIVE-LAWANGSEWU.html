@@ -156,10 +156,10 @@
   <main class="page">
     <section class="hero">
       <span class="label">Status Eksekutif</span>
-      <h1>Migrasi Lawangsewu belum selesai, tetapi tahap publik utama sudah masuk shadow aktif yang tervalidasi.</h1>
-      <p class="lead">Posisi paling akurat per 2026-03-15 adalah: staging CI4 Core sudah kuat untuk eksekusi bertahap, family publik utama sudah aktif di jalur shadow terkontrol, namun cutover produksi penuh masih belum selesai dan tidak boleh diklaim final lebih cepat dari bukti runtime.</p>
+      <h1>Migrasi Lawangsewu belum selesai, tetapi family utama tahap awal sudah masuk shadow aktif yang tervalidasi.</h1>
+      <p class="lead">Posisi paling akurat per 2026-03-15 adalah: staging CI4 Core sudah kuat untuk eksekusi bertahap, family publik, portal, dan app-registry tahap awal sudah aktif di jalur shadow terkontrol, namun cutover produksi penuh masih belum selesai dan tidak boleh diklaim final lebih cepat dari bukti runtime.</p>
       <div class="meta">Tanggal acuan: 2026-03-15</div>
-      <div class="status">Status operasional: public shadow active and validated, staged migration in progress, full production cutover pending.</div>
+      <div class="status">Status operasional: primary shadow families active and validated, staged migration in progress, full production cutover pending.</div>
     </section>
 
     <section class="section">
@@ -178,8 +178,9 @@
           <ul>
             <li>Shell staging CI4 Core sudah hidup untuk smoke, readiness, dan comparison.</li>
             <li>Route contract, compatibility alias, dan cutover matrix sudah tersedia.</li>
-            <li>Family <strong>landing</strong>, <strong>widget-directory</strong>, <strong>docs</strong>, dan <strong>public-widget</strong> kanonik sudah aktif di jalur shadow.</li>
+            <li>Family <strong>landing</strong>, <strong>widget-directory</strong>, <strong>docs</strong>, <strong>public-widget</strong>, <strong>portal</strong>, dan <strong>app-registry</strong> sudah aktif di jalur shadow sesuai scope masing-masing.</li>
             <li>Comparison publik terbaru bersih penuh dengan hasil <strong>safe=20</strong>, <strong>review=0</strong>, <strong>hold=0</strong>.</li>
+            <li>Gap Apache live yang sebelumnya masih <strong>404</strong> pada <strong>portal/launch</strong> dan <strong>app-registry</strong> sudah tertutup oleh shadow staging yang tervalidasi.</li>
           </ul>
         </div>
       </div>
@@ -190,7 +191,7 @@
       <ul>
         <li>Runtime produksi utama belum resmi dipindahkan penuh ke CI4 Core sebagai runtime final tunggal.</li>
         <li>Cutover publik masih berada pada mode shadow aktif, belum dinyatakan final penuh.</li>
-        <li>Portal belum dinyatakan selesai cutover penuh ke runtime baru.</li>
+        <li>Portal dan app-registry sudah aktif di shadow, tetapi belum dinyatakan sebagai cutover final tunggal.</li>
         <li>Laravel sibling app belum menjadi implementasi final yang berjalan penuh.</li>
         <li>Compatibility layer masih harus dijaga selama migrasi bertahap.</li>
       </ul>
@@ -204,7 +205,7 @@
           <ul>
             <li>Fondasi migrasi sudah matang.</li>
             <li>Staging cukup kuat untuk eksekusi bertahap.</li>
-            <li>Family publik utama sudah aktif di shadow dengan guardrail rollback yang jelas.</li>
+            <li>Family publik utama, portal, dan app-registry sudah aktif di shadow dengan guardrail rollback yang jelas.</li>
           </ul>
         </div>
         <div class="card">

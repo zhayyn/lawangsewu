@@ -1,0 +1,24 @@
+# WireGuard server config template for Server 9
+# Path target: /etc/wireguard/wg0.conf
+# Replace all placeholders before use.
+
+[Interface]
+Address = 10.9.0.1/24
+ListenPort = 51820
+PrivateKey = <SERVER_PRIVATE_KEY>
+
+# Recommended hardening: only allow VPN and web ports, deny others by default.
+# Ensure UFW is installed and configured.
+PostUp = ufw route allow in on wg0 out on eth0
+PostUp = iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE
+
+# Admin laptop 1
+[Peer]
+PublicKey = <CLIENT1_PUBLIC_KEY>
+AllowedIPs = 10.9.0.10/32
+
+# Admin laptop 2
+[Peer]
+PublicKey = <CLIENT2_PUBLIC_KEY>
+AllowedIPs = 10.9.0.11/32

@@ -123,6 +123,42 @@ function gateway_login_url(): string
     return gateway_ui_url('login');
 }
 
+function gateway_normalize_return_path(?string $path, string $default = ''): string
+{
+    $value = trim((string) $path);
+    if ($value === '') {
+        return $default;
+    }
+
+    if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
+        return $default;
+    }
+
+    $parts = parse_url($value);
+    if ($parts === false) {
+        return $default;
+    }
+
+    $cleanPath = (string) ($parts['path'] ?? '');
+    if ($cleanPath === '' || !str_starts_with($cleanPath, '/')) {
+        return $default;
+    }
+
+    $query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+    return $cleanPath . $query;
+}
+
+function gateway_login_url_with_return(string $path = ''): string
+{
+    $loginUrl = gateway_login_url();
+    $returnPath = gateway_normalize_return_path($path);
+    if ($returnPath === '') {
+        return $loginUrl;
+    }
+
+    return $loginUrl . '?return=' . rawurlencode($returnPath);
+}
+
 function gateway_logout_url(): string
 {
     return gateway_ui_url('logout');
@@ -130,7 +166,7 @@ function gateway_logout_url(): string
 
 function gateway_wa_admin_portal_logout_url(): string
 {
-    return '/wa-caraka-admin/index.php/portal-logout?return=' . rawurlencode(gateway_login_url());
+    return gateway_login_url();
 }
 
 function gateway_dubes_prakom_url(): string
@@ -141,6 +177,41 @@ function gateway_dubes_prakom_url(): string
 function gateway_mas_satset_url(): string
 {
     return gateway_ui_url('mas-satset-ai');
+}
+
+function gateway_sso_mapping_url(): string
+{
+    return gateway_ui_url('sso-mapping');
+}
+
+function gateway_sso_service_map(): array
+{
+    return [
+        [
+            'service' => 'Portal Lawangsewu',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_ui_url('index'),
+            'notes' => 'Halaman utama portal setelah autentikasi.',
+        ],
+        [
+            'service' => 'Dubes Prakom Ops',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_dubes_prakom_url(),
+            'notes' => 'Operasional website chat dan runtime WA.',
+        ],
+        [
+            'service' => 'Mas Satset Lab',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_mas_satset_url(),
+            'notes' => 'Uji cepat Q&A dan kelola knowledge.',
+        ],
+        [
+            'service' => 'WA Caraka Admin',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_wa_admin_sso_url('dashboard'),
+            'notes' => 'Login lewat signed SSO dari portal.',
+        ],
+    ];
 }
 
 function gateway_sso_status_label(): string
@@ -181,9 +252,38 @@ function gateway_require_login(): void
     exit;
 }
 
+function gateway_user_role(): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return '';
+    }
+    return strtolower(trim((string) ($user['role'] ?? '')));
+}
+
+function gateway_require_roles(array $allowedRoles): void
+{
+    gateway_require_login();
+
+    $role = gateway_user_role();
+    $normalizedAllowed = array_map(static fn ($r) => strtolower(trim((string) $r)), $allowedRoles);
+    if ($role !== '' && in_array($role, $normalizedAllowed, true)) {
+        return;
+    }
+
+    http_response_code(403);
+    echo 'Akses ditolak. Halaman ini hanya untuk role tertentu.';
+    exit;
+}
+
 function gateway_logout(): void
 {
     unset($_SESSION['gateway_user']);
+    unset($_SESSION['gateway_flash']);
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
 }
 
 function gateway_wa_env(): array

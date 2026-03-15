@@ -6,6 +6,8 @@ $basePath = $cfg['base_path'];
 $gatewayUser = gateway_auth_user();
 $masSatsetUrl = gateway_dubes_prakom_url();
 $masSatsetLandingUrl = gateway_mas_satset_url();
+$ssoMappingUrl = gateway_sso_mapping_url();
+$gatewayUserRole = strtolower(trim((string) ($gatewayUser['role'] ?? '')));
 $waCarakaEmbedUrl = gateway_wa_admin_sso_url('dashboard?embed=1');
 $waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
 ?>
@@ -67,7 +69,7 @@ $waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
 <div class="wrap">
     <div class="topbar">
         <div>Login sebagai <strong><?php echo htmlspecialchars((string) ($gatewayUser['full_name'] ?: $gatewayUser['username'] ?? '-')); ?></strong></div>
-        <div><a href="<?php echo htmlspecialchars(gateway_logout_url()); ?>">Logout Portal + WA Caraka</a></div>
+        <div><a href="<?php echo htmlspecialchars(gateway_logout_url()); ?>">Logout Portal</a></div>
     </div>
     <section class="hero">
         <div class="panel hero-main">
@@ -90,6 +92,12 @@ $waCarakaAdminUrl = gateway_wa_admin_sso_url('dashboard');
                     <div class="link-title">WA Caraka Admin via SSO</div>
                     <div class="muted">Buka kontrol utama runtime WhatsApp, inbox operator, messages, devices, dan pengaturan LLM tanpa login ulang.</div>
                 </a>
+                <?php if (in_array($gatewayUserRole, ['superadmin', 'admin'], true)) : ?>
+                    <a class="quick-link" href="<?php echo htmlspecialchars($ssoMappingUrl); ?>">
+                        <div class="link-title">Mapping SSO</div>
+                        <div class="muted">Daftar mapping login terpadu untuk semua layanan portal Lawangsewu.</div>
+                    </a>
+                <?php endif; ?>
             </div>
         </aside>
     </section>

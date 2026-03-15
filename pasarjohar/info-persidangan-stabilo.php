@@ -1,2 +1,2 @@
 <?php
-require __DIR__ . '/../../widgets/views/info-persidangan-stabilo.php';
+require __DIR__ . '/../../widgets/views/php/public/info-persidangan-stabilo.php';

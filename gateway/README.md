@@ -33,8 +33,10 @@ nano /var/www/html/lawangsewu/gateway/.env
 
 - Login Dubes Prakom: `/lawangsewu/gateway/login`
 - Kredensial mengikuti akun admin WA Caraka yang sama (`admin_users`)
-- Setelah login, pengguna diarahkan ke dashboard Lawangsewu dan dapat membuka Dubes Prakom Ops dari sana
+- Setelah login, pengguna diarahkan ke halaman utama Lawangsewu (`/lawangsewu/gateway/index`)
+- Login WA Caraka Admin langsung (`/wa-caraka-admin/login`) dinonaktifkan dan diarahkan ke portal Lawangsewu (SSO)
 - Landing page Mas Satset tersedia di `/lawangsewu/gateway/mas-satset-ai` untuk uji cepat website chat dan input knowledge ke `wacaraka_faq`
+- Mapping SSO layanan tersedia di `/lawangsewu/gateway/sso-mapping`
 
 ## Endpoint
 

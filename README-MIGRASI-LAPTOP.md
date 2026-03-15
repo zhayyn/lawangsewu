@@ -187,7 +187,7 @@ crontab -e
 Contoh jadwal tiap 5 menit:
 
 ```cron
-*/5 * * * * /usr/bin/php /var/www/html/lawangsewu/widgets/views/generate_slide.php >> /var/www/html/lawangsewu/logs/generate_slide.log 2>&1
+*/5 * * * * /usr/bin/php /var/www/html/lawangsewu/widgets/views/php/system/generate_slide.php >> /var/www/html/lawangsewu/logs/generate_slide.log 2>&1
 ```
 
 ## 9) Checklist go-live cepat
@@ -199,7 +199,7 @@ Contoh jadwal tiap 5 menit:
 
 ## 10) Saat pindah staging -> production
 Untuk komponen berita pengadilan, cukup ubah 1 baris di:
-- `widgets/views/berita-pengadilan.html`
+- `widgets/views/html/public/berita-pengadilan.html`
 
 Nilai variabel:
 - `PA_BASE_URL = 'http://192.168.88.9/pasemarang'` (staging)

@@ -10,6 +10,7 @@ $wordpressBaseUrl = 'http://192.168.88.9/pasemarang';
 $websiteChatUrl = $wordpressBaseUrl . '/wp-json/pa-chat/v1/ask';
 $websiteChatPageUrl = $wordpressBaseUrl . '/layanan-bantuan-mas-satset/';
 $runtimeHealthUrl = 'http://127.0.0.1:8793/health';
+$runtimeLlmHealthUrl = 'http://127.0.0.1:8793/llm/health';
 $syncLogPath = dirname(__DIR__) . '/logs/wa-caraka-wordpress-sync.log';
 
 function mas_satset_cmd(string $command): string
@@ -92,6 +93,7 @@ $diskRoot = mas_satset_cmd("df -h / | awk 'NR==2{print \$2 \" total | \" \$4 \" 
 $loadAvg = mas_satset_cmd("cat /proc/loadavg | awk '{print \$1 \" / \" \$2 \" / \" \$3}'");
 $ollamaModels = preg_split('/\r\n|\r|\n/', mas_satset_cmd('ollama list | sed -n "2,8p"')) ?: [];
 $runtimeHealth = mas_satset_http_json($runtimeHealthUrl, null, 6);
+$runtimeLlmHealth = mas_satset_http_json($runtimeLlmHealthUrl, null, 6);
 $websiteHealth = mas_satset_http_json($websiteChatUrl, ['message' => 'uji'], 12);
 $syncCron = mas_satset_cmd("crontab -l | grep 'wa-caraka-wordpress-sync' || true");
 $syncLogMtime = is_file($syncLogPath) ? date('Y-m-d H:i:s', (int) filemtime($syncLogPath)) : '-';
@@ -101,6 +103,10 @@ $memAvailGiB = (float) str_replace(['Gi', 'G', ','], ['', '', '.'], $memAvail);
 $capacityAdvice = mas_satset_capacity_advice($cpuCores, $memAvailGiB);
 $configuredModel = (string) ($runtimeEnv['LLM_MODEL'] ?? '-');
 $llmBaseUrl = (string) ($runtimeEnv['LLM_BASE_URL'] ?? '-');
+$runtimeAiMode = (string) (($runtimeLlmHealth['body']['aiDefaultMode'] ?? $runtimeEnv['WA_CARAKA_AI_DEFAULT_MODE'] ?? 'prompt-only'));
+$runtimeKnowledgeReady = !empty($runtimeLlmHealth['body']['knowledgeEnabled']);
+$runtimeLiveDataReady = !empty($runtimeLlmHealth['body']['dbApiEnabled']) && !empty($runtimeLlmHealth['body']['dbApiConfigured']);
+$runtimeSupportedModes = is_array($runtimeLlmHealth['body']['supportedAiModes'] ?? null) ? $runtimeLlmHealth['body']['supportedAiModes'] : [];
 $presetPrompts = [
     'Apa syarat cerai gugat?',
     'Bagaimana alur pendaftaran perkara?',
@@ -200,6 +206,7 @@ $syncBadge = mas_satset_badge($syncCron !== '', 'Cron sync aktif', 'Cron sync be
         .badge { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 700; }
         .badge.is-ok { background: rgba(30,139,79,0.12); color: var(--green-dark); }
         .badge.is-bad { background: rgba(180,35,24,0.10); color: var(--red); }
+        .badge.is-soft { background: rgba(26, 115, 232, 0.10); color: #1557b0; }
         .hint { margin-top: 14px; padding: 14px 16px; border-radius: 18px; background: linear-gradient(180deg, rgba(225,242,232,0.95), rgba(239,248,242,0.92)); border: 1px solid rgba(30,139,79,0.12); line-height: 1.65; }
         .wide { margin-bottom: 18px; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -276,9 +283,15 @@ $syncBadge = mas_satset_badge($syncCron !== '', 'Cron sync aktif', 'Cron sync be
                 <h2>Runtime dan Model</h2>
                 <span class="badge <?php echo htmlspecialchars($runtimeBadge['class']); ?>"><?php echo htmlspecialchars($runtimeBadge['text']); ?></span>
             </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px;">
+                <span class="badge is-soft"><?php echo htmlspecialchars('Mode AI: ' . $runtimeAiMode); ?></span>
+                <span class="badge <?php echo htmlspecialchars($runtimeKnowledgeReady ? 'is-ok' : 'is-bad'); ?>"><?php echo htmlspecialchars($runtimeKnowledgeReady ? 'Knowledge Ready' : 'Knowledge Off'); ?></span>
+                <span class="badge <?php echo htmlspecialchars($runtimeLiveDataReady ? 'is-ok' : 'is-bad'); ?>"><?php echo htmlspecialchars($runtimeLiveDataReady ? 'DB/API Ready' : 'DB/API Not Ready'); ?></span>
+            </div>
             <div class="detail-list">
                 <div class="detail"><span class="label">Model aktif</span><span class="value"><?php echo htmlspecialchars($configuredModel); ?></span></div>
                 <div class="detail"><span class="label">LLM base URL</span><span class="value"><?php echo htmlspecialchars($llmBaseUrl); ?></span></div>
+                <div class="detail"><span class="label">Default AI mode</span><span class="value"><?php echo htmlspecialchars($runtimeAiMode); ?></span></div>
                 <div class="detail"><span class="label">WhatsApp connected</span><span class="value"><?php echo !empty($runtimeHealth['body']['connected']) ? 'Ya' : 'Tidak'; ?></span></div>
                 <div class="detail"><span class="label">Auto reply</span><span class="value"><?php echo !empty($runtimeHealth['body']['autoReplyEnabled']) ? 'Aktif' : 'Nonaktif'; ?></span></div>
                 <div class="detail"><span class="label">Nomor runtime</span><span class="value"><?php echo htmlspecialchars((string) ($runtimeHealth['body']['activeRuntimePhoneNumber'] ?? '-')); ?></span></div>
@@ -286,6 +299,9 @@ $syncBadge = mas_satset_badge($syncCron !== '', 'Cron sync aktif', 'Cron sync be
             <div class="hint">
                 <strong>Model terpasang di Ollama</strong><br>
                 <span class="footnote"><?php echo htmlspecialchars($ollamaModels !== [] ? implode(' | ', array_filter(array_map('trim', $ollamaModels))) : 'Belum ada model lain terpasang'); ?></span>
+                <?php if ($runtimeSupportedModes !== []) : ?>
+                    <br><span class="footnote"><?php echo htmlspecialchars('Supported modes: ' . implode(' | ', array_map('strval', $runtimeSupportedModes))); ?></span>
+                <?php endif; ?>
             </div>
         </article>
 

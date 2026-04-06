@@ -36,7 +36,7 @@ class LawangsewuPortal
             [
                 'label' => 'Pelayanan',
                 'items' => [
-                    ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'satellite.pendopo', 'href' => route('lawangsewu.satellite.pendopo'), 'badge' => 'Pendopo'],
+                    ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'guestbook', 'href' => route('lawangsewu.guestbook.form'), 'badge' => 'Sprint 2'],
                     ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => null, 'badge' => 'Soon'],
                     ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => null, 'badge' => 'Soon'],
                 ],
@@ -73,7 +73,7 @@ class LawangsewuPortal
         return [
             ['label' => 'Buka CCTV', 'href' => route('lawangsewu.cctv'), 'tone' => 'accent'],
             ['label' => 'Buka Chat', 'href' => route('lawangsewu.chat'), 'tone' => 'neutral'],
-            ['label' => 'Sinkronisasi SIPP', 'href' => '#', 'tone' => 'neutral'],
+            ['label' => 'Buka Buku Tamu', 'href' => route('lawangsewu.guestbook.form'), 'tone' => 'neutral'],
         ];
     }
 
@@ -90,7 +90,7 @@ class LawangsewuPortal
     public static function modules(): array
     {
         return [
-            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 2', 'href' => null],
+            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 2', 'href' => route('lawangsewu.guestbook.form')],
             ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Sprint 2', 'href' => null],
             ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Sprint 2', 'href' => null],
             ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Sprint 3', 'href' => null],

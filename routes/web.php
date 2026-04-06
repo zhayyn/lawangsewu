@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserAccessController;
+use App\Http\Controllers\GuestbookController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WidgetCompatController;
@@ -96,6 +97,13 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,admin'])-
     Route::get('/cctv', [PortalController::class, 'cctv'])->name('lawangsewu.cctv');
     Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('lawangsewu.chat');
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
+
+    Route::get('/buku-tamu', [GuestbookController::class, 'form'])->name('lawangsewu.guestbook.form');
+    Route::post('/buku-tamu', [GuestbookController::class, 'store'])->name('lawangsewu.guestbook.store');
+    Route::get('/buku-tamu/daftar/{period?}', [GuestbookController::class, 'listing'])->name('lawangsewu.guestbook.list');
+    Route::get('/buku-tamu/detail/{id}', [GuestbookController::class, 'detail'])->name('lawangsewu.guestbook.detail');
+    Route::get('/buku-tamu/cetak/{id}', [GuestbookController::class, 'printCard'])->name('lawangsewu.guestbook.cetak');
+    Route::match(['get', 'post'], '/buku-tamu/laporan', [GuestbookController::class, 'report'])->name('lawangsewu.guestbook.report');
     
     // Satellite Integration
     Route::get('/satellite/pendopo', [\App\Http\Controllers\SatelliteController::class, 'pendopo'])->name('lawangsewu.satellite.pendopo');

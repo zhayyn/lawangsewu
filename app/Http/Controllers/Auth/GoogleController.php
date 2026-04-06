@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -18,15 +20,10 @@ class GoogleController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function redirectToGoogle()
+    public function redirectToGoogle(): RedirectResponse
     {
         return Socialite::driver('google')
             ->setScopes(['openid', 'email', 'profile'])
-            ->with([
-                'response_mode' => 'form_post',
-                'include_granted_scopes' => 'false',
-                'access_type' => 'online',
-            ])
             ->redirect();
     }
 
@@ -35,12 +32,38 @@ class GoogleController extends Controller
      *
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request): RedirectResponse
     {
         try {
             $isNewGoogleAccount = false;
             $googleUser = null;
             $superAdminEmail = strtolower((string) config('auth.super_admin_email'));
+
+            if ($request->filled('error')) {
+                $oauthError = (string) $request->string('error');
+                $oauthDescription = (string) $request->string('error_description');
+
+                Log::warning('Google OAuth callback returned error', [
+                    'error' => $oauthError,
+                    'description' => $oauthDescription,
+                ]);
+
+                return redirect()
+                    ->route('access.pending', ['reason' => 'error'])
+                    ->with('error', 'Login Google dibatalkan atau gagal di sisi Google. Silakan coba lagi.');
+            }
+
+            if (! $request->filled('code')) {
+                Log::warning('Google OAuth callback missing code parameter', [
+                    'method' => $request->method(),
+                    'query_keys' => array_keys($request->query()),
+                    'request_keys' => array_keys($request->request->all()),
+                ]);
+
+                return redirect()
+                    ->route('login')
+                    ->with('error', 'Gagal menyelesaikan login Google (kode otorisasi tidak ditemukan). Silakan coba lagi.');
+            }
 
             try {
                 $googleUser = Socialite::driver('google')->user();

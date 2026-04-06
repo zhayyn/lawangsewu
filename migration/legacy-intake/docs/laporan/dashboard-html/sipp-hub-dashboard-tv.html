@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIPP-HUB TV Mode</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg1:#0b4f58;
+      --bg2:#0f766e;
+      --card:#ffffff;
+      --ink:#14202b;
+      --muted:#607080;
+      --accent:#d5a12c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: white;
+      background: radial-gradient(1200px 500px at -5% -10%, #2f8f86 0%, transparent 55%), linear-gradient(130deg, var(--bg1), var(--bg2));
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+    .frame {
+      width: min(1500px, 96vw);
+      height: min(860px, 92vh);
+      background: rgba(255,255,255,.09);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .title {
+      font-size: clamp(20px, 2.2vw, 32px);
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .meta { font-size: 13px; opacity: .9; }
+    .slide {
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 14px;
+      display: none;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+    }
+    .slide.active { display: grid; }
+    .slide h2 { margin: 0; font-size: clamp(18px, 2vw, 28px); }
+    .desc { margin: 0; color: var(--muted); font-size: 14px; }
+    .chart-wrap { height: 100%; min-height: 420px; }
+    .foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      opacity: .95;
+    }
+    .dotbar { display:flex; gap:6px; }
+    .dot { width:8px; height:8px; border-radius:999px; background:rgba(255,255,255,.35); }
+    .dot.on { background: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="head">
+      <div class="title">SIPP-HUB TV Mode • PA Semarang</div>
+      <div class="meta" id="generated">Loading...</div>
+    </div>
+
+    <section class="slide active" data-title="Tren Perkara Bulanan">
+      <h2>Tren Perkara Bulanan</h2>
+      <p class="desc">Indikator ritme layanan harian dan beban perkara.</p>
+      <div class="chart-wrap"><canvas id="tvPerkara"></canvas></div>
+    </section>
+
+    <section class="slide" data-title="E-Court vs Konvensional">
+      <h2>E-Court vs Konvensional</h2>
+      <p class="desc">Laju transformasi digital layanan pendaftaran.</p>
+      <div class="chart-wrap"><canvas id="tvEcourt"></canvas></div>
+    </section>
+
+    <section class="slide" data-title="Cerai Gugat vs Talak">
+      <h2>Cerai Gugat vs Talak</h2>
+      <p class="desc">Komposisi perkara perceraian sebagai insight sosial.</p>
+      <div class="chart-wrap"><canvas id="tvCerai"></canvas></div>
+    </section>
+
+    <section class="slide" data-title="Ringkasan Harian: Validasi & Minutasi">
+      <h2>Ringkasan Harian: Validasi & Minutasi</h2>
+      <p class="desc">Pemantauan sore untuk progres harian.</p>
+      <div class="chart-wrap"><canvas id="tvDaily"></canvas></div>
+    </section>
+
+    <div class="foot">
+      <div>Auto-rotate setiap 12 detik • Mode presentasi layar penuh</div>
+      <div class="dotbar" id="dots"></div>
+    </div>
+  </div>
+
+  <script>
+    const dots = document.getElementById('dots');
+    const slides = [...document.querySelectorAll('.slide')];
+    let idx = 0;
+
+    function setSlide(n) {
+      idx = (n + slides.length) % slides.length;
+      slides.forEach((s,i)=>s.classList.toggle('active', i===idx));
+      [...dots.children].forEach((d,i)=>d.classList.toggle('on', i===idx));
+    }
+
+    function autoRotate() {
+      setInterval(() => setSlide(idx + 1), 12000);
+    }
+
+    function sum(arr, key){ return arr.reduce((t,x)=>t+Number(x[key]||0),0); }
+    function groupBy(rows, key){ return rows.reduce((a,r)=>((a[r[key]] ||= []).push(r), a), {}); }
+
+    async function initCharts() {
+      const res = await fetch('./data/sipp-dashboard-data.json', { cache:'no-store' });
+      const d = await res.json();
+      document.getElementById('generated').textContent = 'Updated: ' + (d.generated_at || '-');
+
+      const pb = d.perkara_bulanan || [];
+      new Chart(document.getElementById('tvPerkara'), {
+        type:'line',
+        data:{labels:pb.map(x=>x.bulan), datasets:[{label:'Perkara', data:pb.map(x=>x.jumlah_perkara_masuk), borderColor:'#0f766e', backgroundColor:'rgba(15,118,110,.2)', fill:true, tension:.25, pointRadius:0}]},
+        options:{maintainAspectRatio:false, plugins:{legend:{display:false}}}
+      });
+
+      const evk = d.ecourt_vs_konvensional || [];
+      const byM = groupBy(evk,'bulan');
+      const lm = Object.keys(byM).sort();
+      new Chart(document.getElementById('tvEcourt'), {
+        type:'line',
+        data:{labels:lm,datasets:[
+          {label:'E-Court', data:lm.map(m=>sum(byM[m].filter(x=>x.kanal==='E-COURT'),'jumlah_perkara')), borderColor:'#0f766e', pointRadius:0, tension:.22},
+          {label:'Konvensional', data:lm.map(m=>sum(byM[m].filter(x=>x.kanal==='KONVENSIONAL'),'jumlah_perkara')), borderColor:'#d5a12c', pointRadius:0, tension:.22},
+        ]},
+        options:{maintainAspectRatio:false}
+      });
+
+      const cg = d.cerai_gugat_talak || [];
+      new Chart(document.getElementById('tvCerai'), {
+        type:'doughnut',
+        data:{labels:['Cerai Gugat','Cerai Talak','Lainnya'],datasets:[{data:[sum(cg.filter(x=>x.kategori==='CERAI GUGAT'),'jumlah_perkara'),sum(cg.filter(x=>x.kategori==='CERAI TALAK'),'jumlah_perkara'),sum(cg.filter(x=>x.kategori==='LAINNYA'),'jumlah_perkara')],backgroundColor:['#0f766e','#d5a12c','#64748b']}]},
+        options:{maintainAspectRatio:false,cutout:'62%'}
+      });
+
+      const dt = d.daily_trend_14d || [];
+      new Chart(document.getElementById('tvDaily'), {
+        type:'bar',
+        data:{labels:dt.map(x=>x.tanggal.slice(5)),datasets:[
+          {type:'bar', label:'Perkara Masuk', data:dt.map(x=>x.perkara_masuk), backgroundColor:'#0b4f58cc'},
+          {type:'line', label:'Validasi', data:dt.map(x=>x.validasi), borderColor:'#0f766e', pointRadius:0, tension:.25},
+          {type:'line', label:'Minutasi', data:dt.map(x=>x.minutasi), borderColor:'#d5a12c', pointRadius:0, tension:.25},
+        ]},
+        options:{maintainAspectRatio:false}
+      });
+    }
+
+    slides.forEach(()=>{
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dots.appendChild(dot);
+    });
+    setSlide(0);
+    autoRotate();
+    initCharts().catch(console.error);
+  </script>
+</body>
+</html>

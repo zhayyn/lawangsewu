@@ -1,0 +1,102 @@
+<div
+    id="berita-pasmg-root"
+    data-wp-api-url="https://wp.pa-semarang.go.id"
+    data-pa-frontend-url="https://pa-semarang.go.id"
+    data-wp-cat-berita="12"
+    data-wp-cat-pengumuman="7"
+    data-wp-cat-artikel="6"
+    data-thumb-fallback="/widgets/assets/ma-fallback.jpg"
+>
+    <div class="news-wrap">
+        <section class="news-top">
+
+            <article class="panel">
+                <div class="panel-head">
+                    <h3 class="panel-title">Berita PA Semarang</h3>
+                </div>
+                <div id="pa-berita-list" class="berita-grid">
+                    <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat berita terbaru...</div>
+                </div>
+                <a class="lihat-semua-berita" href="https://pa-semarang.go.id/kategori/berita" target="_blank" rel="noopener">Lihat Semua Berita</a>
+            </article>
+
+            <article class="panel">
+                <div class="panel-head">
+                    <h3 class="panel-title">Pengumuman & Artikel</h3>
+                    <div class="tab-row" id="pa-tabs">
+                        <button class="tab-btn active" data-tab="pa-pengumuman" type="button">Pengumuman</button>
+                        <button class="tab-btn" data-tab="pa-artikel" type="button">Artikel</button>
+                    </div>
+                </div>
+
+                <div id="pa-pengumuman" class="tab-pane active">
+                    <div id="pa-pengumuman-list" class="list">
+                        <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat pengumuman...</div>
+                    </div>
+                    <a class="more-link" id="pa-pengumuman-more" href="#" data-pa-path="/kategori/pengumuman" target="_blank" rel="noopener">Lihat Semua Pengumuman</a>
+                </div>
+
+                <div id="pa-artikel" class="tab-pane">
+                    <div id="pa-artikel-list" class="list">
+                        <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat artikel...</div>
+                    </div>
+                    <a class="more-link" id="pa-artikel-more" href="#" data-pa-path="/kategori/arsip-artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
+                </div>
+            </article>
+        </section>
+
+        <section class="rss-panel panel">
+            <div class="rss-head">
+                <h3 class="panel-title">Informasi Seputar Peradilan</h3>
+                <div class="tab-row" id="rss-tabs">
+                    <button class="tab-btn active" data-rss-source="ma" type="button">MA RI</button>
+                    <button class="tab-btn" data-rss-source="badilag" type="button">Badilag</button>
+                    <button class="tab-btn" data-rss-source="pta" type="button">PTA Semarang</button>
+                </div>
+            </div>
+            <div class="rss-body" id="rss-container">
+                <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat feed peradilan...</div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const cssCandidates = [
+            `${window.location.origin}/widgets/assets/berita-pasmg.css`,
+            `${window.location.origin}/lawangsewu/widgets/assets/berita-pasmg.css`
+        ];
+        cssCandidates.forEach((href) => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            document.head.appendChild(link);
+        });
+
+        const jsCandidates = [
+            `${window.location.origin}/widgets/assets/berita-pasmg.js`,
+            `${window.location.origin}/lawangsewu/widgets/assets/berita-pasmg.js`
+        ];
+
+        function loadScriptAt(index) {
+            if (index >= jsCandidates.length) {
+                console.error('Gagal memuat asset JS berita-pasmg');
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = `${jsCandidates[index]}?v=20260331b`;
+            script.defer = true;
+            script.onload = function () {
+                script.dataset.ok = '1';
+            };
+            script.onerror = function () {
+                loadScriptAt(index + 1);
+            };
+            document.body.appendChild(script);
+        }
+
+        loadScriptAt(0);
+    })();
+</script>

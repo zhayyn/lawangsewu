@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lembar Kebijakan - Keamanan Akses Remote Server 9</title>
+  <style>
+    :root {
+      --text: #111827;
+      --muted: #4b5563;
+      --line: #cbd5e1;
+      --accent: #0b5f4a;
+      --bg: #ffffff;
+      --soft: #f8fafc;
+    }
+
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      line-height: 1.35;
+      font-size: 12px;
+    }
+
+    .page {
+      max-width: 182mm;
+      margin: 0 auto;
+    }
+
+    .doc-head {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 3mm;
+    }
+
+    .doc-head table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .doc-head td {
+      border-right: 1px solid var(--line);
+      vertical-align: middle;
+      padding: 2.3mm;
+    }
+
+    .doc-head td:last-child {
+      border-right: none;
+    }
+
+    .logo-box {
+      width: 18mm;
+      height: 18mm;
+      border: 1px dashed var(--line);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--muted);
+      margin: 0 auto;
+    }
+
+    .instansi {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+
+    .unit {
+      margin-top: 0.8mm;
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+
+    .meta-title {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 0.8mm;
+    }
+
+    .meta-value {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    h1 {
+      margin: 1.5mm 0 1.2mm 0;
+      font-size: 18px;
+      color: var(--accent);
+      line-height: 1.2;
+    }
+
+    .sub {
+      margin: 0 0 2.2mm 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    h2 {
+      font-size: 12.5px;
+      margin: 2.6mm 0 1.2mm 0;
+      padding-bottom: 0.8mm;
+      border-bottom: 1px solid var(--line);
+    }
+
+    p, ul, ol {
+      margin: 0 0 1.8mm 0;
+    }
+
+    ul, ol {
+      padding-left: 5mm;
+    }
+
+    li {
+      margin-bottom: 0.8mm;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 5px;
+      background: var(--soft);
+      padding: 2mm 2.4mm;
+      margin: 1.5mm 0 2.4mm 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.4mm 4mm;
+    }
+
+    .block {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1.8mm 2.2mm;
+      background: #fff;
+    }
+
+    .block h3 {
+      margin: 0 0 1.2mm 0;
+      font-size: 11.5px;
+      color: var(--accent);
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10.5px;
+      background: #eef2f7;
+      padding: 0.2mm 0.9mm;
+      border-radius: 3px;
+    }
+
+    .footer-note {
+      margin-top: 2.5mm;
+      font-size: 10px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 1.5mm;
+    }
+
+    .sign {
+      margin-top: 3.2mm;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .sign table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .sign th, .sign td {
+      border-right: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+      padding: 1.8mm;
+      vertical-align: top;
+      text-align: center;
+    }
+
+    .sign tr:first-child th {
+      border-top: none;
+      background: #f8fafc;
+      font-size: 11px;
+    }
+
+    .sign td:last-child,
+    .sign th:last-child {
+      border-right: none;
+    }
+
+    .sign .space {
+      height: 18mm;
+    }
+
+    .label {
+      text-align: left;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    @media print {
+      .page {
+        max-width: none;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="doc-head">
+      <table>
+        <tr>
+          <td style="width: 16%; text-align: center;">
+            <div class="logo-box">LOGO</div>
+          </td>
+          <td style="width: 54%;">
+            <div class="instansi">Pengadilan Agama Semarang Kelas I-A</div>
+            <div class="unit">Lembar Kebijakan Keamanan Akses Remote Infrastruktur</div>
+          </td>
+          <td style="width: 30%;">
+            <div class="meta-title">Nomor Dokumen</div>
+            <div class="meta-value">SEC-RA-S9-2026-03</div>
+            <div class="meta-title" style="margin-top: 1.2mm;">Revisi</div>
+            <div class="meta-value">R1</div>
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <h1>Kebijakan Keamanan Akses Remote Server 9</h1>
+    <p class="sub">Tanggal Berlaku: 09 Maret 2026 | Klasifikasi: Internal | Lingkup: Administrasi server produksi</p>
+
+    <h2>Ringkasan Keputusan</h2>
+    <p>Akses remote server menggunakan model <code>WireGuard + SSH</code> sebagai jalur utama. Semua jalur cloud tunnel dinonaktifkan (masked) untuk menurunkan risiko pengambilalihan akses akibat kompromi akun cloud.</p>
+
+    <div class="panel">
+      <strong>Perumpamaan:</strong> WireGuard adalah jalan privat ke area internal, SSH adalah pintu utama dengan kunci admin, dan rate limit firewall adalah satpam yang membatasi percobaan masuk berulang. Pintu tamu online (cloud tunnel) saat ini ditutup.
+    </div>
+
+    <div class="grid">
+      <section class="block">
+        <h3>Latar Belakang Risiko</h3>
+        <ul>
+          <li>Potensi pembajakan akun cloud (GitHub/Microsoft).</li>
+          <li>Session/token cloud dapat tertinggal di server.</li>
+          <li>Ketergantungan berlebih pada identitas eksternal.</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h3>Implementasi Aktif</h3>
+        <ul>
+          <li><code>wg0</code> aktif pada <code>51830/udp</code>.</li>
+          <li>Peer iPad khusus: <code>10.19.9.11</code>.</li>
+          <li>SSH aktif dengan <code>LIMIT IN 22/tcp</code>.</li>
+          <li>Dua service tunnel berstatus <code>masked</code>.</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h3>Tingkat Keamanan</h3>
+        <ul>
+          <li>Risiko takeover akun cloud ke akses server: <strong>Rendah</strong>.</li>
+          <li>Risiko brute-force SSH publik: <strong>Terkendali</strong>.</li>
+          <li>Ketersediaan akses admin: <strong>Baik</strong>.</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h3>Dampak Operasional</h3>
+        <ul>
+          <li>Admin tetap dapat bekerja dari iPad.</li>
+          <li>Tidak mengganggu layanan produksi berjalan.</li>
+          <li>Tidak bergantung akun GitHub tertentu untuk akses server.</li>
+        </ul>
+      </section>
+    </div>
+
+    <h2>SOP Ringkas</h2>
+    <ol>
+      <li>Nyalakan WireGuard pada perangkat admin.</li>
+      <li>SSH ke IP VPN server, bukan IP publik.</li>
+      <li>Lakukan aktivitas administrasi seperlunya.</li>
+      <li>Putuskan VPN setelah pekerjaan selesai.</li>
+    </ol>
+
+    <h2>Catatan GitHub Copilot</h2>
+    <p>Penggunaan Copilot tetap diperbolehkan di sisi client dan akun GitHub dapat diganti kapan saja. Perubahan akun Copilot tidak membuka akses baru ke server selama tunnel cloud tetap dinonaktifkan.</p>
+
+    <section class="sign">
+      <table>
+        <tr>
+          <th>Disusun Oleh</th>
+          <th>Diverifikasi Oleh</th>
+          <th>Disetujui Oleh</th>
+        </tr>
+        <tr>
+          <td>
+            <div class="space"></div>
+            <div class="label">Nama: ....................................................</div>
+            <div class="label">Jabatan: Pranata Komputer Ahli Pertama</div>
+            <div class="label">Tanggal:</div>
+          </td>
+          <td>
+            <div class="space"></div>
+            <div class="label">Nama: ....................................................</div>
+            <div class="label">Jabatan: Plt Kasubbag PTIP</div>
+            <div class="label">Tanggal:</div>
+          </td>
+          <td>
+            <div class="space"></div>
+            <div class="label">Nama: ....................................................</div>
+            <div class="label">Jabatan: Sekretaris</div>
+            <div class="label">Tanggal:</div>
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <p class="footer-note">Referensi detail teknis: <code>REMOTE-ACCESS-SECURITY-SERVER9.md</code> dan <code>REMOTE-ACCESS-SECURITY-SERVER9-ONEPAGE.md</code>.</p>
+  </main>
+</body>
+</html>

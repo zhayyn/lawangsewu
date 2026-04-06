@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs Index Lawangsewu</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --paper: rgba(255, 252, 247, 0.88);
+      --ink: #1f2a2a;
+      --muted: #5f6b67;
+      --line: rgba(31, 42, 42, 0.12);
+      --accent: #a64b2a;
+      --accent-soft: #efe0d5;
+      --shadow: 0 18px 50px rgba(56, 43, 24, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(166, 75, 42, 0.14), transparent 34%),
+        radial-gradient(circle at right, rgba(64, 110, 98, 0.12), transparent 26%),
+        linear-gradient(180deg, #f7f1e8 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 20px 56px;
+    }
+
+    .hero {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      backdrop-filter: blur(8px);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 6vw, 56px);
+      line-height: 0.96;
+      font-weight: 700;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .quick {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .quick-card,
+    .doc-card {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .quick-card:hover,
+    .doc-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(166, 75, 42, 0.35);
+      box-shadow: 0 14px 30px rgba(56, 43, 24, 0.1);
+    }
+
+    .quick-card strong,
+    .doc-card strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .quick-card span,
+    .doc-card span {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .section {
+      margin-top: 26px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 700px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .footer-note {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 720px) {
+      .wrap {
+        padding: 24px 16px 40px;
+      }
+
+      .hero {
+        padding: 22px;
+        border-radius: 20px;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-head p {
+        margin-top: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Lawangsewu Documentation</p>
+      <h1>Dokumentasi yang lebih singkat, jelas, dan bisa dipindai cepat.</h1>
+      <p class="lead">Mulai dari ringkasan, lalu turun ke detail hanya jika memang perlu. Struktur ini dibuat agar status migrasi, boundary sistem, keamanan, dan shadow rollout bisa dipahami tanpa membuka terlalu banyak file.</p>
+      <div class="quick">
+        <a class="quick-card" href="OFFICIAL-DOCS-SET-LAWANGSEWU.md">
+          <strong>Official Docs Set</strong>
+          <span>Aturan resmi paket dokumen PDF utama Lawangsewu.</span>
+        </a>
+        <a class="quick-card" href="/docs/laporan/final/LAPORAN-FINAL-LAWANGSEWU-PKAPP-M-AGUS-HAYYUDIN.pdf">
+          <strong>Master PDF</strong>
+          <span>Versi final siap baca, kirim, cetak, dan arsip formal.</span>
+        </a>
+        <a class="quick-card" href="APPENDIX-INDEX-LAWANGSEWU.md">
+          <strong>Appendix Index</strong>
+          <span>Daftar lampiran, referensi teknis, dan arsip lama yang masih dipertahankan.</span>
+        </a>
+        <a class="quick-card" href="DOCS-GUIDE-LAWANGSEWU.md">
+          <strong>Docs Guide</strong>
+          <span>Pintu masuk utama untuk memilih dokumen yang benar.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Paket Resmi</h2>
+        <p>Jika ingin versi paling singkat dan paling aman, mulai dari paket ini sebelum membuka dokumen detail lainnya.</p>
+      </div>
+      <div class="grid">
+        <a class="doc-card" href="OFFICIAL-DOCS-SET-LAWANGSEWU.md">
+          <span class="tag">Official Set</span>
+          <strong>OFFICIAL-DOCS-SET-LAWANGSEWU.md</strong>
+          <span>Aturan paket dokumen resmi dengan handbook PDF tunggal Lawangsewu.</span>
+        </a>
+        <a class="doc-card" href="/docs/laporan/final/LAPORAN-FINAL-LAWANGSEWU-PKAPP-M-AGUS-HAYYUDIN.pdf">
+          <span class="tag">Master PDF</span>
+          <strong>LAWANGSEWU-KOMPENDIUM-LENGKAP.pdf</strong>
+          <span>Versi final siap baca, kirim, cetak, dan arsip formal.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Ringkasan Inti</h2>
+        <p>Lapisan pertama yang sebaiknya dibuka sebelum masuk ke lampiran detail appendix.</p>
+      </div>
+      <div class="grid">
+        <a class="doc-card" href="/docs/laporan/final/LAPORAN-FINAL-LAWANGSEWU-PKAPP-M-AGUS-HAYYUDIN.pdf">
+          <span class="tag">Master PDF</span>
+          <strong>LAWANGSEWU-KOMPENDIUM-LENGKAP.pdf</strong>
+          <span>Naskah tunggal resmi untuk status, arsitektur, migrasi, operasional, dan keamanan Lawangsewu.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Detail Lanjutan</h2>
+        <p>Buka bagian ini jika membutuhkan keputusan arsitektur, timeline, atau runbook operasional yang lebih spesifik.</p>
+      </div>
+      <div class="grid">
+        <a class="doc-card" href="../appendix/migration/MIGRATION-STATUS-EXECUTIVE-LAWANGSEWU.md">
+          <span class="tag">Formal Status</span>
+          <strong>docs/appendix/migration/MIGRATION-STATUS-EXECUTIVE-LAWANGSEWU.md</strong>
+          <span>Versi status resmi yang lebih formal dan eksplisit.</span>
+        </a>
+        <a class="doc-card" href="../appendix/migration/MIGRATION-REPORT-DETAIL-LAWANGSEWU.md">
+          <span class="tag">Detail Report</span>
+          <strong>docs/appendix/migration/MIGRATION-REPORT-DETAIL-LAWANGSEWU.md</strong>
+          <span>Laporan migrasi lengkap, timeline, risiko, dan langkah lanjutan.</span>
+        </a>
+        <a class="doc-card" href="../appendix/migration/LARAVEL-SIBLING-ONBOARDING-LAWANGSEWU.md">
+          <span class="tag">Laravel</span>
+          <strong>docs/appendix/migration/LARAVEL-SIBLING-ONBOARDING-LAWANGSEWU.md</strong>
+          <span>Boundary dan onboarding untuk sibling app Laravel.</span>
+        </a>
+        <a class="doc-card" href="../appendix/systems/SHADOW-GUIDE-LAWANGSEWU.md">
+          <span class="tag">Shadow</span>
+          <strong>docs/appendix/systems/SHADOW-GUIDE-LAWANGSEWU.md</strong>
+          <span>Ringkasan status aktivasi shadow per family route.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Appendix dan Arsip</h2>
+        <p>Dokumen lama tetap dipertahankan sebagai lampiran. Gunakan indeks appendix agar root terasa lebih rapi dan jalur baca tetap jelas.</p>
+      </div>
+      <div class="grid">
+        <a class="doc-card" href="APPENDIX-INDEX-LAWANGSEWU.md">
+          <span class="tag">Appendix</span>
+          <strong>APPENDIX-INDEX-LAWANGSEWU.md</strong>
+          <span>Pengelompokan seluruh file md, html, dan pdf lama sebagai appendix, referensi, atau arsip.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Operasional dan Kepatuhan</h2>
+        <p>Dokumen yang biasanya hanya dibuka saat ada tugas operasional, audit, atau perubahan keamanan.</p>
+      </div>
+      <div class="grid">
+        <a class="doc-card" href="../appendix/security/SECURITY-HARDENING.md">
+          <span class="tag">Hardening</span>
+          <strong>docs/appendix/security/SECURITY-HARDENING.md</strong>
+          <span>Audit cepat, hardening GitHub, Cloudflare, dan monitoring rutin.</span>
+        </a>
+        <a class="doc-card" href="../appendix/security/SECRET-ROTATION.md">
+          <span class="tag">Secrets</span>
+          <strong>docs/appendix/security/SECRET-ROTATION.md</strong>
+          <span>Runbook rotasi credential database, SMTP, dan gateway.</span>
+        </a>
+        <a class="doc-card" href="../appendix/security/CLOUDFLARE-CHECKLIST.md">
+          <span class="tag">Cloudflare</span>
+          <strong>docs/appendix/security/CLOUDFLARE-CHECKLIST.md</strong>
+          <span>Checklist rule dan bypass yang perlu dijaga agar endpoint penting tidak tertantang.</span>
+        </a>
+        <a class="doc-card" href="../appendix/security/BACKUP-RECOVERY.md">
+          <span class="tag">Recovery</span>
+          <strong>docs/appendix/security/BACKUP-RECOVERY.md</strong>
+          <span>Jalur recovery dan ekspektasi backup operasional.</span>
+        </a>
+      </div>
+      <p class="footer-note">Catatan: dirty marker root yang tersisa saat ini hanya berasal dari archive legacy pasif, bukan dari target migrasi aktif yang sedang dibersihkan.</p>
+    </section>
+  </main>
+</body>
+</html>

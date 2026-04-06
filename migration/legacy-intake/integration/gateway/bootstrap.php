@@ -1,0 +1,466 @@
+<?php
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_name('lawangsewu_gateway_session');
+    session_start();
+}
+
+function gateway_load_env(string $filePath): array
+{
+    $values = [];
+    if (!is_readable($filePath)) {
+        return $values;
+    }
+
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return $values;
+    }
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+        $key = trim($parts[0]);
+        $value = trim($parts[1]);
+        $value = trim($value, "\"'");
+        $values[$key] = $value;
+    }
+
+    return $values;
+}
+
+function gateway_config(): array
+{
+    static $config = null;
+    if ($config !== null) {
+        return $config;
+    }
+
+    $baseDir = dirname(__DIR__);
+    $env = gateway_load_env(__DIR__ . '/.env');
+
+    $config = [
+        'app_name' => $env['GATEWAY_APP_NAME'] ?? 'Lawangsewu Gateway',
+        'base_path' => rtrim($env['GATEWAY_BASE_PATH'] ?? '/gateway', '/'),
+        'api_token' => $env['GATEWAY_API_TOKEN'] ?? '',
+        'sso_shared_secret' => $env['GATEWAY_SSO_SHARED_SECRET'] ?? '',
+        'db_host' => $env['GATEWAY_DB_HOST'] ?? '',
+        'db_port' => $env['GATEWAY_DB_PORT'] ?? '',
+        'db_user' => $env['GATEWAY_DB_USER'] ?? '',
+        'db_password' => $env['GATEWAY_DB_PASSWORD'] ?? '',
+        'db_name' => $env['GATEWAY_DB_NAME'] ?? '',
+        'business_laravel_base_url' => rtrim($env['GATEWAY_BUSINESS_LARAVEL_BASE_URL'] ?? 'http://127.0.0.1:8790', '/'),
+        'jatidiri_base_url' => rtrim($env['GATEWAY_JATIDIRI_BASE_URL'] ?? 'http://127.0.0.1/lawangsewu/projects/jatidiri/public', '/'),
+        'allow_commands' => (($env['GATEWAY_ALLOW_COMMANDS'] ?? 'false') === 'true'),
+        'project_root' => $env['GATEWAY_PROJECT_ROOT'] ?? ($baseDir . '/projects'),
+        'deploy_root' => $env['GATEWAY_DEPLOY_ROOT'] ?? '/var/www/html',
+        'backup_root' => $env['GATEWAY_BACKUP_ROOT'] ?? '/var/backups/lawangsewu',
+        'backup_file_prefix' => $env['GATEWAY_BACKUP_FILE_PREFIX'] ?? 'lawangsewu_',
+        'backup_cron_tag' => $env['GATEWAY_BACKUP_CRON_TAG'] ?? 'lawangsewu',
+        'connections_file' => __DIR__ . '/data/connections.json',
+        'wa_env_file' => $baseDir . '/wa-caraka/.env',
+    ];
+
+    return $config;
+}
+
+function gateway_json(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function gateway_request_json(): array
+{
+    $raw = file_get_contents('php://input');
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function gateway_get_header_token(): string
+{
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    if (str_starts_with($auth, 'Bearer ')) {
+        return trim(substr($auth, 7));
+    }
+    return (string)($_GET['token'] ?? '');
+}
+
+function gateway_require_token(): void
+{
+    $cfg = gateway_config();
+    if ($cfg['api_token'] === '') {
+        gateway_json([
+            'ok' => false,
+            'error' => 'Token API belum diset. Isi gateway/.env pada GATEWAY_API_TOKEN',
+        ], 500);
+    }
+
+    $token = gateway_get_header_token();
+    if (!hash_equals($cfg['api_token'], $token)) {
+        gateway_json(['ok' => false, 'error' => 'Unauthorized'], 401);
+    }
+}
+
+function gateway_safe_project_name(string $name): bool
+{
+    return preg_match('/^[a-zA-Z0-9_-]+$/', $name) === 1;
+}
+
+function gateway_ui_url(string $path = ''): string
+{
+    $basePath = gateway_config()['base_path'];
+    $trimmed = ltrim($path, '/');
+    return $trimmed === '' ? $basePath . '/index' : $basePath . '/' . $trimmed;
+}
+
+function gateway_login_url(): string
+{
+    return gateway_ui_url('login');
+}
+
+function gateway_normalize_return_path(?string $path, string $default = ''): string
+{
+    $value = trim((string) $path);
+    if ($value === '') {
+        return $default;
+    }
+
+    if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
+        return $default;
+    }
+
+    $parts = parse_url($value);
+    if ($parts === false) {
+        return $default;
+    }
+
+    $cleanPath = (string) ($parts['path'] ?? '');
+    if ($cleanPath === '' || !str_starts_with($cleanPath, '/')) {
+        return $default;
+    }
+
+    $query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+    return $cleanPath . $query;
+}
+
+function gateway_login_url_with_return(string $path = ''): string
+{
+    $loginUrl = gateway_login_url();
+    $returnPath = gateway_normalize_return_path($path);
+    if ($returnPath === '') {
+        return $loginUrl;
+    }
+
+    return $loginUrl . '?return=' . rawurlencode($returnPath);
+}
+
+function gateway_logout_url(): string
+{
+    return gateway_ui_url('logout');
+}
+
+function gateway_wa_admin_portal_logout_url(): string
+{
+    return gateway_login_url();
+}
+
+function gateway_dubes_prakom_url(): string
+{
+    return gateway_ui_url('dubes-prakom');
+}
+
+function gateway_mas_satset_url(): string
+{
+    return gateway_ui_url('mas-satset-ai');
+}
+
+function gateway_sso_mapping_url(): string
+{
+    return gateway_ui_url('sso-mapping');
+}
+
+function gateway_sso_service_map(): array
+{
+    return [
+        [
+            'service' => 'Portal Lawangsewu',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_ui_url('index'),
+            'notes' => 'Halaman utama portal setelah autentikasi.',
+        ],
+        [
+            'service' => 'Dubes Prakom Ops',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_dubes_prakom_url(),
+            'notes' => 'Operasional website chat dan runtime WA.',
+        ],
+        [
+            'service' => 'Mas Satset Lab',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_mas_satset_url(),
+            'notes' => 'Uji cepat Q&A dan kelola knowledge.',
+        ],
+        [
+            'service' => 'WA Caraka Admin',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_wa_admin_sso_url('dashboard'),
+            'notes' => 'Login lewat signed SSO dari portal.',
+        ],
+        [
+            'service' => 'Lawangsewu Business Laravel',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_business_laravel_sso_url('dashboard'),
+            'notes' => 'Launcher domain bisnis melalui signed SSO dari portal.',
+        ],
+        [
+            'service' => 'Jatidiri Laravel 12',
+            'login_url' => gateway_login_url(),
+            'access_url' => gateway_jatidiri_sso_url('dashboard'),
+            'notes' => 'Konsolidasi Jatidiri pada Laravel terbaru dengan signed SSO Lawangsewu.',
+        ],
+    ];
+}
+
+function gateway_sso_status_label(): string
+{
+    return gateway_is_logged_in() ? 'Aktif dan siap dipakai' : 'Menunggu login portal';
+}
+
+function gateway_flash_set(string $key, string $message): void
+{
+    $_SESSION['gateway_flash'][$key] = $message;
+}
+
+function gateway_flash_get(string $key): ?string
+{
+    $value = $_SESSION['gateway_flash'][$key] ?? null;
+    unset($_SESSION['gateway_flash'][$key]);
+    return is_string($value) ? $value : null;
+}
+
+function gateway_auth_user(): ?array
+{
+    $user = $_SESSION['gateway_user'] ?? null;
+    return is_array($user) ? $user : null;
+}
+
+function gateway_is_logged_in(): bool
+{
+    return gateway_auth_user() !== null;
+}
+
+function gateway_require_login(): void
+{
+    if (gateway_is_logged_in()) {
+        return;
+    }
+
+    header('Location: ' . gateway_login_url());
+    exit;
+}
+
+function gateway_user_role(): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return '';
+    }
+    return strtolower(trim((string) ($user['role'] ?? '')));
+}
+
+function gateway_require_roles(array $allowedRoles): void
+{
+    gateway_require_login();
+
+    $role = gateway_user_role();
+    $normalizedAllowed = array_map(static fn ($r) => strtolower(trim((string) $r)), $allowedRoles);
+    if ($role !== '' && in_array($role, $normalizedAllowed, true)) {
+        return;
+    }
+
+    http_response_code(403);
+    echo 'Akses ditolak. Halaman ini hanya untuk role tertentu.';
+    exit;
+}
+
+function gateway_logout(): void
+{
+    unset($_SESSION['gateway_user']);
+    unset($_SESSION['gateway_flash']);
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
+}
+
+function gateway_wa_env(): array
+{
+    static $values = null;
+    if ($values !== null) {
+        return $values;
+    }
+
+    $values = gateway_load_env(gateway_config()['wa_env_file']);
+    return $values;
+}
+
+function gateway_sso_secret(): string
+{
+    $cfg = gateway_config();
+
+    if ((string) ($cfg['sso_shared_secret'] ?? '') !== '') {
+        return (string) $cfg['sso_shared_secret'];
+    }
+
+    return $cfg['api_token'] !== '' ? (string) $cfg['api_token'] : sha1(__FILE__ . php_uname('n'));
+}
+
+function gateway_base64url_encode(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function gateway_wa_admin_sso_url(string $target = 'dashboard?embed=1'): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return '/wa-caraka-admin/login';
+    }
+
+    $payload = [
+        'uid' => (int) ($user['id'] ?? 0),
+        'username' => (string) ($user['username'] ?? ''),
+        'ts' => time(),
+        'target' => ltrim($target, '/'),
+    ];
+
+    $encoded = gateway_base64url_encode(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}');
+    $signature = hash_hmac('sha256', $encoded, gateway_sso_secret());
+
+    return '/wa-caraka-admin/index.php/sso-login?payload=' . rawurlencode($encoded) . '&sig=' . rawurlencode($signature);
+}
+
+function gateway_business_laravel_sso_url(string $target = 'helpdesk/tickets'): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return gateway_login_url();
+    }
+
+    $payload = [
+        'uid' => (int) ($user['id'] ?? 0),
+        'username' => (string) ($user['username'] ?? ''),
+        'full_name' => (string) ($user['full_name'] ?? ''),
+        'role' => (string) ($user['role'] ?? 'viewer'),
+        'ts' => time(),
+        'target' => ltrim($target, '/'),
+    ];
+
+    $encoded = gateway_base64url_encode(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}');
+    $signature = hash_hmac('sha256', $encoded, gateway_sso_secret());
+    $base = gateway_config()['business_laravel_base_url'];
+
+    return $base . '/sso/consume?payload=' . rawurlencode($encoded) . '&sig=' . rawurlencode($signature);
+}
+
+function gateway_jatidiri_sso_url(string $target = 'dashboard'): string
+{
+    $user = gateway_auth_user();
+    if (!is_array($user)) {
+        return gateway_login_url();
+    }
+
+    $payload = [
+        'uid' => (int) ($user['id'] ?? 0),
+        'username' => (string) ($user['username'] ?? ''),
+        'full_name' => (string) ($user['full_name'] ?? ''),
+        'role' => (string) ($user['role'] ?? 'viewer'),
+        'ts' => time(),
+        'target' => ltrim($target, '/'),
+    ];
+
+    $encoded = gateway_base64url_encode(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}');
+    $signature = hash_hmac('sha256', $encoded, gateway_sso_secret());
+    $base = gateway_config()['jatidiri_base_url'];
+
+    return $base . '/sso/consume?payload=' . rawurlencode($encoded) . '&sig=' . rawurlencode($signature);
+}
+
+function gateway_admin_pdo(): PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    $cfg = gateway_config();
+    $env = gateway_wa_env();
+    $host = $cfg['db_host'] !== '' ? $cfg['db_host'] : ($env['DB_HOST'] ?? '127.0.0.1');
+    $port = (int) ($cfg['db_port'] !== '' ? $cfg['db_port'] : ($env['DB_PORT'] ?? 3306));
+    $dbName = $cfg['db_name'] !== '' ? $cfg['db_name'] : ($env['DB_NAME'] ?? '');
+    $user = $cfg['db_user'] !== '' ? $cfg['db_user'] : ($env['DB_USER'] ?? '');
+    $password = $cfg['db_password'] !== '' ? $cfg['db_password'] : ($env['DB_PASSWORD'] ?? '');
+
+    if ($dbName === '' || $user === '') {
+        throw new RuntimeException('Gateway database credentials are incomplete.');
+    }
+
+    $pdo = new PDO(
+        sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $host, $port, $dbName),
+        $user,
+        $password,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]
+    );
+
+    return $pdo;
+}
+
+function gateway_attempt_login(string $username, string $password): array
+{
+    $username = trim($username);
+    if ($username === '' || $password === '') {
+        return ['ok' => false, 'message' => 'Username dan password wajib diisi.'];
+    }
+
+    try {
+        $stmt = gateway_admin_pdo()->prepare('SELECT id, username, full_name, role, is_active, password_hash FROM admin_users WHERE username = :username LIMIT 1');
+        $stmt->execute([':username' => $username]);
+        $user = $stmt->fetch();
+    } catch (Throwable $e) {
+        return ['ok' => false, 'message' => 'Login gateway belum dapat memeriksa database admin.'];
+    }
+
+    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) {
+        return ['ok' => false, 'message' => 'Username atau password salah.'];
+    }
+
+    if (!password_verify($password, (string) ($user['password_hash'] ?? ''))) {
+        return ['ok' => false, 'message' => 'Username atau password salah.'];
+    }
+
+    $_SESSION['gateway_user'] = [
+        'id' => (int) $user['id'],
+        'username' => (string) $user['username'],
+        'full_name' => (string) $user['full_name'],
+        'role' => (string) $user['role'],
+        'login_at' => date('c'),
+    ];
+
+    return ['ok' => true, 'user' => $_SESSION['gateway_user']];
+}

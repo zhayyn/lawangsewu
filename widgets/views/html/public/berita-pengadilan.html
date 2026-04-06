@@ -1,0 +1,869 @@
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;600;700;800&display=swap');
+
+    :root {
+        /* Tema PA Semarang (Hijau) */
+        --pa-green: #1e6a3a;
+        --pa-green-soft: #eaf7ee;
+        
+        /* Tema RSS Peradilan (Oranye) */
+        --pa-orange: #ff8a00;
+        --pa-orange-grad: linear-gradient(135deg, #ff8a00, #ff6200);
+        --pa-orange-soft: #fff4df;
+        --pa-orange-border: #ffd8a8;
+        --pa-orange-text: #7a4b00;
+        
+        /* Warna Dasar */
+        --pa-ink: #1f2937;
+        --pa-muted: #64748b;
+        --pa-border: #e5ece7;
+    }
+
+    .news-wrap {
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        background: #fff;
+        border: 1px solid var(--pa-border);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .news-top {
+        display: grid;
+        grid-template-columns: minmax(0, calc(50% + 10px)) minmax(0, calc(50% - 10px));
+        align-items: stretch;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .panel {
+        border: 1px solid var(--pa-border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .panel-head,
+    .rss-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 16px;
+        border-bottom: 1px solid #edf3ee;
+        background: linear-gradient(180deg, #ffffff, #fbfdfb);
+    }
+
+    .panel-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--pa-ink);
+        font-family: 'Playfair Display', serif;
+    }
+
+    .tab-row {
+        display: flex;
+        gap: 8px;
+    }
+
+    .tab-btn {
+        border: 1px solid #dbe6de;
+        background: #fff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* Tab Default (Tema Hijau PA) */
+    .tab-btn.active {
+        background: linear-gradient(135deg, #1e6a3a, #16532d);
+        color: #fff;
+        border-color: #1e6a3a;
+        box-shadow: 0 4px 10px rgba(30, 106, 58, 0.2);
+    }
+
+    /* Tab Khusus RSS (Tema Oranye) */
+    .rss-panel .tab-btn.active {
+        background: var(--pa-orange-grad);
+        color: #fff;
+        border-color: var(--pa-orange);
+        box-shadow: 0 4px 10px rgba(255, 98, 0, 0.2);
+    }
+
+    /* Trik Magnet Bawah & Gravitasi Atas */
+    .berita-grid,
+    .list,
+    .tab-pane {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+        justify-content: flex-start;
+    }
+
+    .tab-pane .list {
+        padding: 0;
+    }
+
+    #pa-pengumuman-list,
+    #pa-artikel-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .tab-pane {
+        display: none;
+        flex-direction: column;
+    }
+    .tab-pane.active {
+        display: flex;
+    }
+
+    /* ================================================= */
+    /* SIMPLE LIST (PENGUMUMAN & ARTIKEL)                */
+    /* ================================================= */
+    .simple-list-item {
+        padding: 7px 0;
+        border-bottom: 1px solid #e5ece7;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+    .simple-list-item:last-child {
+        border-bottom: none;
+    }
+    .simple-list-item a {
+        color: var(--pa-ink);
+        text-decoration: none;
+        display: block;
+        padding: 0 2px;
+        transition: color 0.15s;
+    }
+    .simple-list-item a:hover {
+        color: var(--pa-green);
+        text-decoration: underline;
+    }
+
+    /* ================================================= */
+    /* KARTU GAMBAR BESAR (FEATURED HERO)                */
+    /* ================================================= */
+    .featured-hero {
+        border: 1px solid #dce7ef;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #ffffff, #f9fcff);
+        box-shadow: 0 10px 24px rgba(2, 24, 43, 0.06);
+    }
+    .featured-hero img {
+        width: 100%;
+        height: 188px;
+        object-fit: cover;
+        display: block;
+        background: #e9eef3;
+        border-bottom: 1px solid #e5edf4;
+    }
+    .featured-body {
+        padding: 12px 14px 14px;
+    }
+
+    .meta-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--pa-muted);
+        font-size: 9px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .featured-link {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.35;
+        display: block;
+        margin-bottom: 8px;
+        transition: color 0.2s ease;
+    }
+    .featured-link:hover { color: var(--pa-green); }
+    
+    .featured-excerpt {
+        margin: 0 0 10px;
+        color: #475569;
+        font-size: 10px;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* ================================================= */
+    /* KARTU LIST TEKS KECIL                             */
+    /* ================================================= */
+    .list-item {
+        border: 1px solid #dde7df;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #fbfdfb, #f8fcf9);
+        padding: 12px;
+        transition: background 0.2s ease, transform 0.2s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .list-item.list-item-compact {
+        min-height: 0;
+        padding: 10px 12px;
+    }
+    .list-item:hover {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        transform: translateY(-2px);
+    }
+    .list-item a:not(.btn-detail) {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .list-item a:not(.btn-detail):hover { color: var(--pa-green); }
+    .list-meta {
+        margin-top: 6px;
+        color: var(--pa-muted);
+        font-size: 9px;
+        font-weight: 600;
+    }
+    .list-excerpt {
+        margin: 6px 0 0;
+        color: #4b5563;
+        font-size: 10px;
+        line-height: 1.45;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Tombol Selengkapnya Dalam Kartu */
+    .btn-detail {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        border: 1px solid #d7e5d9;
+        background: #eef8f1;
+        color: #16592f;
+        text-decoration: none;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 9px;
+        transition: all 0.2s ease;
+        margin-top: 8px;
+        align-self: flex-start;
+    }
+    .btn-detail:hover {
+        background: #1e6a3a;
+        border-color: #1e6a3a;
+        color: #fff;
+    }
+
+    /* Tombol Lihat Semua di Bawah Panel */
+    .lihat-semua-btn {
+        margin: auto 12px 12px 12px; /* margin-top: auto menarik tombol ke bawah */
+        display: block;
+        text-align: center;
+        text-decoration: none;
+        color: var(--pa-green);
+        border: 1px solid #c9e1cf;
+        background: var(--pa-green-soft);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 14px;
+        transition: all 0.2s ease;
+    }
+    .lihat-semua-btn:hover {
+        background: var(--pa-green);
+        color: #fff;
+    }
+
+    /* ================================================= */
+    /* BAGIAN KANAN: RSS FEED PERADILAN (ORANYE)         */
+    /* ================================================= */
+    .rss-panel {
+        border: 1px solid var(--pa-border);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .rss-body {
+        padding: 10px 12px 0;
+        height: 100%;
+    }
+
+    .rss-feed-shell {
+        position: relative;
+        border-radius: 12px;
+        border: 1px solid #dbe5df;
+        background:
+            linear-gradient(150deg, rgba(30, 106, 58, 0.04) 0%, rgba(255, 255, 255, 0) 40%),
+            linear-gradient(25deg, rgba(30, 106, 58, 0.035) 0%, rgba(255, 255, 255, 0) 48%),
+            #f7faf8;
+        padding: 14px 16px 10px;
+        overflow: hidden;
+    }
+
+    .rss-feed-shell::before,
+    .rss-feed-shell::after {
+        content: '';
+        position: absolute;
+        pointer-events: none;
+        background: rgba(30, 106, 58, 0.06);
+    }
+
+    .rss-feed-shell::before {
+        width: 220px;
+        height: 120px;
+        top: -32px;
+        right: -56px;
+        transform: rotate(-16deg);
+        clip-path: polygon(0 0, 100% 0, 78% 100%, 0 72%);
+    }
+
+    .rss-feed-shell::after {
+        width: 200px;
+        height: 110px;
+        bottom: -40px;
+        left: -55px;
+        transform: rotate(12deg);
+        clip-path: polygon(20% 0, 100% 18%, 80% 100%, 0 80%);
+    }
+
+    .rss-columns {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+    .rss-bullet-list {
+        margin: 0;
+        padding: 0;
+    }
+
+    .rss-bullet-item {
+        margin: 0 0 13px;
+        color: var(--pa-ink);
+        list-style: none;
+    }
+
+    .rss-bullet-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .rss-bullet-item .rss-item-row {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 10px;
+        align-items: start;
+    }
+
+    .rss-bullet-item .rss-thumb {
+        width: 80px;
+        height: 58px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #dde6ef;
+        background: #e8edf3;
+    }
+
+    .rss-bullet-item a {
+        text-decoration: none;
+        color: var(--pa-ink);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.45;
+        display: inline;
+    }
+
+    .rss-bullet-item a:hover {
+        color: var(--pa-orange);
+    }
+
+    .rss-source {
+        margin-top: 4px;
+        color: var(--pa-muted);
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .rss-pagination {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 7px;
+        margin-top: 14px;
+    }
+
+    .rss-page-btn {
+        border: none;
+        background: transparent;
+        color: #0f172a;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        font-weight: 500;
+        padding: 3px 5px;
+    }
+
+    .rss-page-btn.active {
+        color: var(--pa-green);
+        font-weight: 700;
+    }
+
+    .rss-next-btn {
+        margin-left: 8px;
+        color: #0f172a;
+        font-weight: 500;
+    }
+
+    .rss-next-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .rss-bottom-accent {
+        height: 8px;
+        border-radius: 0 0 12px 12px;
+        background: linear-gradient(90deg, #9ad400, #6bbf1a, #9ad400);
+        background-size: 200% 100%;
+        margin-top: 0;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .rss-bottom-accent.in-view {
+        transform: scaleX(1);
+        animation: accent-shimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes accent-shimmer {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    .rss-loader {
+        color: var(--pa-muted);
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        padding: 20px 4px;
+    }
+
+    @media (max-width: 980px) {
+        .news-wrap {
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+        }
+        .news-top { grid-template-columns: 1fr; }
+        .rss-columns {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        .rss-feed-shell {
+            padding: 12px 14px 8px;
+        }
+    }
+</style>
+
+<div
+    id="berita-pasmg-root"
+    data-wp-api-url="https://wp.pa-semarang.go.id"
+    data-pa-frontend-url="https://pa-semarang.go.id"
+    data-wp-cat-berita="6"
+    data-wp-cat-pengumuman="7"
+    data-wp-cat-artikel="12"
+    data-thumb-fallback="/widgets/assets/ma-fallback.jpg"
+>
+    <div class="news-wrap">
+        <section class="news-top">
+            
+            <article class="panel">
+                <div class="panel-head">
+                    <h3 class="panel-title">Berita PA Semarang</h3>
+                </div>
+                <div id="pa-berita-list" class="berita-grid">
+                    <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat berita terbaru...</div>
+                </div>
+                <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/berita" target="_blank" rel="noopener">Lihat Semua Berita</a>
+            </article>
+
+            <article class="panel">
+                <div class="panel-head">
+                    <h3 class="panel-title">Pengumuman & Artikel</h3>
+                    <div class="tab-row" id="pa-tabs">
+                        <button class="tab-btn active" data-tab="pa-pengumuman" type="button">Pengumuman</button>
+                        <button class="tab-btn" data-tab="pa-artikel" type="button">Artikel</button>
+                    </div>
+                </div>
+
+                <div id="pa-pengumuman" class="tab-pane active">
+                    <div id="pa-pengumuman-list">
+                        <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat pengumuman...</div>
+                    </div>
+                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/pengumuman" target="_blank" rel="noopener">Lihat Semua Pengumuman</a>
+                </div>
+
+                <div id="pa-artikel" class="tab-pane">
+                    <div id="pa-artikel-list">
+                        <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat artikel...</div>
+                    </div>
+                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/arsip-artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
+                </div>
+            </article>
+        </section>
+
+        <section class="rss-panel panel">
+            <div class="rss-head">
+                <h3 class="panel-title">Informasi Seputar Peradilan</h3>
+                <div class="tab-row" id="rss-tabs">
+                    <button class="tab-btn active" data-rss-source="ma" type="button">MA RI</button>
+                    <button class="tab-btn" data-rss-source="badilag" type="button">Badilag</button>
+                    <button class="tab-btn" data-rss-source="pta" type="button">PTA Semarang</button>
+                </div>
+            </div>
+            <div class="rss-body" id="rss-container">
+                <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat feed peradilan...</div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const root = document.getElementById('berita-pasmg-root');
+        if (!root || root.dataset.loaded === '1') return;
+        root.dataset.loaded = '1';
+
+        // Konfigurasi & Variabel
+        const wpCatIdBerita = Number(root.dataset.wpCatBerita || '6');
+        const wpCatIdPengumuman = Number(root.dataset.wpCatPengumuman || '7');
+        const wpCatIdArtikel = Number(root.dataset.wpCatArtikel || '12');
+        const wpApiUrl = String(root.dataset.wpApiUrl).replace(/\/$/, '');
+        const paFrontendUrl = String(root.dataset.paFrontendUrl).replace(/\/$/, '');
+        const thumbLocalFallback = String(root.dataset.thumbFallback || '/widgets/assets/ma-fallback.jpg');
+
+        const THUMB_BADILAG_BUILDING = 'https://marinews.mahkamahagung.go.id/static/2025/12/10/dirjen-badilag-mowEv.jpg';
+        const THUMB_PTA_BUILDING = 'https://pta-semarang.go.id/wp-content/uploads/2025/11/gedung-pta-semarang.png';
+        const RSS_SOURCE_NAMES = { ma: 'Mahkamah Agung RI', badilag: 'Badilag MA RI', pta: 'PTA Semarang' };
+        const RSS_PAGE_SIZE = 3;
+
+        const localApiCandidates = [
+            `${window.location.origin}/api/pengumuman-rss`,
+            `${window.location.origin}/lawangsewu/api/pengumuman-rss`,
+            `${window.location.origin}/widgets/views/php/api/api-pengumuman-rss.php`,
+            `${window.location.origin}/lawangsewu/widgets/views/php/api/api-pengumuman-rss.php`
+        ];
+
+        // Utilitas
+        function escHtml(text) {
+            return String(text || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        function formatDate(input) {
+            try {
+                return new Date(input).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+            } catch (_) { return '-'; }
+        }
+
+        function formatDateCompact(input) {
+            try {
+                const dt = new Date(input);
+                if (Number.isNaN(dt.getTime())) return '-';
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const yy = String(dt.getFullYear());
+                return `${dd}-${mm}-${yy}`;
+            } catch (_) {
+                return '-';
+            }
+        }
+
+        const LOWERCASE_WORDS = new Set(['dan','di','ke','dari','yang','untuk','pada','dengan','oleh','atau','ini','itu','se','tak','tidak','akan','telah','juga','bagi','atas','dalam','tentang','secara','saat','antara','setelah','sebelum','terhadap','melalui','hingga','sampai','seperti','namun','tetapi','bila','jika','karena','sehingga','agar','supaya','bahwa','maupun']);
+
+        function toTitleCase(text) {
+            if (!text) return '';
+            return String(text).toLowerCase().replace(/(?:^|(?<=[\.\!\?]\s))\S|\b\S/g, (char, offset, str) => {
+                const wordMatch = str.slice(offset).match(/^\S+/);
+                const word = wordMatch ? wordMatch[0] : '';
+                if (offset === 0) return char.toUpperCase();
+                if (/[\.\!\?]/.test(str.slice(0, offset).trim().slice(-1))) return char.toUpperCase();
+                if (LOWERCASE_WORDS.has(word)) return char;
+                return char.toUpperCase();
+            });
+        }
+
+        function applyPaBaseUrl() {
+            root.querySelectorAll('[data-pa-path]').forEach((link) => {
+                const path = link.getAttribute('data-pa-path');
+                if (path) link.setAttribute('href', `${paFrontendUrl}${path}`);
+            });
+        }
+
+        // Templating UI untuk WP Lokal (Semua kategori pakai layout ini)
+        function renderFeaturedItem(item, label) {
+            return `
+                <article class="featured-hero">
+                    <img src="${escHtml(item.image)}" alt="${escHtml(label)}" loading="lazy" onerror="this.onerror=null;this.src='${thumbLocalFallback}'">
+                    <div class="featured-body">
+                        <div class="meta-line"><span><i class="fas fa-newspaper"></i> ${escHtml(label)}</span><span>${formatDate(item.date)}</span></div>
+                        <a class="featured-link" href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+                        <p class="featured-excerpt">${escHtml(item.description)}</p>
+                        <a class="btn-detail" href="${escHtml(item.link)}" target="_blank" rel="noopener">Selengkapnya <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </article>
+            `;
+        }
+
+        function renderTextItem(item) {
+            return `
+                <article class="list-item list-item-compact">
+                    <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(item.title)}</a>
+                    <div class="list-meta"><i class="far fa-calendar-alt"></i> ${formatDate(item.date)}</div>
+                </article>
+            `;
+        }
+
+        // ==========================================================
+        // 1. DATA FETCHER: WP REST API (Berita, Pengumuman, Artikel)
+        // ==========================================================
+        async function loadWpPosts(categoryId, limit = 3) {
+            const apiUrl = `${wpApiUrl}/wp-json/wp/v2/posts?categories=${categoryId}&per_page=${limit}&_embed=true`;
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network error');
+                const posts = await response.json();
+
+                return posts.map((post) => {
+                    let imageUrl = thumbLocalFallback;
+                    if (post._embedded && post._embedded['wp:featuredmedia']) {
+                        const media = post._embedded['wp:featuredmedia'][0];
+                        if (media && media.source_url) imageUrl = media.source_url;
+                    }
+
+                    const rawExcerpt = post.excerpt && post.excerpt.rendered ? post.excerpt.rendered : '';
+                    const cleanExcerpt = rawExcerpt.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+                    const rawTitle = post.title && post.title.rendered ? post.title.rendered : '';
+                    const cleanTitle = rawTitle.replace(/^[\?\s]+/, '').trim(); // Fix Bug Joomla
+                    const finalLink = String(post.link || '').replace('wp.pa-semarang.go.id', 'pa-semarang.go.id');
+
+                    return { link: finalLink, title: cleanTitle, date: post.date, image: imageUrl, description: cleanExcerpt };
+                });
+            } catch (error) {
+                console.error(`Gagal memuat kategori ID ${categoryId}:`, error);
+                return [];
+            }
+        }
+
+        async function renderCategoryStack(categoryId, containerId, label) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const items = await loadWpPosts(categoryId, 3);
+            if (!items.length) {
+                container.innerHTML = `<div class="rss-loader">${escHtml(label)} belum tersedia.</div>`;
+                return;
+            }
+
+            const [featured, ...rest] = items;
+            const textItems = rest.slice(0, 2).map((item) => renderTextItem(item)).join('');
+            container.innerHTML = `
+                ${renderFeaturedItem(featured, label)}
+                ${textItems}
+            `;
+        }
+
+        // ==========================================================
+        // 2. DATA FETCHER: EKSTERNAL RSS (MA, Badilag, PTA)
+        // ==========================================================
+        function isPengumumanItem(item) {
+            const text = `${item && item.title ? item.title : ''} ${item && item.url ? item.url : ''}`.toLowerCase();
+            return /(pengumuman|pemberitahuan|edaran|seleksi|hasil|jadwal|undangan)/.test(text);
+        }
+
+        async function loadLocalSource(source) {
+            let payload = null;
+            for (const base of localApiCandidates) {
+                try {
+                    const apiUrl = `${base}?source=${encodeURIComponent(source)}&limit=20&t=${Date.now()}`;
+                    const response = await fetch(apiUrl, { cache: 'no-store' });
+                    if (!response.ok) continue;
+                    const candidate = await response.json();
+                    if (candidate && candidate.ok && Array.isArray(candidate.items)) {
+                        payload = candidate;
+                        break;
+                    }
+                } catch (_) { }
+            }
+
+            if (!payload) return [];
+
+            const sourceLabel = payload.sourceName || RSS_SOURCE_NAMES[source] || source.toUpperCase();
+            const filteredItems = payload.items.filter(isPengumumanItem).slice(0, 15);
+
+            return filteredItems.map((item) => ({
+                link: item.url,
+                title: item.title,
+                date: item.date || payload.fetchedAt,
+                source: sourceLabel,
+                thumb: source === 'badilag' ? THUMB_BADILAG_BUILDING : (source === 'pta' ? THUMB_PTA_BUILDING : thumbLocalFallback)
+            }));
+        }
+
+        async function renderExternalRss(source) {
+            const container = document.getElementById('rss-container');
+            if (!container) return;
+            container.innerHTML = '<div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat feed...</div>';
+
+            try {
+                const items = await loadLocalSource(source);
+                if (!items.length) {
+                    container.innerHTML = '<div class="rss-loader">Feed belum tersedia.</div>';
+                    return;
+                }
+
+                const totalPages = Math.max(1, Math.ceil(items.length / RSS_PAGE_SIZE));
+                let currentPage = 1;
+
+                const renderPage = (pageNumber) => {
+                    const page = Math.min(Math.max(pageNumber, 1), totalPages);
+                    currentPage = page;
+                    const startIndex = (page - 1) * RSS_PAGE_SIZE;
+                    const visibleItems = items.slice(startIndex, startIndex + RSS_PAGE_SIZE);
+
+                    const renderBulletItems = (list) => list.map((item) => `
+                        <li class="rss-bullet-item">
+                            <div class="rss-item-row">
+                                <img class="rss-thumb" src="${escHtml(item.thumb)}" alt="${escHtml(item.source)}" loading="lazy" onerror="this.onerror=null;this.src='${thumbLocalFallback}'">
+                                <div>
+                                    <a href="${escHtml(item.link)}" target="_blank" rel="noopener">${escHtml(toTitleCase(item.title))}</a>
+                                    <div class="rss-source">Sumber : ${escHtml(item.source)} | Tanggal : ${formatDateCompact(item.date)} | Oleh ${escHtml(item.author || 'ruhan')}</div>
+                                </div>
+                            </div>
+                        </li>
+                    `).join('');
+
+                    const pageButtons = Array.from({ length: totalPages }, (_, idx) => {
+                        const number = idx + 1;
+                        const activeClass = number === currentPage ? 'active' : '';
+                        return `<button class="rss-page-btn ${activeClass}" type="button" data-page="${number}">${number}</button>`;
+                    }).join('');
+
+                    const nextDisabled = currentPage >= totalPages ? 'disabled' : '';
+                    const nextPage = Math.min(currentPage + 1, totalPages);
+
+                    container.innerHTML = `
+                        <div class="rss-feed-shell">
+                            <ul class="rss-bullet-list">${renderBulletItems(visibleItems)}</ul>
+                            <div class="rss-pagination" aria-label="Pagination berita">
+                                ${pageButtons}
+                                <button class="rss-page-btn rss-next-btn" type="button" data-page="${nextPage}" ${nextDisabled}>Berikutnya</button>
+                            </div>
+                        </div>
+                        <div class="rss-bottom-accent" aria-hidden="true"></div>
+                    `;
+                };
+
+                container.onclick = (event) => {
+                    const button = event.target.closest('[data-page]');
+                    if (!button || button.disabled) return;
+                    const targetPage = Number(button.getAttribute('data-page') || '1');
+                    renderPage(targetPage);
+                };
+
+                renderPage(1);
+            } catch (_) {
+                container.innerHTML = '<div class="rss-loader">Gagal memuat RSS feed dari server.</div>';
+            }
+        }
+
+        // ==========================================================
+        // 3. UI HANDLERS (TABS) & INIT
+        // ==========================================================
+        function setupTabs(rootId, attrName, panePrefix) {
+            const root = document.getElementById(rootId);
+            if (!root) return;
+            root.addEventListener('click', (event) => {
+                const button = event.target.closest(`[${attrName}]`);
+                if (!button) return;
+                const key = button.getAttribute(attrName);
+                root.querySelectorAll(`[${attrName}]`).forEach((btn) => btn.classList.toggle('active', btn === button));
+                document.querySelectorAll(`${panePrefix}`).forEach((pane) => pane.classList.remove('active'));
+                const targetPane = document.getElementById(key);
+                if (targetPane) targetPane.classList.add('active');
+            });
+        }
+
+        function setupRssTabs() {
+            const tabs = document.getElementById('rss-tabs');
+            if (!tabs) return;
+            tabs.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-rss-source]');
+                if (!button) return;
+                const source = button.getAttribute('data-rss-source');
+                tabs.querySelectorAll('[data-rss-source]').forEach((btn) => btn.classList.toggle('active', btn === button));
+                renderExternalRss(String(source || 'ma'));
+            });
+        }
+
+        applyPaBaseUrl();
+        setupTabs('pa-tabs', 'data-tab', '.tab-pane');
+        setupRssTabs();
+        
+        // Render Konten PA Lokal
+        renderCategoryStack(wpCatIdBerita, 'pa-berita-list', 'Berita');
+        renderCategoryStack(wpCatIdPengumuman, 'pa-pengumuman-list', 'Pengumuman');
+        renderCategoryStack(wpCatIdArtikel, 'pa-artikel-list', 'Artikel');
+        
+        // Render Konten RSS Eksternal Pertama
+        renderExternalRss('ma');
+
+        const accentObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                entry.target.classList.toggle('in-view', entry.isIntersecting);
+            });
+        }, { threshold: 0.3 });
+
+        new MutationObserver(() => {
+            root.querySelectorAll('.rss-bottom-accent:not([data-observed])').forEach((el) => {
+                el.setAttribute('data-observed', '1');
+                accentObserver.observe(el);
+            });
+        }).observe(root, { childList: true, subtree: true });
+    })();
+</script>

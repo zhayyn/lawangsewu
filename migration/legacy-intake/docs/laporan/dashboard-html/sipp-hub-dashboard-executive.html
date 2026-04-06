@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIPP-HUB Executive Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1b2430;
+      --muted: #596579;
+      --surface: #ffffff;
+      --line: #ddd7cb;
+      --brand: #0f766e;
+      --brand-deep: #0b4f58;
+      --gold: #c88f2b;
+      --teal-soft: #d8efeb;
+      --rose-soft: #f7e8de;
+      --shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Manrope, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 460px at -15% -10%, #dfefe9, transparent 62%),
+        radial-gradient(760px 420px at 115% 5%, #f6e7c6, transparent 62%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .container {
+      width: min(1320px, 94vw);
+      margin: 0 auto;
+      padding: 22px 0 44px;
+    }
+
+    .hero {
+      background: linear-gradient(122deg, var(--brand-deep), var(--brand) 55%, #1f9388);
+      color: white;
+      border-radius: 26px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border-radius: 999px;
+      right: -90px;
+      top: -120px;
+      background: rgba(255,255,255,0.16);
+    }
+
+    .eyebrow {
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 800;
+      opacity: .88;
+    }
+
+    h1 {
+      font-family: Fraunces, serif;
+      font-size: clamp(28px, 4.1vw, 50px);
+      margin: 10px 0 8px;
+      line-height: 1.07;
+      max-width: 980px;
+    }
+
+    .hero p {
+      max-width: 900px;
+      line-height: 1.65;
+      margin: 0;
+      font-size: 15px;
+      opacity: .96;
+    }
+
+    .hero-meta {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hero-chip {
+      border: 1px solid rgba(255,255,255,.28);
+      background: rgba(255,255,255,.16);
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      backdrop-filter: blur(5px);
+    }
+
+    .kpi-grid {
+      margin: 16px 0;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+    }
+
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 15px;
+      box-shadow: 0 8px 22px rgba(17, 24, 39, 0.05);
+    }
+
+    .kpi .v {
+      font-weight: 800;
+      font-size: 30px;
+      line-height: 1;
+      color: var(--brand-deep);
+    }
+
+    .kpi .l {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .section {
+      margin-top: 18px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 8px 22px rgba(17, 24, 39, 0.05);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .canvas-wrap {
+      height: 300px;
+    }
+
+    .canvas-wrap.sm { height: 250px; }
+    .canvas-wrap.lg { height: 340px; }
+
+    .footer {
+      margin-top: 14px;
+      background: linear-gradient(90deg, var(--teal-soft), var(--rose-soft));
+      border: 1px solid #d8d0c3;
+      border-radius: 14px;
+      padding: 12px 14px;
+      color: #344053;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 1100px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .span-8, .span-6, .span-4 { grid-column: span 12; }
+      .canvas-wrap, .canvas-wrap.sm, .canvas-wrap.lg { height: 280px; }
+    }
+
+    @media (max-width: 620px) {
+      .container { width: 95vw; }
+      .hero { border-radius: 20px; padding: 20px; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .canvas-wrap, .canvas-wrap.sm, .canvas-wrap.lg { height: 250px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <div class="eyebrow">PA Semarang - Executive View</div>
+      <h1>Dashboard Kinerja, Transparansi, dan Analisis Sosial</h1>
+      <p>
+        Ringkasan visual ini membaca data dari view BigQuery SIPP-HUB yang sudah dideploy.
+        Fokus utama: layanan publik, transformasi digital, perlindungan ibu-anak, serta peta sosial perceraian.
+      </p>
+      <div class="hero-meta">
+        <div class="hero-chip">Project: lawang-sewu-490507</div>
+        <div class="hero-chip">Dataset: sipp_dataset</div>
+        <div class="hero-chip">Engine: 19 view aktif</div>
+      </div>
+    </section>
+
+    <section class="kpi-grid">
+      <div class="kpi"><div class="v" id="kpiViews">-</div><div class="l">Total View Dashboard</div></div>
+      <div class="kpi"><div class="v" id="kpiPerkara">-</div><div class="l">Total Penerimaan Perkara</div></div>
+      <div class="kpi"><div class="v" id="kpiProdeo">-</div><div class="l">Akumulasi Prodeo</div></div>
+      <div class="kpi"><div class="v" id="kpiStatus">LIVE</div><div class="l">Status Data Feed</div></div>
+    </section>
+
+    <section class="section">
+      <article class="card span-8">
+        <h3>Tren Perkara Bulanan</h3>
+        <div class="canvas-wrap lg"><canvas id="cPerkaraBulanan"></canvas></div>
+        <div class="note">Menunjukkan arus perkara masuk bulanan sebagai dasar perencanaan beban kerja.</div>
+      </article>
+      <article class="card span-4">
+        <h3>Cerai Gugat vs Talak</h3>
+        <div class="canvas-wrap sm"><canvas id="cCerai"></canvas></div>
+        <div class="note">Komposisi kategori cerai dari data akta cerai.</div>
+      </article>
+
+      <article class="card span-6">
+        <h3>E-Court vs Konvensional</h3>
+        <div class="canvas-wrap"><canvas id="cEcourt"></canvas></div>
+        <div class="note">Mengukur laju transformasi digital layanan pendaftaran perkara.</div>
+      </article>
+      <article class="card span-6">
+        <h3>Rata-rata Durasi Penyelesaian Perkara (Hari)</h3>
+        <div class="canvas-wrap"><canvas id="cDurasi"></canvas></div>
+        <div class="note">Rata-rata hari dari daftar hingga putus (agregat lintas jenis perkara).</div>
+      </article>
+
+      <article class="card span-4">
+        <h3>Top Faktor Perceraian</h3>
+        <div class="canvas-wrap sm"><canvas id="cFaktor"></canvas></div>
+        <div class="note">Bahan kebijakan sosial untuk intervensi pencegahan.</div>
+      </article>
+      <article class="card span-4">
+        <h3>Status Putusan Teratas</h3>
+        <div class="canvas-wrap sm"><canvas id="cStatus"></canvas></div>
+        <div class="note">Kontrol mutu produk putusan dan konsistensi putusan.</div>
+      </article>
+      <article class="card span-4">
+        <h3>Top Kecamatan Perkara</h3>
+        <div class="canvas-wrap sm"><canvas id="cKecamatan"></canvas></div>
+        <div class="note">Prioritas wilayah untuk sosialisasi hukum dan mediasi.</div>
+      </article>
+
+      <article class="card span-12">
+        <h3>Prodeo dan Isbat Nikah</h3>
+        <div class="canvas-wrap lg"><canvas id="cProdeoIsbat"></canvas></div>
+        <div class="note">Dua indikator akses keadilan: dukungan biaya perkara dan legalisasi status pernikahan.</div>
+      </article>
+    </section>
+
+    <section class="footer">
+      Halaman ini responsif dan siap presentasi. Untuk sinkron otomatis dataset chart, jalankan:
+      <strong>python3 scripts/export-sipp-dashboard-data.py</strong>
+      setelah proses sinkron SIPP-HUB selesai.
+    </section>
+  </div>
+
+  <script>
+    const fmt = new Intl.NumberFormat('id-ID');
+
+    function groupBy(rows, key) {
+      return rows.reduce((acc, r) => {
+        const k = r[key];
+        (acc[k] ||= []).push(r);
+        return acc;
+      }, {});
+    }
+
+    function sum(arr, key) {
+      return arr.reduce((t, x) => t + Number(x[key] || 0), 0);
+    }
+
+    function chartDefaults() {
+      Chart.defaults.font.family = 'Manrope, sans-serif';
+      Chart.defaults.color = '#4b5663';
+      Chart.defaults.plugins.legend.labels.usePointStyle = true;
+      Chart.defaults.plugins.legend.labels.boxWidth = 10;
+      Chart.defaults.plugins.legend.position = 'bottom';
+    }
+
+    async function main() {
+      chartDefaults();
+      const res = await fetch('./data/sipp-dashboard-data.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Gagal memuat data JSON dashboard');
+      const d = await res.json();
+
+      document.getElementById('kpiViews').textContent = fmt.format(d.summary.views || 0);
+      document.getElementById('kpiPerkara').textContent = fmt.format(d.summary.perkara_total || 0);
+      document.getElementById('kpiProdeo').textContent = 'Rp ' + fmt.format(Math.round(d.summary.prodeo_total || 0));
+
+      // 1. Perkara bulanan
+      const pb = d.perkara_bulanan || [];
+      new Chart(document.getElementById('cPerkaraBulanan'), {
+        type: 'line',
+        data: {
+          labels: pb.map(x => x.bulan),
+          datasets: [{
+            label: 'Perkara Masuk',
+            data: pb.map(x => x.jumlah_perkara_masuk),
+            borderColor: '#0f766e',
+            backgroundColor: 'rgba(15, 118, 110, .18)',
+            borderWidth: 2.5,
+            fill: true,
+            tension: .25,
+            pointRadius: 0,
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+
+      // 2. Cerai gugat vs talak
+      const cg = d.cerai_gugat_talak || [];
+      const totalGugat = sum(cg.filter(x => x.kategori === 'CERAI GUGAT'), 'jumlah_perkara');
+      const totalTalak = sum(cg.filter(x => x.kategori === 'CERAI TALAK'), 'jumlah_perkara');
+      const totalLain = sum(cg.filter(x => x.kategori === 'LAINNYA'), 'jumlah_perkara');
+      new Chart(document.getElementById('cCerai'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Cerai Gugat', 'Cerai Talak', 'Lainnya'],
+          datasets: [{
+            data: [totalGugat, totalTalak, totalLain],
+            backgroundColor: ['#0f766e', '#c88f2b', '#94a3b8'],
+            borderWidth: 0,
+          }]
+        },
+        options: { maintainAspectRatio: false, cutout: '62%' }
+      });
+
+      // 3. Ecourt vs konvensional
+      const evk = d.ecourt_vs_konvensional || [];
+      const byMonth = groupBy(evk, 'bulan');
+      const labelsEvk = Object.keys(byMonth).sort();
+      const ecourt = labelsEvk.map(m => sum(byMonth[m].filter(x => x.kanal === 'E-COURT'), 'jumlah_perkara'));
+      const konv = labelsEvk.map(m => sum(byMonth[m].filter(x => x.kanal === 'KONVENSIONAL'), 'jumlah_perkara'));
+      new Chart(document.getElementById('cEcourt'), {
+        type: 'line',
+        data: {
+          labels: labelsEvk,
+          datasets: [
+            { label: 'E-Court', data: ecourt, borderColor: '#0f766e', backgroundColor: '#0f766e', borderWidth: 2, pointRadius: 0, tension: .22 },
+            { label: 'Konvensional', data: konv, borderColor: '#c88f2b', backgroundColor: '#c88f2b', borderWidth: 2, pointRadius: 0, tension: .22 },
+          ]
+        },
+        options: { maintainAspectRatio: false }
+      });
+
+      // 4. Durasi perkara (agregat per bulan)
+      const dp = d.durasi_perkara || [];
+      const grpDur = groupBy(dp, 'bulan');
+      const labelsDur = Object.keys(grpDur).sort();
+      const durAvg = labelsDur.map(m => {
+        const rows = grpDur[m];
+        return rows.length ? rows.reduce((a, b) => a + Number(b.rata_hari_selesai || 0), 0) / rows.length : 0;
+      });
+      new Chart(document.getElementById('cDurasi'), {
+        type: 'bar',
+        data: {
+          labels: labelsDur,
+          datasets: [{
+            label: 'Rata-rata hari',
+            data: durAvg,
+            backgroundColor: '#0b4f58cc',
+            borderRadius: 6,
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+
+      // 5. Faktor perceraian top
+      const fp = d.faktor_perceraian_top || [];
+      new Chart(document.getElementById('cFaktor'), {
+        type: 'bar',
+        data: {
+          labels: fp.map(x => x.faktor_perceraian),
+          datasets: [{ label: 'Total', data: fp.map(x => x.total), backgroundColor: '#0f766e' }]
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 6. Status putusan
+      const sp = d.status_putusan_top || [];
+      new Chart(document.getElementById('cStatus'), {
+        type: 'polarArea',
+        data: {
+          labels: sp.map(x => x.status_putusan),
+          datasets: [{
+            data: sp.map(x => x.total),
+            backgroundColor: ['#0f766e', '#c88f2b', '#1f5e82', '#7c3e66', '#5f7a2d', '#6f4f2a', '#6b7280', '#3f7f7a']
+          }]
+        },
+        options: { maintainAspectRatio: false }
+      });
+
+      // 7. Kecamatan top
+      const kc = d.kecamatan_top || [];
+      new Chart(document.getElementById('cKecamatan'), {
+        type: 'bar',
+        data: {
+          labels: kc.map(x => x.kecamatan),
+          datasets: [{ label: 'Total', data: kc.map(x => x.total), backgroundColor: '#c88f2b' }]
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 8. Prodeo + Isbat
+      const pr = d.prodeo || [];
+      const isb = d.isbat_nikah || [];
+      const map = {};
+      pr.forEach(x => { map[x.bulan] = map[x.bulan] || {}; map[x.bulan].prodeo = Number(x.jumlah_perkara_prodeo_flag || 0); map[x.bulan].biaya = Number(x.total_biaya_prodeo || 0); });
+      isb.forEach(x => { map[x.bulan] = map[x.bulan] || {}; map[x.bulan].isbat = Number(x.jumlah_perkara_isbat || 0); });
+      const labelsPI = Object.keys(map).sort();
+      new Chart(document.getElementById('cProdeoIsbat'), {
+        data: {
+          labels: labelsPI,
+          datasets: [
+            { type: 'bar', label: 'Perkara Prodeo', data: labelsPI.map(m => map[m].prodeo || 0), backgroundColor: '#0f766eb8', yAxisID: 'y' },
+            { type: 'line', label: 'Perkara Isbat Nikah', data: labelsPI.map(m => map[m].isbat || 0), borderColor: '#c88f2b', backgroundColor: '#c88f2b', borderWidth: 2, pointRadius: 0, tension: .22, yAxisID: 'y' },
+            { type: 'line', label: 'Nilai Prodeo (Rp)', data: labelsPI.map(m => map[m].biaya || 0), borderColor: '#0b4f58', backgroundColor: '#0b4f58', borderDash: [6, 5], borderWidth: 2, pointRadius: 0, tension: .2, yAxisID: 'y1' },
+          ]
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            y: { position: 'left', beginAtZero: true },
+            y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    main().catch((err) => {
+      document.getElementById('kpiStatus').textContent = 'ERROR';
+      document.getElementById('kpiStatus').style.color = '#b91c1c';
+      console.error(err);
+      alert('Data dashboard gagal dimuat. Pastikan file ./data/sipp-dashboard-data.json tersedia.');
+    });
+  </script>
+</body>
+</html>

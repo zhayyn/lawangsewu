@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Detail Monitoring Perkara — PA Semarang</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f6f9;--card:#fff;--border:#e2e8f0;
+  --text:#1e293b;--muted:#64748b;--faint:#94a3b8;
+  --teal:#0f766e;--teal-light:#e0f2f1;
+  --gold:#d97706;--red:#dc2626;--green:#16a34a;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+  --shadow-md:0 4px 20px rgba(0,0,0,.09);
+  --radius:14px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+.wrap{width:min(1280px,96vw);margin:0 auto;padding:24px 0 56px}
+
+/* HEADER */
+.header{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:22px 26px;box-shadow:var(--shadow-md);margin-bottom:22px;position:relative;overflow:hidden}
+.header::after{content:"";position:absolute;right:0;top:0;bottom:0;width:5px;
+  background:linear-gradient(180deg,var(--teal),var(--gold))}
+.header-title{font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px}
+.header-sub{font-size:13px;color:var(--muted);line-height:1.5}
+.header-nav{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.nav-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;border:2px solid var(--border);
+  background:var(--card);color:var(--text);cursor:pointer;transition:all .2s}
+.nav-btn:hover{border-color:var(--teal);color:var(--teal)}
+.nav-btn.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+
+/* STAT CARDS */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat-card::before{content:"";position:absolute;right:-20px;top:-20px;width:80px;height:80px;
+  border-radius:50%;opacity:.08}
+.stat-card.diterima::before{background:var(--green)}
+.stat-card.proses::before{background:var(--gold)}
+.stat-card.diputus::before{background:var(--teal)}
+.stat-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.stat-value{font-size:32px;font-weight:800;line-height:1.1;margin-bottom:2px}
+.stat-diterima .stat-value{color:var(--green)}
+.stat-proses .stat-value{color:var(--gold)}
+.stat-diputus .stat-value{color:var(--teal)}
+.stat-sub{font-size:11px;color:var(--faint)}
+
+/* TABS */
+.tab-nav{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:6px;margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{flex-shrink:0;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;
+  border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap}
+.tab-btn:hover{background:#f1f5f9;color:var(--text)}
+.tab-btn.active{background:var(--teal);color:#fff;box-shadow:0 2px 8px rgba(15,118,110,.24)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* CONTENT */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;
+  box-shadow:var(--shadow);margin-bottom:18px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:14px;color:var(--text)}
+.card-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.chart-wrap{position:relative;height:300px;margin:16px 0}
+.chart-wrap.tall{height:500px}
+
+/* TABLE */
+.table-wrap{overflow:auto;border-radius:8px;border:1px solid var(--border)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:#f8fafc;padding:12px 14px;text-align:left;font-weight:700;color:var(--text);
+  border-bottom:2px solid var(--border)}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border)}
+.tbl tr:hover{background:#f8fafc}
+.tbl .num{text-align:right;font-family:ui-monospace,monospace;color:var(--muted)}
+
+/* FILTER */
+.filter-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.filter-item{display:flex;flex-direction:column;gap:4px}
+.filter-item label{font-size:12px;font-weight:600;color:var(--text)}
+.filter-item input,.filter-item select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+  font-size:13px;background:var(--card);color:var(--text)}
+.filter-item input:focus,.filter-item select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-light)}
+.btn{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--teal);color:#fff}
+.btn-primary:hover{background:#0d5f5a;box-shadow:0 2px 8px rgba(15,118,110,.28)}
+.btn-secondary{background:#f1f5f9;color:var(--text)}
+.btn-secondary:hover{background:#e2e8f0}
+
+/* AUDIT */
+.audit-box{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;
+  margin-bottom:14px;font-size:12px}
+.audit-ok{background:#e0f2f1;border-color:#4db8b0;color:var(--teal)}
+.audit-warn{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+
+footer{text-align:center;margin-top:40px;padding:14px;color:var(--muted);font-size:12px}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="header">
+    <div style="position:relative;z-index:1">
+      <h1 class="header-title">Monitoring Status Perkara</h1>
+      <p class="header-sub">Diterima harian · total 5 tahun · diputus harian — audit dari sumber SIPP PA Semarang</p>
+      <div class="header-nav">
+        <button class="nav-btn" onclick="location.href='sipp-hub-pipeline-hub.html'">← Kembali ke Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-cards">
+    <div class="stat-card diterima">
+      <div class="stat-label">Diterima Hari Ini</div>
+      <div class="stat-value" id="valDiterima">—</div>
+      <div class="stat-sub">Perkara masuk hari ini</div>
+    </div>
+    <div class="stat-card proses">
+      <div class="stat-label">Total 5 Tahun</div>
+      <div class="stat-value" id="valProses">—</div>
+      <div class="stat-sub">Perkara terdata 5 tahun terakhir</div>
+    </div>
+    <div class="stat-card diputus">
+      <div class="stat-label">Diputus Hari Ini</div>
+      <div class="stat-value" id="valDiputus">—</div>
+      <div class="stat-sub">Perkara dengan putusan hari ini</div>
+    </div>
+  </div>
+
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="tab-trend" onclick="switchTab('tab-trend')">Tren 30 Hari</button>
+    <button class="tab-btn" data-tab="tab-detail" onclick="switchTab('tab-detail')">Detail Hari Ini</button>
+    <button class="tab-btn" data-tab="tab-audit" onclick="switchTab('tab-audit')">Audit Data</button>
+  </div>
+
+  <div id="tab-trend" class="tab-pane active">
+    <div class="card">
+      <div class="card-title">Tren Status Perkara (30 Hari Terakhir)</div>
+      <div class="card-sub">Perkara diterima, dalam proses, dan diputus per hari</div>
+      <div class="filter-row">
+        <div class="filter-item">
+          <label for="fYear">Pilih Tahun</label>
+          <select id="fYear"></select>
+        </div>
+        <div class="filter-item">
+          <label for="fMonth">Pilih Bulan</label>
+          <select id="fMonth"></select>
+        </div>
+        <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+      </div>
+      <div class="chart-wrap tall">
+        <canvas id="chartTrend"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-detail" class="tab-pane">
+    <div class="card">
+      <div class="card-title">Detail Perkara Hari Ini</div>
+      <div class="card-sub" id="detailDate">Tanggal: —</div>
+      <div class="filter-row">
+        <div class="filter-item">
+          <label for="pickDate">Pilih Tanggal</label>
+          <input type="date" id="pickDate" onchange="loadDetail()">
+        </div>
+        <button class="btn btn-primary" onclick="loadDetail()">Lihat Detail</button>
+      </div>
+      <div class="audit-box audit-ok">
+        Statistik dihitung dari tanggal pendaftaran dan putusan di SIPP PA Semarang.
+        Kartu tengah pada halaman ini menampilkan total perkara 5 tahun terakhir, bukan backlog aktif, karena dataset backlog tanpa putusan belum dipisahkan akurat di halaman ini.
+      </div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>Metrik</th><th class="num">Jumlah</th><th class="num">%</th></tr>
+          </thead>
+          <tbody id="detailTbody">
+            <tr><td colspan="3" style="text-align:center;color:var(--muted)">Pilih tanggal untuk melihat detail</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-audit" class="tab-pane">
+    <div class="card">
+      <div class="card-title">Audit Data & Metodologi</div>
+      <div style="line-height:1.8;font-size:13px">
+        <h3 style="margin-top:14px;margin-bottom:8px;color:var(--text);font-weight:700">Definisi Metrik</h3>
+        <ul style="margin-left:20px;margin-bottom:14px">
+          <li><strong>Diterima Hari Ini:</strong> Perkara dengan tanggal_pendaftaran = hari ini</li>
+          <li><strong>Dalam Proses:</strong> Perkara dengan tanggal_pendaftaran ≤ hari ini DAN belum ada record putusan (tanggal_putusan = NULL)</li>
+          <li><strong>Diputus Hari Ini:</strong> Perkara dengan tanggal_putusan = hari ini</li>
+        </ul>
+
+        <h3 style="margin-top:14px;margin-bottom:8px;color:var(--text);font-weight:700">Sumber Data</h3>
+        <ul style="margin-left:20px;margin-bottom:14px">
+          <li>Project: <code>lawang-sewu-490507</code></li>
+          <li>Dataset: <code>sipp_dataset</code></li>
+          <li>Raw: <code>server10_ingest_raw</code></li>
+          <li>Sources: <code>sipp_hub_perkara</code>, <code>sipp_hub_perkara_putusan</code></li>
+        </ul>
+
+        <h3 style="margin-top:14px;margin-bottom:8px;color:var(--text);font-weight:700">Catatan Akurasi</h3>
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;
+          font-size:12px;color:#92400e;margin-bottom:14px">
+          ⚠ Perkara dalam proses dihitung berdasarkan kehadiran record putusan.
+          Akurasi bergantung pada konsistensi input tanggal di SIPP.
+          Data diperbarui setiap kali exporter berjalan.
+        </div>
+
+        <h3 style="margin-top:14px;margin-bottom:8px;color:var(--text);font-weight:700">Validasi Terhadap Statistik Existing</h3>
+        <div class="table-wrap" style="margin-top:10px">
+          <table class="tbl">
+            <thead><tr><th>Metrik</th><th class="num">Expected</th><th class="num">Actual</th><th>Status</th></tr></thead>
+            <tbody id="auditTbody">
+              <tr><td>Total Perkara 5 Tahun</td><td class="num">35,599</td><td class="num" id="auditTotal">—</td><td id="auditStatus">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>Dashboard SIPP-HUB v3 · Pengadilan Agama Semarang · Data real-time dari BigQuery</p>
+</footer>
+
+<script>
+const fmt = new Intl.NumberFormat('id-ID');
+let allData = null;
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+}
+
+async function loadData() {
+  try {
+    const r = await fetch('./data/sipp-dashboard-data.json?t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allData = await r.json();
+    initAll();
+  } catch (e) {
+    console.error('Data load error:', e);
+    document.body.innerHTML += '<div style="color:red;padding:20px">Gagal memuat data: ' + e.message + '</div>';
+  }
+}
+
+function initAll() {
+  updateStats();
+  initFilters();
+  initDatePicker();
+}
+
+function getFiveYearWindow() {
+  const years = (allData.perkara_bulanan || [])
+    .map(x => Number(String(x.bulan || '').slice(0, 4)))
+    .concat((allData.jenis_perkara_tahunan || []).map(x => Number(x.tahun)))
+    .filter(Number.isFinite);
+  const maxYear = years.length ? Math.max(...years) : new Date().getFullYear();
+  return { maxYear, minYear: maxYear - 4 };
+}
+
+function getFiveYearTotal() {
+  const { minYear, maxYear } = getFiveYearWindow();
+  const yearly = (allData.jenis_perkara_tahunan || []).filter(x => {
+    const y = Number(x.tahun);
+    return Number.isFinite(y) && y >= minYear && y <= maxYear;
+  });
+  if (yearly.length) {
+    return yearly.reduce((acc, row) => acc + Number(row.total || 0), 0);
+  }
+  return (allData.perkara_bulanan || []).filter(x => {
+    const y = Number(String(x.bulan || '').slice(0, 4));
+    return Number.isFinite(y) && y >= minYear && y <= maxYear;
+  }).reduce((acc, row) => acc + Number(row.jumlah_perkara_masuk || 0), 0);
+}
+
+function updateStats() {
+  // Placeholder - akan diisi dari daily_summary
+  const daily = (allData.daily_summary || [])[0] || {};
+  document.getElementById('valDiterima').textContent = fmt.format(daily.perkara_masuk_hari_ini || 0);
+  document.getElementById('valProses').textContent = fmt.format(getFiveYearTotal());
+  document.getElementById('valDiputus').textContent = fmt.format(daily.putusan_hari_ini || 0);
+}
+
+function initFilters() {
+  const years = Array.from(new Set(
+    (allData.perkara_periodik || []).map(x => String(x.tahun)).filter(Boolean)
+  )).sort((a, b) => b.localeCompare(a));
+  
+  const yearEl = document.getElementById('fYear');
+  yearEl.innerHTML = ['<option value="">Semua Tahun</option>']
+    .concat(years.map(y => `<option value="${y}">${y}</option>`)).join('');
+  
+  populateMonths();
+}
+
+function populateMonths() {
+  const year = document.getElementById('fYear').value;
+  const months = year
+    ? Array.from(new Set(
+        (allData.perkara_periodik || [])
+          .filter(x => String(x.tahun) === year)
+          .map(x => String(x.bulan).slice(0, 7))
+      )).sort().reverse()
+    : [];
+  
+  const monthEl = document.getElementById('fMonth');
+  monthEl.innerHTML = ['<option value="">Semua Bulan</option>']
+    .concat(months.map(m => `<option value="${m}">${m}</option>`)).join('');
+}
+
+function resetFilters() {
+  document.getElementById('fYear').value = '';
+  document.getElementById('fMonth').value = '';
+  populateMonths();
+}
+
+function initDatePicker() {
+  const picker = document.getElementById('pickDate');
+  const data = allData.daily_trend_14d || [];
+  if (data.length) {
+    picker.min = data[0].tanggal;
+    picker.max = data[data.length - 1].tanggal;
+    picker.value = data[data.length - 1].tanggal;
+  }
+}
+
+function loadDetail() {
+  const date = document.getElementById('pickDate').value;
+  if (!date) return;
+  
+  const row = (allData.daily_trend_14d || []).find(x => x.tanggal === date) || {};
+  const total = (row.perkara_masuk || 0) + (row.minutasi || 0) + (row.validasi || 0) + (row.putusan || 0);
+  
+  document.getElementById('detailDate').textContent = 'Tanggal: ' + date;
+  const tbody = document.getElementById('detailTbody');
+  tbody.innerHTML = [
+    ['Diterima', row.perkara_masuk || 0],
+    ['Total Perkara 5 Tahun', getFiveYearTotal()],
+    ['Diputus', row.putusan || 0]
+  ].map(([k, v]) => {
+    const pct = total ? ((v / total) * 100).toFixed(1) : 0;
+    return `<tr><td>${k}</td><td class="num">${fmt.format(v)}</td><td class="num">${pct}%</td></tr>`;
+  }).join('');
+}
+
+document.getElementById('fYear').addEventListener('change', populateMonths);
+
+loadData();
+</script>
+
+</body>
+</html>

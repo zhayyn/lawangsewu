@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIPP-HUB Daily Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --bg:#f4f1ea; --ink:#1b2430; --muted:#5a6678; --card:#fff; --line:#ded7cb; --teal:#0f766e; --navy:#0b4f58; --gold:#d1a23a; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+    .wrap { width:min(1200px, 94vw); margin:0 auto; padding:20px 0 34px; }
+    .hero { background:linear-gradient(125deg,var(--navy),var(--teal)); color:#fff; border-radius:18px; padding:18px; }
+    h1 { margin:0; font-size:clamp(22px,3.4vw,38px); }
+    .sub { margin:6px 0 0; opacity:.94; }
+    .kpis { margin:14px 0; display:grid; gap:10px; grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .kpi { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; }
+    .kpi .v { font-size:30px; font-weight:800; color:var(--navy); }
+    .kpi .l { font-size:13px; color:var(--muted); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .grid { display:grid; gap:12px; grid-template-columns:2fr 1fr; }
+    .chart { height:320px; }
+    .list { margin:0; padding-left:18px; color:var(--muted); line-height:1.7; }
+    .chip { display:inline-block; margin-top:8px; padding:6px 10px; border-radius:999px; font-size:12px; background:#e8f5f2; color:var(--teal); }
+    @media(max-width:900px){ .kpis{grid-template-columns:1fr 1fr;} .grid{grid-template-columns:1fr;} .chart{height:270px;} }
+    @media(max-width:520px){ .kpis{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Daily Monitor SIPP-HUB</h1>
+      <p class="sub">Pantauan sore untuk progres harian: validasi, minutasi, putusan, dan perkara masuk.</p>
+      <p class="sub" id="generated">Updated: -</p>
+    </section>
+
+    <section class="kpis">
+      <div class="kpi"><div class="v" id="kMasuk">-</div><div class="l">Perkara Masuk Hari Ini</div></div>
+      <div class="kpi"><div class="v" id="kPutus">-</div><div class="l">Putusan Hari Ini</div></div>
+      <div class="kpi"><div class="v" id="kValid">-</div><div class="l">Validasi Hari Ini</div></div>
+      <div class="kpi"><div class="v" id="kMinut">-</div><div class="l">Minutasi Hari Ini</div></div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Trend 14 Hari Terakhir</h3>
+        <div class="chart"><canvas id="cTrend"></canvas></div>
+        <span class="chip">Sinkron tipis sore dirancang untuk mengisi gap harian sebelum sinkron malam.</span>
+      </article>
+      <article class="card">
+        <h3>Checklist Harian</h3>
+        <ol class="list">
+          <li>Perkara masuk sudah tercatat.</li>
+          <li>Validasi administrasi berjalan.</li>
+          <li>Putusan hari ini sudah update.</li>
+          <li>Minutasi terlapor.</li>
+          <li>Data feed dashboard berhasil refresh.</li>
+        </ol>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    const fmt = new Intl.NumberFormat('id-ID');
+    async function main(){
+      const d = await fetch('./data/sipp-dashboard-data.json',{cache:'no-store'}).then(r=>r.json());
+      const s = (d.daily_summary && d.daily_summary[0]) || {};
+      document.getElementById('generated').textContent = 'Updated: ' + (d.generated_at || '-');
+      document.getElementById('kMasuk').textContent = fmt.format(s.perkara_masuk_hari_ini || 0);
+      document.getElementById('kPutus').textContent = fmt.format(s.putusan_hari_ini || 0);
+      document.getElementById('kValid').textContent = fmt.format(s.validasi_hari_ini || 0);
+      document.getElementById('kMinut').textContent = fmt.format(s.minutasi_hari_ini || 0);
+
+      const t = d.daily_trend_14d || [];
+      new Chart(document.getElementById('cTrend'), {
+        type:'bar',
+        data:{
+          labels:t.map(x=>x.tanggal.slice(5)),
+          datasets:[
+            {type:'bar', label:'Perkara Masuk', data:t.map(x=>x.perkara_masuk), backgroundColor:'#0b4f58bb'},
+            {type:'line', label:'Validasi', data:t.map(x=>x.validasi), borderColor:'#0f766e', pointRadius:0, tension:.24},
+            {type:'line', label:'Minutasi', data:t.map(x=>x.minutasi), borderColor:'#d1a23a', pointRadius:0, tension:.24}
+          ]
+        },
+        options:{maintainAspectRatio:false}
+      });
+    }
+    main().catch(console.error);
+  </script>
+</body>
+</html>

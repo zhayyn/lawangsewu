@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ringkasan 1 Halaman - Keamanan Akses Remote Server 9</title>
+  <style>
+    :root {
+      --text: #111827;
+      --muted: #4b5563;
+      --line: #d1d5db;
+      --accent: #0f766e;
+      --bg: #ffffff;
+    }
+
+    @page {
+      size: A4;
+      margin: 16mm;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      line-height: 1.35;
+      font-size: 12.5px;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    .page {
+      max-width: 180mm;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 2mm 0;
+      font-size: 21px;
+      line-height: 1.2;
+      color: var(--accent);
+    }
+
+    h2 {
+      margin: 0 0 4mm 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    h3 {
+      margin: 4mm 0 1.5mm 0;
+      font-size: 12.8px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1.2mm;
+    }
+
+    p, ul, ol {
+      margin: 0 0 2.2mm 0;
+    }
+
+    ul, ol {
+      padding-left: 5mm;
+    }
+
+    li {
+      margin: 0 0 1mm 0;
+    }
+
+    .meta {
+      color: var(--muted);
+      margin-bottom: 2.5mm;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      padding: 2.5mm 3mm;
+      margin: 2.5mm 0;
+      background: #f9fafb;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3mm 5mm;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 11px;
+      background: #f3f4f6;
+      padding: 0.3mm 1mm;
+      border-radius: 3px;
+    }
+
+    pre {
+      margin: 1.8mm 0;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 2mm;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 10.8px;
+      line-height: 1.3;
+    }
+
+    .footer {
+      margin-top: 3.5mm;
+      border-top: 1px solid var(--line);
+      padding-top: 1.8mm;
+      color: var(--muted);
+      font-size: 10.5px;
+    }
+
+    @media print {
+      a { color: inherit; text-decoration: none; }
+      .page { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Ringkasan 1 Halaman</h1>
+    <h2>Keamanan Akses Remote Server 9</h2>
+    <p class="meta">Tanggal: 2026-03-09 | Status: Aktif (sudah diterapkan di server)</p>
+
+    <h3>Tujuan</h3>
+    <p>Menjaga akses admin Server 9 tetap aman, tetap bisa dipakai dari iPad, dan tidak bergantung pada satu akun cloud yang bisa dibajak.</p>
+
+    <h3>Masalah Awal</h3>
+    <ul>
+      <li>Model awal memakai VS Code Tunnel berbasis akun cloud.</li>
+      <li>Jika akun cloud dicuri, ada peluang penyalahgunaan akses remote.</li>
+      <li>Sesi/token bisa tertinggal di server bila tidak dicabut dengan benar.</li>
+    </ul>
+
+    <h3>Keputusan Arsitektur</h3>
+    <p>Jalur utama admin: <code>WireGuard + SSH</code>. Jalur cloud tunnel: <code>dinonaktifkan total</code> (masked).</p>
+
+    <div class="panel">
+      <strong>Perumpamaan:</strong>
+      <ul>
+        <li>WireGuard = jalan privat ke area internal.</li>
+        <li>SSH = pintu utama dengan kunci admin.</li>
+        <li>UFW limit = satpam yang membatasi percobaan berulang.</li>
+        <li>Tunnel cloud = pintu tamu online (saat ini ditutup).</li>
+      </ul>
+    </div>
+
+    <h3>Implementasi yang Sudah Berjalan</h3>
+    <div class="grid">
+      <div>
+        <ul>
+          <li><code>wg0</code> aktif, port <code>51830/udp</code>.</li>
+          <li>Peer iPad khusus: <code>10.19.9.11</code>.</li>
+          <li>SSH aktif dengan <code>LIMIT IN 22/tcp</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <ul>
+          <li><code>vscode-tunnel-lawangsewu.service</code> masked.</li>
+          <li><code>vscode-tunnel-lawangsewu-ms.service</code> masked.</li>
+          <li>User tunnel: <code>not logged in</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Tingkat Keamanan (Praktis)</h3>
+    <ul>
+      <li>Risiko pembajakan akun cloud untuk akses server: <strong>rendah</strong>.</li>
+      <li>Risiko brute-force SSH publik: <strong>terkendali</strong> (rate limit aktif).</li>
+      <li>Ketersediaan akses admin: <strong>baik</strong> (jalur VPN + SSH).</li>
+    </ul>
+
+    <h3>Dampak Operasional</h3>
+    <ul>
+      <li>Admin tetap bisa kerja dari iPad via WireGuard + SSH.</li>
+      <li>Tidak perlu perubahan besar pada layanan produksi yang berjalan.</li>
+      <li>Tidak tergantung akun GitHub tertentu untuk masuk server.</li>
+    </ul>
+
+    <h3>SOP Harian Singkat</h3>
+    <ol>
+      <li>Connect WireGuard di iPad.</li>
+      <li>SSH ke IP VPN server (bukan IP publik).</li>
+      <li>Lakukan administrasi.</li>
+      <li>Disconnect VPN setelah selesai.</li>
+    </ol>
+
+    <h3>Checklist Verifikasi Cepat</h3>
+    <pre>systemctl is-enabled vscode-tunnel-lawangsewu.service
+systemctl is-enabled vscode-tunnel-lawangsewu-ms.service
+sudo -u lawangsewu-vscode -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+sudo -u lawangsewu-vscode-ms -H /usr/local/bin/code-tunnel-lawangsewu tunnel user show
+systemctl status wg-quick@wg0 --no-pager
+wg show
+ufw status numbered</pre>
+
+    <p class="small">Ekspektasi: kedua service tunnel <code>masked</code>, kedua user tunnel <code>not logged in</code>, dan WireGuard aktif.</p>
+
+    <div class="footer">
+      Dokumen briefing cepat untuk pimpinan dan audit internal. Sumber detail teknis: <code>REMOTE-ACCESS-SECURITY-SERVER9.md</code>.
+    </div>
+  </main>
+</body>
+</html>

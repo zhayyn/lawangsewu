@@ -14,7 +14,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
-            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -24,8 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => \App\Http\Middleware\EnsureActiveUser::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
-            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
             'permission' => \App\Http\Middleware\Permission::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
 
         //

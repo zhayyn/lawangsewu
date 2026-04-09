@@ -19,8 +19,13 @@
 5. Set Authorized redirect URIs:
    - http://localhost:8000/auth/google/callback
    - http://satker-svr.local/auth/google/callback
-6. Copy: Client ID & Client Secret
-7. Save ke file aman (notes)
+   - https://lawangsewu.pa-semarang.go.id/auth/google/callback
+6. Set Authorized JavaScript origins:
+   - https://lawangsewu.pa-semarang.go.id
+7. Jika login OAuth klasik masih 403 di edge/Cloudflare, buat rule bypass untuk host `lawangsewu.pa-semarang.go.id`
+   dan path `/auth/google/callback`
+8. Copy: Client ID & Client Secret
+9. Save ke file aman (notes)
 ```
 
 #### Step 2: Review Existing Auth Structure

@@ -27,11 +27,23 @@ const shellTheme = computed(() => (isDark.value ? 'theme-dark' : 'theme-light'))
 const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?.user?.name || 'Operator PTIP');
 const userRole = computed(() => page.props.auth?.user?.email ?? 'Prototype internal mode');
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
+const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
+const viewerRouteKeys = ['dashboard', 'cctv', 'chat', 'satellite.pendopo'];
 const displayNavGroups = computed(() => {
     const accessibleGroups = props.navGroups
         .map(group => ({
             ...group,
-            items: group.items.filter(item => Boolean(item.href)),
+            items: group.items.filter((item) => {
+                if (!item.href) {
+                    return false;
+                }
+
+                if (isViewer.value) {
+                    return viewerRouteKeys.includes(item.routeKey);
+                }
+
+                return true;
+            }),
         }))
         .filter(group => group.items.length > 0);
 
@@ -44,6 +56,20 @@ const displayNavGroups = computed(() => {
         {
             label: 'Superadmin',
             items: [
+                {
+                    label: 'Kelola Pendopo',
+                    short: 'PD',
+                    routeKey: 'admin-pendopo',
+                    href: route('admin.pendopo.index'),
+                    badge: 'Admin',
+                },
+                {
+                    label: 'Kelola CCTV',
+                    short: 'CC',
+                    routeKey: 'admin-cctv',
+                    href: route('admin.cctv.index'),
+                    badge: 'Admin',
+                },
                 {
                     label: 'Kelola User',
                     short: 'US',
@@ -58,7 +84,7 @@ const displayNavGroups = computed(() => {
 const primaryNav = computed(() => {
     return displayNavGroups.value
         .flatMap((group) => group.items)
-        .filter((item) => ['dashboard', 'cctv', 'chat', 'satellite.pendopo', 'admin-users'].includes(item.routeKey));
+        .filter((item) => ['dashboard', 'cctv', 'chat', 'satellite.pendopo', 'admin-pendopo', 'admin-cctv', 'admin-users'].includes(item.routeKey));
 });
 
 const linkClasses = (item) => [
@@ -219,7 +245,7 @@ onMounted(() => {
                                 Menu
                             </button>
 
-                            <div class="hidden min-w-0 flex-1 md:block">
+                            <div v-if="!isViewer" class="hidden min-w-0 flex-1 md:block">
                                 <input
                                     type="text"
                                     class="input-surface w-full"
@@ -227,7 +253,7 @@ onMounted(() => {
                                 >
                             </div>
 
-                            <div class="hidden items-center gap-2 lg:flex">
+                            <div v-if="!isViewer" class="hidden items-center gap-2 lg:flex">
                                 <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] overflow-hidden transition-all hover:border-[var(--accent-border)]">
                                     <span class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Ecosystem</span>
                                     <svg class="w-2.5 h-2.5 text-[var(--text-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
@@ -263,7 +289,7 @@ onMounted(() => {
                                         {{ userName }}
                                     </p>
                                     <p class="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest leading-none opacity-80">
-                                        {{ isSuperAdmin ? 'Superadmin' : 'Operator' }}
+                                        {{ isSuperAdmin ? 'Superadmin' : (isViewer ? 'Viewer' : 'Operator') }}
                                     </p>
                                 </div>
                             </div>

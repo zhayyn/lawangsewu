@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     users: {
@@ -11,6 +11,14 @@ const props = defineProps({
     roles: {
         type: Array,
         required: true,
+    },
+    allowlist: {
+        type: Array,
+        required: true,
+    },
+    superAdminEmail: {
+        type: String,
+        default: '',
     },
     status: {
         type: String,
@@ -35,15 +43,59 @@ const submitNewUser = () => {
     });
 };
 
-const formState = reactive(
-    props.users.reduce((acc, user) => {
-        acc[user.id] = {
+const allowlistForm = useForm({
+    email: '',
+    note: '',
+    auto_activate: false,
+});
+
+const submitAllowlist = () => {
+    allowlistForm.post(route('admin.users.allowlist.store'), {
+        onSuccess: () => {
+            allowlistForm.reset();
+        },
+    });
+};
+
+const toggleAllowlist = (entry) => {
+    router.patch(route('admin.users.allowlist.update', entry.id), {
+        auto_activate: !entry.auto_activate,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
+
+const removeAllowlist = (entryId) => {
+    router.delete(route('admin.users.allowlist.destroy', entryId), {
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
+
+const formState = reactive({});
+
+const syncFormState = (users) => {
+    users.forEach((user) => {
+        formState[user.id] = {
             role: user.role ?? 'viewer',
             is_active: Boolean(user.is_active),
         };
+    });
 
-        return acc;
-    }, {}),
+    Object.keys(formState).forEach((userId) => {
+        if (!users.some((user) => String(user.id) === String(userId))) {
+            delete formState[userId];
+        }
+    });
+};
+
+watch(
+    () => props.users,
+    (users) => {
+        syncFormState(users);
+    },
+    { immediate: true },
 );
 
 const pendingGoogleOnly = ref(false);
@@ -143,6 +195,94 @@ const saveUser = (userId) => {
                     </form>
                     <div v-if="newUserForm.errors" class="mt-4 space-y-1">
                         <p v-for="(error, key) in newUserForm.errors" :key="key" class="text-xs text-red-500 font-bold italic">{{ error }}</p>
+                    </div>
+                </div>
+
+                <!-- Allowlist Google -->
+                <div class="card-surface p-8 border-amber-500/30 bg-amber-500/[0.02]">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h3 class="text-lg font-black uppercase tracking-[0.2em] text-amber-600">
+                                Daftar Akses Login Google
+                            </h3>
+                            <p class="mt-2 text-xs text-[var(--text-3)] font-semibold">
+                                Hanya email akun Google dalam daftar ini yang boleh mendaftar via Google. Superadmin tetap diizinkan.
+                            </p>
+                        </div>
+                        <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-amber-600">
+                            Superadmin: {{ superAdminEmail || 'Belum diset' }}
+                        </div>
+                    </div>
+
+                    <form @submit.prevent="submitAllowlist" class="grid gap-6 md:grid-cols-3 items-end">
+                        <div class="space-y-2 md:col-span-1">
+                            <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Email Google</label>
+                            <input v-model="allowlistForm.email" type="email" class="input-surface w-full" required placeholder="nama@pa-semarang.go.id">
+                        </div>
+                        <div class="space-y-2 md:col-span-1">
+                            <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Catatan (Opsional)</label>
+                            <input v-model="allowlistForm.note" type="text" class="input-surface w-full" placeholder="Unit / jabatan">
+                        </div>
+                        <div class="space-y-2 md:col-span-1">
+                            <label class="inline-flex items-center gap-3 cursor-pointer mb-3 text-xs font-semibold text-[var(--text-2)]">
+                                <input
+                                    v-model="allowlistForm.auto_activate"
+                                    type="checkbox"
+                                    class="rounded-lg border-[var(--border)] text-emerald-600 shadow-sm focus:ring-emerald-500 focus:ring-offset-0 bg-[var(--surface-2)]"
+                                >
+                                Auto-aktif setelah login
+                            </label>
+                            <button type="submit" class="github-button !bg-amber-600 hover:!bg-amber-700 !w-full" :disabled="allowlistForm.processing">
+                                Tambahkan ke Allowlist
+                            </button>
+                        </div>
+                    </form>
+
+                    <div v-if="allowlistForm.errors" class="mt-4 space-y-1">
+                        <p v-for="(error, key) in allowlistForm.errors" :key="key" class="text-xs text-red-500 font-bold italic">{{ error }}</p>
+                    </div>
+
+                    <div class="mt-6 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-1)]">
+                        <table class="min-w-full divide-y divide-[var(--border)] text-sm">
+                            <thead class="bg-[var(--surface-2)]">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Email</th>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Catatan</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Auto Aktif</th>
+                                    <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--border)]">
+                                <tr v-for="entry in allowlist" :key="entry.id">
+                                    <td class="px-4 py-3 font-semibold text-[var(--text-1)]">{{ entry.email }}</td>
+                                    <td class="px-4 py-3 text-[var(--text-2)]">{{ entry.note || '-' }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-4 !text-[11px]"
+                                            :class="entry.auto_activate ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-slate-600 hover:!bg-slate-700'"
+                                            @click="toggleAllowlist(entry)"
+                                        >
+                                            {{ entry.auto_activate ? 'ON' : 'OFF' }}
+                                        </button>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-4 !text-[11px] !bg-rose-600 hover:!bg-rose-700"
+                                            @click="removeAllowlist(entry.id)"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="allowlist.length === 0">
+                                    <td colspan="3" class="px-4 py-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
+                                        Belum ada email di allowlist
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

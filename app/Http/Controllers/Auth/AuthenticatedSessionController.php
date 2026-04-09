@@ -24,6 +24,7 @@ class AuthenticatedSessionController extends Controller
             'canGoogleAuth' => filled(config('services.google.client_id'))
                 && filled(config('services.google.client_secret'))
                 && filled(config('services.google.redirect')),
+            'googleClientId' => (string) config('services.google.client_id'),
             'status' => session('status'),
             'error' => session('error'),
         ]);

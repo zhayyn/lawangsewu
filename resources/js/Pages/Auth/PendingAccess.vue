@@ -40,6 +40,9 @@ const error = page.props.error;
                     <template v-else-if="reason === 'pending'">
                         Menunggu Persetujuan Admin
                     </template>
+                    <template v-else-if="reason === 'not-allowed'">
+                        Akses Belum Terdaftar
+                    </template>
                     <template v-else-if="reason === 'error'">
                         Terjadi Kesalahan
                     </template>
@@ -55,7 +58,11 @@ const error = page.props.error;
                     </p>
 
                     <p v-else class="text-sm text-[var(--text-2)] leading-relaxed px-4">
-                        {{ flash?.message || (reason === 'unregistered' ? 'Akun Google Anda telah berhasil terdaftar. Silakan menghubungi admin untuk mengaktifkan akses Anda.' : 'Akun Anda sudah tercatat, namun masih menunggu persetujuan administrator.') }}
+                        {{ flash?.message || (reason === 'unregistered'
+                            ? 'Akun Google Anda telah berhasil terdaftar. Silakan menghubungi admin untuk mengaktifkan akses Anda.'
+                            : (reason === 'not-allowed'
+                                ? 'Email Anda belum ada di daftar akses. Silakan hubungi admin untuk mendaftarkan akun Anda.'
+                                : 'Akun Anda sudah tercatat, namun masih menunggu persetujuan administrator.')) }}
                     </p>
                 </div>
 

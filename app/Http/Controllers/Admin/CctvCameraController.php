@@ -1,0 +1,99 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\CctvCamera;
+use App\Support\LawangsewuPortal;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class CctvCameraController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        return Inertia::render('Admin/CctvManager', [
+            'appMeta' => LawangsewuPortal::appMeta(),
+            'navGroups' => LawangsewuPortal::navGroups(),
+            'cameras' => CctvCamera::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (CctvCamera $camera) => [
+                    'id' => $camera->id,
+                    'key' => $camera->key,
+                    'name' => $camera->name,
+                    'zone' => $camera->zone,
+                    'iframe_src' => $camera->iframe_src,
+                    'sort_order' => $camera->sort_order,
+                    'is_active' => $camera->is_active,
+                    'is_featured' => $camera->is_featured,
+                    'updated_at' => optional($camera->updated_at)?->setTimezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB',
+                ])
+                ->values(),
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $payload = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'zone' => ['nullable', 'string', 'max:255'],
+            'iframe_src' => ['required', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['nullable', 'boolean'],
+            'is_featured' => ['nullable', 'boolean'],
+        ]);
+
+        CctvCamera::query()->create([
+            'key' => $this->generateKey($payload['name']),
+            'name' => $payload['name'],
+            'zone' => $payload['zone'] ?? null,
+            'iframe_src' => $payload['iframe_src'],
+            'sort_order' => $payload['sort_order'] ?? 0,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'is_featured' => (bool) ($payload['is_featured'] ?? false),
+        ]);
+
+        return back()->with('status', 'Kamera CCTV baru berhasil ditambahkan.');
+    }
+
+    public function update(Request $request, CctvCamera $camera): RedirectResponse
+    {
+        $payload = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'zone' => ['nullable', 'string', 'max:255'],
+            'iframe_src' => ['required', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['required', 'boolean'],
+            'is_featured' => ['required', 'boolean'],
+        ]);
+
+        $camera->update($payload);
+
+        return back()->with('status', 'Konfigurasi CCTV berhasil diperbarui.');
+    }
+
+    private function generateKey(string $name): string
+    {
+        $base = Str::slug($name);
+
+        if ($base === '') {
+            $base = 'camera';
+        }
+
+        $key = $base;
+        $suffix = 2;
+
+        while (CctvCamera::query()->where('key', $key)->exists()) {
+            $key = sprintf('%s-%d', $base, $suffix);
+            $suffix++;
+        }
+
+        return $key;
+    }
+}

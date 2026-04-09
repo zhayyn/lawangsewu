@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\GoogleAccessAllowlist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -63,5 +64,30 @@ class UserAccessApprovalTest extends TestCase
         ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_superadmin_can_allowlist_non_gmail_google_account(): void
+    {
+        $superadmin = User::factory()->create([
+            'email' => Config::string('auth.super_admin_email'),
+            'is_active' => true,
+            'role' => 'admin',
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->actingAs($superadmin)->post(route('admin.users.allowlist.store'), [
+            'email' => 'operator@pa-semarang.go.id',
+            'note' => 'Operator PTSP',
+            'auto_activate' => true,
+        ]);
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('google_access_allowlist', [
+            'email' => 'operator@pa-semarang.go.id',
+            'note' => 'Operator PTSP',
+            'auto_activate' => true,
+        ]);
+        $this->assertSame(1, GoogleAccessAllowlist::query()->count());
     }
 }

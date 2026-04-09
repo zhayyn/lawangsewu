@@ -13,10 +13,17 @@
 
         <!-- Scripts -->
         @routes
-        @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
         @inertiaHead
     </head>
     <body class="font-sans antialiased">
+        <script>
+            // Escape iframe: jika halaman Inertia (LawangsewuLayout) termuat di dalam iframe,
+            // paksa navigasi ke top window agar sidebar tidak nesting/dobel.
+            if (window.self !== window.top) {
+                window.top.location.replace(window.location.href);
+            }
+        </script>
         @inertia
     </body>
 </html>

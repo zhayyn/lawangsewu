@@ -5,16 +5,21 @@ namespace App\Support;
 use App\Models\ChatAlias;
 use App\Models\ChatMessage;
 use App\Models\CctvCamera;
+use App\Models\PtspQueueTicket;
+use App\Models\ServiceCounter;
+use App\Models\SidangQueueTicket;
+use App\Models\SippCache;
+use Illuminate\Support\Facades\Schema;
 
 class LawangsewuPortal
 {
     public static function appMeta(): array
     {
         return [
-            'name' => 'Lawangsewu V2',
+            'name'    => 'Lawangsewu V2',
             'tagline' => 'Ekosistem digital internal PA Semarang',
-            'sprint' => 'Sprint 1: Chatroom, CCTV, dan dashboard integrasi.',
-            'status' => 'Semua layanan inti berjalan normal.',
+            'sprint'  => 'Sprint 4: Pilar Antrian Phase 2 — unified queue authority, service catalog, dan migrasi antrian ke Vue/Inertia.',
+            'status'  => 'Semua layanan inti berjalan normal.',
         ];
     }
 
@@ -37,8 +42,10 @@ class LawangsewuPortal
                 'label' => 'Pelayanan',
                 'items' => [
                     ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'guestbook', 'href' => route('lawangsewu.guestbook.form'), 'badge' => 'Sprint 2'],
-                    ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => null, 'badge' => 'Soon'],
-                    ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => null, 'badge' => 'Soon'],
+                    ['label' => 'Pendopo', 'short' => 'PD', 'routeKey' => 'satellite.pendopo', 'href' => route('lawangsewu.satellite.pendopo'), 'badge' => 'Live'],
+                    ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Sprint 2'],
+                    ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Sprint 2'],
+                    ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Sprint 3'],
                 ],
             ],
             [
@@ -46,7 +53,7 @@ class LawangsewuPortal
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
                     ['label' => 'Chat Internal', 'short' => 'CH', 'routeKey' => 'chat', 'href' => route('lawangsewu.chat'), 'badge' => 'Live'],
-                    ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => null, 'badge' => 'Next'],
+                    ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Sprint 3'],
                 ],
             ],
             [
@@ -74,16 +81,35 @@ class LawangsewuPortal
             ['label' => 'Buka CCTV', 'href' => route('lawangsewu.cctv'), 'tone' => 'accent'],
             ['label' => 'Buka Chat', 'href' => route('lawangsewu.chat'), 'tone' => 'neutral'],
             ['label' => 'Buka Buku Tamu', 'href' => route('lawangsewu.guestbook.form'), 'tone' => 'neutral'],
+            ['label' => 'Buka Antrian PTSP', 'href' => route('lawangsewu.ptsp.index'), 'tone' => 'neutral'],
+            ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral'],
+            ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral'],
+            ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent'],
         ];
     }
 
     public static function metrics(): array
     {
+        $ptspWaiting = '-';
+        if (Schema::hasTable('ptsp_queue_tickets')) {
+            $ptspWaiting = (string) PtspQueueTicket::query()->today()->where('status', 'waiting')->count();
+        }
+
+        $sidangWaiting = '-';
+        if (Schema::hasTable('sidang_queue_tickets')) {
+            $sidangWaiting = (string) SidangQueueTicket::query()->today()->where('status', 'waiting')->count();
+        }
+
+        $sippCacheCount = '-';
+        if (Schema::hasTable('sipp_caches')) {
+            $sippCacheCount = (string) SippCache::query()->active()->count();
+        }
+
         return [
-            ['title' => 'Antrian PTSP', 'value' => '34', 'trend' => '-5 dari jam 09:30', 'detail' => '3 loket aktif, 1 loket cadangan', 'tone' => 'blue'],
-            ['title' => 'Sidang Hari Ini', 'value' => '12', 'trend' => '3 sedang berlangsung', 'detail' => 'Perdata 7, Pidana 5', 'tone' => 'violet'],
+            ['title' => 'Antrian PTSP', 'value' => $ptspWaiting, 'trend' => 'Data hari ini', 'detail' => 'Loket aktif dan antrean berjalan', 'tone' => 'blue'],
+            ['title' => 'Sidang Hari Ini', 'value' => $sidangWaiting, 'trend' => 'Data hari ini', 'detail' => 'Antrean persidangan aktif', 'tone' => 'violet'],
             ['title' => 'Buku Tamu', 'value' => '28', 'trend' => '8 tamu internal', 'detail' => 'Puncak kunjungan pukul 10:00', 'tone' => 'amber'],
-            ['title' => 'Sinkronisasi SIPP', 'value' => '98%', 'trend' => 'Terakhir 08:12 WIB', 'detail' => 'Widget cache siap dimuat', 'tone' => 'emerald'],
+            ['title' => 'SIPP Cache', 'value' => $sippCacheCount, 'trend' => 'Entri aktif', 'detail' => 'Widget cache siap dimuat', 'tone' => 'emerald'],
         ];
     }
 
@@ -91,12 +117,13 @@ class LawangsewuPortal
     {
         return [
             ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 2', 'href' => route('lawangsewu.guestbook.form')],
-            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Sprint 2', 'href' => null],
-            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Sprint 2', 'href' => null],
-            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Sprint 3', 'href' => null],
-            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Sprint 4', 'href' => null],
-            ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Sprint 4', 'href' => null],
-            ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Sprint 4', 'href' => null],
+            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.ptsp.index')],
+            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.sidang.index')],
+            ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.pilar.index')],
+            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Sprint 3', 'href' => route('lawangsewu.sipp.index')],
+            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Sprint 5', 'href' => null],
+            ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Sprint 5', 'href' => null],
+            ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Sprint 5', 'href' => null],
             ['title' => 'Pandanaran AI', 'description' => 'Asisten internal untuk tanya jawab cepat.', 'owner' => 'AI', 'badge' => 'Beta', 'href' => null],
         ];
     }
@@ -113,9 +140,15 @@ class LawangsewuPortal
 
     public static function alerts(): array
     {
+        $cacheStatus = 'Cache siap';
+        if (Schema::hasTable('sipp_caches')) {
+            $active = SippCache::query()->active()->count();
+            $cacheStatus = $active > 0 ? 'Cache aktif ' . $active . ' entri' : 'Cache kosong - refresh untuk sinkronisasi';
+        }
+
         return [
             ['title' => 'CCTV Lobby stabil', 'detail' => 'Stream utama latency 1.2 detik.', 'tone' => 'emerald'],
-            ['title' => 'Sync SIPP tertunda ringan', 'detail' => 'Cache statistik akan diperbarui 15 menit lagi.', 'tone' => 'amber'],
+            ['title' => 'Sync SIPP aktif', 'detail' => $cacheStatus, 'tone' => 'emerald'],
             ['title' => 'Interkom aktif', 'detail' => '4 alias online di kanal operasional.', 'tone' => 'blue'],
         ];
     }
@@ -134,6 +167,7 @@ class LawangsewuPortal
                 ['label' => 'SSO', 'value' => 'Siap integrasi', 'tone' => 'emerald'],
                 ['label' => 'Reverb', 'value' => 'Ready untuk real-time', 'tone' => 'blue'],
                 ['label' => 'CCTV', 'value' => sprintf('%d stream aktif', CctvCamera::query()->active()->count()), 'tone' => 'emerald'],
+                ['label' => 'SIPP Cache', 'value' => Schema::hasTable('sipp_caches') ? sprintf('%d cache aktif', SippCache::query()->active()->count()) : 'Inisialisasi', 'tone' => 'emerald'],
             ],
             'cameras' => self::cameras(limit: 4, featuredOnly: true),
             'messages' => self::messages(limit: 4),
@@ -172,6 +206,102 @@ class LawangsewuPortal
             ],
         ];
     }
+
+    public static function pilarPayload(): array
+    {
+        $ptspToday = Schema::hasTable('ptsp_queue_tickets')
+            ? PtspQueueTicket::query()->today()->count()
+            : 0;
+
+        $sidangToday = Schema::hasTable('sidang_queue_tickets')
+            ? SidangQueueTicket::query()->today()->count()
+            : 0;
+
+        $ptspWaiting = Schema::hasTable('ptsp_queue_tickets')
+            ? PtspQueueTicket::query()->today()->where('status', 'waiting')->count()
+            : 0;
+
+        $sidangWaiting = Schema::hasTable('sidang_queue_tickets')
+            ? SidangQueueTicket::query()->today()->where('status', 'waiting')->count()
+            : 0;
+
+        // Catalog loket PTSP dari DB (Phase 2)
+        $ptspCounters = Schema::hasTable('service_counters')
+            ? ServiceCounter::query()
+                ->whereHas('service', fn ($q) => $q->where('code', 'ptsp_frontdesk'))
+                ->orderBy('sort_order')
+                ->get(['code', 'name', 'call_label', 'display_label', 'location_type', 'is_active'])
+                ->map(fn ($c) => [
+                    'code'         => $c->code,
+                    'name'         => $c->name,
+                    'callLabel'    => $c->call_label,
+                    'displayLabel' => $c->display_label,
+                    'locationType' => $c->location_type,
+                    'isActive'     => (bool) $c->is_active,
+                ])
+                ->all()
+            : [];
+
+        // Catalog ruang sidang dari DB (Phase 2)
+        $sidangCounters = Schema::hasTable('service_counters')
+            ? ServiceCounter::query()
+                ->whereHas('service', fn ($q) => $q->where('code', 'sidang'))
+                ->orderBy('sort_order')
+                ->get(['code', 'name', 'call_label', 'display_label', 'location_type', 'is_active'])
+                ->map(fn ($c) => [
+                    'code'         => $c->code,
+                    'name'         => $c->name,
+                    'callLabel'    => $c->call_label,
+                    'displayLabel' => $c->display_label,
+                    'locationType' => $c->location_type,
+                    'isActive'     => (bool) $c->is_active,
+                ])
+                ->all()
+            : [];
+
+        return [
+            'appMeta'   => self::appMeta(),
+            'navGroups' => self::navGroups(),
+            'overview'  => [
+                'title'       => 'Pilar Antrian PASMG sebagai hub antrean terpadu',
+                'description' => 'Modul ini menjadi pintu konsolidasi antrean PTSP dan sidang di dalam Lawangsewu, sesuai blueprint modular monolith untuk pelayanan satu komando.',
+                'status'      => 'Phase 2 aktif — service catalog dan unified queue authority berjalan.',
+            ],
+            'stats' => [
+                ['label' => 'Tiket PTSP hari ini',   'value' => (string) $ptspToday,     'detail' => 'Tercatat dari modul antrean PTSP Lawangsewu'],
+                ['label' => 'Tiket Sidang hari ini', 'value' => (string) $sidangToday,   'detail' => 'Tercatat dari modul antrean sidang Lawangsewu'],
+                ['label' => 'Menunggu PTSP',         'value' => (string) $ptspWaiting,   'detail' => 'Snapshot antrean aktif saat ini'],
+                ['label' => 'Menunggu Sidang',       'value' => (string) $sidangWaiting, 'detail' => 'Snapshot antrean aktif saat ini'],
+            ],
+            'pillars' => [
+                ['title' => 'Identity & Access',  'description' => 'Memakai SSO Lawangsewu, role, dan persetujuan akses yang sudah aktif.'],
+                ['title' => 'Queue Core',         'description' => 'Menjadi otoritas tunggal status antrean untuk PTSP dan sidang — queue_tickets sebagai sumber kebenaran.'],
+                ['title' => 'PTSP Services',      'description' => (count($ptspCounters) > 0 ? count($ptspCounters) . ' loket terdaftar di katalog resmi.' : 'Menaungi katalog layanan loket.') . ' Nomor antre A-xxx.'],
+                ['title' => 'Hearing Services',   'description' => (count($sidangCounters) > 0 ? count($sidangCounters) . ' ruang terdaftar di katalog resmi.' : 'Mengelola antrean ruang sidang.') . ' Nomor antre S-xxx.'],
+                ['title' => 'Display & Calling',  'description' => 'Menjadi rumah untuk TV publik, audio panggilan, dan printer tiket. (Phase 3)'],
+                ['title' => 'Integration Layer',  'description' => 'Menjembatani sinkronisasi ke SIPP dan legacy transition tanpa query liar dari frontend. (Phase 4)'],
+            ],
+            'ptspCounters'   => $ptspCounters,
+            'sidangCounters' => $sidangCounters,
+            'legacySources'  => [
+                ['name' => 'Legacy PTSP',                   'path' => '/var/www/pilarpasmg/ptsp',                                       'summary' => 'Sumber modul loket, pencetakan, kamera, dan display publik.'],
+                ['name' => 'Legacy Antrian Sidang',         'path' => '/var/www/pilarpasmg/antrianpasmg',                              'summary' => 'Sumber login, flow sidang, dan tampilan antrean warisan.'],
+                ['name' => 'Blueprint Pilar Antrian PASMG', 'path' => '/var/www/pilarpasmg/docs/pilarpasmg-architecture-blueprint.md', 'summary' => 'Dokumen arsitektur target modular monolith antrean.'],
+            ],
+            'launchers' => [
+                ['label' => 'Buka Antrian PTSP',   'href' => route('lawangsewu.ptsp.index'),   'caption' => 'Gunakan modul aktif yang sudah berjalan di Lawangsewu'],
+                ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'caption' => 'Gunakan modul aktif yang sudah berjalan di Lawangsewu'],
+                ['label' => 'Buka SIPP Hub',       'href' => route('lawangsewu.sipp.index'),   'caption' => 'Lapis integrasi data menuju sinkronisasi antrean dan jadwal'],
+            ],
+            'phases' => [
+                ['step' => 'Phase 1 ✓', 'title' => 'Masuk sebagai hub modul',    'description' => 'Pilar Antrian PASMG tampil di Lawangsewu sebagai modul resmi dan launcher untuk fondasi antrean yang sudah ada.'],
+                ['step' => 'Phase 2 ✓', 'title' => 'Samakan domain data',        'description' => 'Service catalog (loket & ruang sidang) terdaftar di DB. Queue authority aktif menyinkronkan semua tiket ke queue_tickets.'],
+                ['step' => 'Phase 3',   'title' => 'Migrasi display dan calling', 'description' => 'Pindahkan TV antrean, audio panggil, kiosk, dan printer payload dari legacy ke modul inti.'],
+                ['step' => 'Phase 4',   'title' => 'Integrasi SIPP terkendali',  'description' => 'Semua akses jadwal sidang dan referensi perkara masuk lewat adapter resmi, bukan query langsung dari UI.'],
+            ],
+        ];
+    }
+
 
     public static function cameras(?int $limit = null, bool $featuredOnly = false): array
     {

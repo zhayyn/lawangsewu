@@ -7,7 +7,9 @@ use App\Models\ChatMessage;
 use App\Models\User;
 use App\Support\LawangsewuPortal;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Throwable;
 
 class ChatController extends Controller
 {
@@ -41,12 +43,22 @@ class ChatController extends Controller
 
         $message = ChatMessage::create([
             'user_id' => $request->user()->id,
-            'content' => $request->content,
+            'content' => trim((string) $request->content),
             'type' => 'global',
         ]);
 
-        ChatMessageSent::dispatch($message->load('user'));
+        $message->load('user');
 
-        return back();
+        try {
+            ChatMessageSent::dispatch($message);
+        } catch (Throwable $exception) {
+            Log::warning('Chat message broadcast failed; falling back to polling sync.', [
+                'message_id' => $message->id,
+                'user_id' => $request->user()->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return back()->with('status', 'message-sent');
     }
 }

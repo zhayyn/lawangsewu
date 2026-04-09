@@ -26,4 +26,7 @@ class GuestbookEntry extends Model
         'purpose',
         'checkin',
     ];
+    protected $casts = [
+        'checkin' => 'datetime',
+    ];
 }

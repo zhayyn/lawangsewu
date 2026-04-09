@@ -5,7 +5,8 @@ import ModuleShortcutCard from '@/Components/lawangsewu/ModuleShortcutCard.vue';
 import SectionHeader from '@/Components/lawangsewu/SectionHeader.vue';
 import StatCard from '@/Components/lawangsewu/StatCard.vue';
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
     appMeta: { type: Object, required: true },
@@ -21,6 +22,9 @@ const props = defineProps({
     channels: { type: Array, default: () => [] },
 });
 
+const page = usePage();
+const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
+
 </script>
 
 <template>
@@ -31,7 +35,85 @@ const props = defineProps({
         :nav-groups="navGroups"
         :app-meta="appMeta"
     >
-        <div class="space-y-6">
+        <div v-if="isViewer" class="space-y-6">
+            <section class="card-surface overflow-hidden p-6 lg:p-8">
+                <div class="max-w-3xl space-y-4">
+                    <div class="inline-flex items-center gap-2 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-1)]">
+                        Viewer workspace
+                    </div>
+
+                    <div class="space-y-3">
+                        <h1 class="max-w-3xl text-3xl font-semibold tracking-tight text-[var(--text-1)] sm:text-4xl">
+                            Akses ringkas untuk pemantauan CCTV dan chat internal.
+                        </h1>
+                        <p class="max-w-2xl text-sm leading-7 text-[var(--text-2)] md:text-base">
+                            Tampilan viewer disederhanakan supaya fokus pada dua kebutuhan utama: melihat monitoring kamera dan membuka komunikasi internal.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid gap-5 lg:grid-cols-2">
+                <Link
+                    :href="route('lawangsewu.cctv')"
+                    class="group relative overflow-hidden rounded-[2rem] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_28%),linear-gradient(145deg,rgba(8,47,73,0.92),rgba(8,15,26,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-cyan-400/40"
+                >
+                    <div class="space-y-4">
+                        <div class="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">
+                            Monitoring
+                        </div>
+                        <h2 class="text-2xl font-black tracking-tight">Monitoring CCTV</h2>
+                        <p class="max-w-md text-sm leading-7 text-slate-200/85">
+                            Buka wall monitoring untuk memantau seluruh kamera aktif dengan tampilan responsif dan fokus layar penuh.
+                        </p>
+                        <span class="inline-flex items-center gap-2 text-sm font-bold text-cyan-200">
+                            Buka monitoring
+                            <span aria-hidden="true">→</span>
+                        </span>
+                    </div>
+                </Link>
+
+                <Link
+                    :href="route('lawangsewu.chat')"
+                    class="group relative overflow-hidden rounded-[2rem] border border-blue-500/20 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_26%),linear-gradient(145deg,rgba(15,23,42,0.94),rgba(10,15,28,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-blue-400/40"
+                >
+                    <div class="space-y-4">
+                        <div class="inline-flex rounded-full border border-blue-300/20 bg-blue-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
+                            Komunikasi
+                        </div>
+                        <h2 class="text-2xl font-black tracking-tight">Chat Internal</h2>
+                        <p class="max-w-md text-sm leading-7 text-slate-200/85">
+                            Masuk ke kanal komunikasi internal untuk koordinasi cepat dengan operator dan unit kerja terkait.
+                        </p>
+                        <span class="inline-flex items-center gap-2 text-sm font-bold text-blue-200">
+                            Buka chat
+                            <span aria-hidden="true">→</span>
+                        </span>
+                    </div>
+                </Link>
+
+                <Link
+                    :href="route('lawangsewu.satellite.pendopo')"
+                    class="group relative overflow-hidden rounded-[2rem] border border-amber-500/20 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.16),transparent_28%),linear-gradient(145deg,rgba(69,26,3,0.92),rgba(24,24,27,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-amber-400/40 lg:col-span-2"
+                >
+                    <div class="space-y-4">
+                        <div class="inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+                            Pendopo
+                        </div>
+                        <h2 class="text-2xl font-black tracking-tight">Pusat Entri Data & Operasional Pengunjung</h2>
+                        <p class="max-w-2xl text-sm leading-7 text-slate-200/85">
+                            Buka pusat entri data dan operasional pengunjung di Pengadilan Agama Semarang melalui modul Pendopo yang disiapkan khusus untuk alur viewer.
+                        </p>
+                        <span class="inline-flex items-center gap-2 text-sm font-bold text-amber-200">
+                            Buka Pendopo
+                            <span aria-hidden="true">→</span>
+                        </span>
+                    </div>
+                </Link>
+            </section>
+        </div>
+
+        <div v-else class="space-y-6">
             <section class="card-surface overflow-hidden p-6 lg:p-8">
                 <div class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr),360px]">
                     <div class="space-y-5">

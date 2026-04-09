@@ -1,4 +1,3 @@
-import '../css/app.css';
 import './bootstrap';
 
 import { createInertiaApp } from '@inertiajs/vue3';
@@ -13,7 +12,7 @@ createInertiaApp({
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/${name}.vue`,
-            import.meta.glob('./Pages/**/*.vue'),
+            import.meta.glob('./Pages/**/*.vue', { eager: true }),
         ),
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })

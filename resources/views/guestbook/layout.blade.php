@@ -197,6 +197,8 @@
     @stack('styles')
 </head>
 <body>
+@php $isEmbedded = request()->boolean('embedded'); @endphp
+@if(!$isEmbedded)
 <header class="site-header" role="banner">
     <div class="site-header-inner">
         <div class="site-header-badge">
@@ -205,14 +207,15 @@
         </div>
 
         <div class="site-header-right">
-            <a class="site-pill" href="{{ route('lawangsewu.dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a class="site-pill" href="{{ route('lawangsewu.guestbook.form') }}"><i class="bi bi-book-half"></i> Form Tamu</a>
-            <a class="site-pill" href="{{ route('lawangsewu.guestbook.list', ['period' => 'all']) }}"><i class="bi bi-clock-history"></i> Riwayat</a>
+            <a class="site-pill" href="{{ route('lawangsewu.dashboard') }}" target="_top"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a class="site-pill" href="{{ route('lawangsewu.guestbook.form') }}" target="_top"><i class="bi bi-book-half"></i> Form Tamu</a>
+            <a class="site-pill" href="{{ route('lawangsewu.guestbook.list', ['period' => 'all']) }}" target="_top"><i class="bi bi-clock-history"></i> Riwayat</a>
         </div>
     </div>
 </header>
+@endif
 
-<div class="page-layer">
+<div class="page-layer" @if($isEmbedded) style="padding-top:0" @endif>
     @yield('content')
 
     <footer class="site-footer-signature">

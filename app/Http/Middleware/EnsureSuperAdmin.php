@@ -14,8 +14,18 @@ class EnsureSuperAdmin
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        if (! $user) {
+            abort(403, 'Akses khusus superadmin.');
+        }
 
-        if (! $user || ! $user->isSuperAdmin()) {
+        // Check new is_superadmin flag first
+        if ($user->is_superadmin) {
+            return $next($request);
+        }
+
+        // Fallback to email check for backward compatibility
+        $superAdminEmail = strtolower((string) config('auth.super_admin_email', 'dbprakom@gmail.com'));
+        if (strtolower((string) $user->email) !== $superAdminEmail) {
             abort(403, 'Akses khusus superadmin.');
         }
 

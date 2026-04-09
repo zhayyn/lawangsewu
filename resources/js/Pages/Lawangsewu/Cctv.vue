@@ -16,6 +16,7 @@ const IDLE_TIMEOUT = 10 * 60 * 1000;
 const expandedCameraIndex = ref(null);
 const selectedZone = ref('all');
 const isIdle = ref(false);
+const isFullscreen = ref(false);
 const lastActivity = ref(Date.now());
 const gridContainer = ref(null);
 
@@ -45,7 +46,11 @@ const filteredCameras = computed(() => {
     return props.cameras.filter((camera) => camera.zone === selectedZone.value);
 });
 
-const visibleCameras = computed(() => filteredCameras.value.slice(0, 16));
+const visibleCameras = computed(() => (
+    isFullscreen.value
+        ? filteredCameras.value
+        : filteredCameras.value.slice(0, 16)
+));
 
 const selectedCamera = computed(() => {
     if (expandedCameraIndex.value === null) {
@@ -89,6 +94,10 @@ function toggleFullscreenApp() {
     document.exitFullscreen?.();
 }
 
+function syncFullscreenState() {
+    isFullscreen.value = document.fullscreenElement === gridContainer.value;
+}
+
 function expandCamera(index) {
     expandedCameraIndex.value = expandedCameraIndex.value === index ? null : index;
     resetIdleTimer();
@@ -128,6 +137,7 @@ onMounted(() => {
     window.addEventListener('mousedown', resetIdleTimer);
     window.addEventListener('touchstart', resetIdleTimer, { passive: true });
     window.addEventListener('keydown', handleKeydown);
+    document.addEventListener('fullscreenchange', syncFullscreenState);
 });
 
 onUnmounted(() => {
@@ -138,6 +148,7 @@ onUnmounted(() => {
     window.removeEventListener('mousedown', resetIdleTimer);
     window.removeEventListener('touchstart', resetIdleTimer);
     window.removeEventListener('keydown', handleKeydown);
+    document.removeEventListener('fullscreenchange', syncFullscreenState);
 });
 
 watch(selectedZone, (value) => {
@@ -155,11 +166,17 @@ watch(selectedZone, (value) => {
     >
         <div
             ref="gridContainer"
-            class="relative min-h-[calc(100vh-120px)] space-y-5 overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0f18] p-4 sm:p-5 xl:p-6"
+            :class="[
+                'relative min-h-[calc(100vh-120px)] rounded-[2rem] border border-white/10 bg-[#0a0f18] p-4 sm:p-5 xl:p-6',
+                isFullscreen ? 'flex h-screen flex-col overflow-y-auto space-y-0' : 'space-y-5 overflow-visible',
+            ]"
         >
             <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.22),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(20,184,166,0.15),transparent_22%)]" />
 
-            <div class="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div
+                v-if="!isFullscreen"
+                class="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between"
+            >
                 <div class="space-y-3">
                     <div class="flex items-center gap-3">
                         <div class="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300">
@@ -230,7 +247,10 @@ watch(selectedZone, (value) => {
                 </div>
             </div>
 
-            <div class="relative flex flex-wrap items-center gap-2">
+            <div
+                v-if="!isFullscreen"
+                class="relative flex flex-wrap items-center gap-2"
+            >
                 <button
                     v-for="zone in zoneCatalog"
                     :key="zone.key"
@@ -251,7 +271,25 @@ watch(selectedZone, (value) => {
                 </span>
             </div>
 
-            <div class="relative flex-1">
+            <div :class="['relative', isFullscreen ? 'flex-1 min-h-0' : 'flex-1']">
+                <div
+                    v-if="isFullscreen"
+                    class="absolute right-0 top-0 z-20 flex items-center gap-2"
+                >
+                    <span
+                        class="rounded-full border border-cyan-400/20 bg-black/55 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-200 backdrop-blur-md"
+                    >
+                        {{ filteredCameras.length }} kamera
+                    </span>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/55 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur-md transition hover:border-cyan-400/40 hover:bg-white/10"
+                        @click="toggleFullscreenApp"
+                    >
+                        Keluar Fullscreen
+                    </button>
+                </div>
+
                 <Transition name="fade">
                     <div
                         v-if="isIdle"
@@ -280,20 +318,30 @@ watch(selectedZone, (value) => {
 
                 <div
                     v-if="visibleCameras.length > 0 && !isIdle"
-                    class="grid auto-rows-[220px] grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+                    :class="[
+                        'grid',
+                        isFullscreen
+                            ? 'grid-cols-1 gap-3 pt-16 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                            : 'grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4',
+                    ]"
                 >
                     <button
                         v-for="(camera, index) in visibleCameras"
                         :key="camera.key"
                         type="button"
                         data-testid="camera-tile"
-                        class="group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-black text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-400/35 hover:shadow-[0_20px_60px_rgba(34,211,238,0.08)]"
+                        :class="[
+                            'group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-black text-left transition duration-300 hover:-translate-y-0.5 hover:border-cyan-400/35 hover:shadow-[0_20px_60px_rgba(34,211,238,0.08)]',
+                            isFullscreen
+                                ? 'fullscreen-camera-tile'
+                                : 'aspect-[16/10] min-h-[220px] sm:aspect-video xl:min-h-[240px]',
+                        ]"
                         @click="expandCamera(index)"
                     >
                         <iframe
                             :src="camera.iframeSrc"
                             :title="camera.name"
-                            class="h-full w-full border-0 opacity-90 transition-opacity group-hover:opacity-100"
+                            class="absolute inset-0 h-full w-full border-0 opacity-90 transition-opacity group-hover:opacity-100"
                             loading="lazy"
                             allow="autoplay; fullscreen"
                             referrerpolicy="strict-origin-when-cross-origin"
@@ -353,7 +401,7 @@ watch(selectedZone, (value) => {
                 <div
                     v-if="selectedCamera"
                     data-testid="expanded-camera"
-                    class="absolute inset-3 z-40 overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-black shadow-[0_24px_120px_rgba(0,0,0,0.65)] sm:inset-6"
+                    class="fixed inset-x-3 bottom-20 top-[5.5rem] z-40 overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-black shadow-[0_24px_120px_rgba(0,0,0,0.65)] sm:inset-x-6 sm:bottom-24 sm:top-24 xl:left-[max(22rem,calc((100vw-1800px)/2+2rem))] xl:right-[max(2rem,calc((100vw-1800px)/2+2rem))] xl:bottom-8 xl:top-24"
                 >
                     <div class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-5">
                         <div class="rounded-[1.25rem] border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-xl">
@@ -417,5 +465,9 @@ watch(selectedZone, (value) => {
     opacity: 0;
     transform: scale(0.97);
 }
-</style>
 
+.fullscreen-camera-tile {
+    aspect-ratio: 16 / 9;
+    min-height: calc((100vh - 7.75rem) / 4);
+}
+</style>

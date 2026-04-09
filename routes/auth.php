@@ -39,6 +39,7 @@ Route::middleware('guest')->group(function () {
 
     // Google Socialite Routes
     Route::get('auth/google', [GoogleController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::post('auth/google/credential', [GoogleController::class, 'handleGoogleCredential'])->name('auth.google.credential');
     Route::match(['get', 'post'], 'auth/google/callback', [GoogleController::class, 'handleGoogleCallback']);
 });
 

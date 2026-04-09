@@ -22,4 +22,9 @@ class PortalController extends Controller
     {
         return Inertia::render('Lawangsewu/Chat', LawangsewuPortal::chatPayload());
     }
+
+    public function pilar(): Response
+    {
+        return Inertia::render('Lawangsewu/Pilar', LawangsewuPortal::pilarPayload());
+    }
 }

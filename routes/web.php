@@ -1,8 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\CctvCameraController;
+use App\Http\Controllers\Admin\PendopoAdminController;
 use App\Http\Controllers\Admin\UserAccessController;
 use App\Http\Controllers\GuestbookController;
+use App\Http\Controllers\PtspQueueController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\SidangQueueController;
+use App\Http\Controllers\SippHubController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WidgetCompatController;
 use Illuminate\Support\Facades\Auth;
@@ -98,19 +103,43 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,admin'])-
     Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('lawangsewu.chat');
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
 
-    Route::get('/buku-tamu', [GuestbookController::class, 'form'])->name('lawangsewu.guestbook.form');
-    Route::post('/buku-tamu', [GuestbookController::class, 'store'])->name('lawangsewu.guestbook.store');
-    Route::get('/buku-tamu/daftar/{period?}', [GuestbookController::class, 'listing'])->name('lawangsewu.guestbook.list');
-    Route::get('/buku-tamu/detail/{id}', [GuestbookController::class, 'detail'])->name('lawangsewu.guestbook.detail');
-    Route::get('/buku-tamu/cetak/{id}', [GuestbookController::class, 'printCard'])->name('lawangsewu.guestbook.cetak');
-    Route::match(['get', 'post'], '/buku-tamu/laporan', [GuestbookController::class, 'report'])->name('lawangsewu.guestbook.report');
-    
     // Satellite Integration
     Route::get('/satellite/pendopo', [\App\Http\Controllers\SatelliteController::class, 'pendopo'])->name('lawangsewu.satellite.pendopo');
 });
 
+Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,admin'])->group(function () {
+    Route::get('/buku-tamu', [GuestbookController::class, 'form'])->name('lawangsewu.guestbook.form');
+    Route::post('/buku-tamu', [GuestbookController::class, 'store'])->name('lawangsewu.guestbook.store');
+    Route::get('/buku-tamu/daftar/{period?}', [GuestbookController::class, 'listing'])->name('lawangsewu.guestbook.list');
+    Route::get('/antrian-ptsp', [PtspQueueController::class, 'index'])->name('lawangsewu.ptsp.index');
+    Route::get('/antrian-sidang-v2', [SidangQueueController::class, 'index'])->name('lawangsewu.sidang.index');
+    Route::get('/pilar-smg', [PortalController::class, 'pilar'])->name('lawangsewu.pilar.index');
+    Route::get('/sipp-hub', [SippHubController::class, 'index'])->name('lawangsewu.sipp.index');
+});
+
+Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(function () {
+    Route::get('/buku-tamu/detail/{id}', [GuestbookController::class, 'detail'])->name('lawangsewu.guestbook.detail');
+    Route::get('/buku-tamu/cetak/{id}', [GuestbookController::class, 'printCard'])->name('lawangsewu.guestbook.cetak');
+    Route::match(['get', 'post'], '/buku-tamu/laporan', [GuestbookController::class, 'report'])->name('lawangsewu.guestbook.report');
+});
+
+Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(function () {
+    Route::post('/antrian-ptsp', [PtspQueueController::class, 'store'])->name('lawangsewu.ptsp.store');
+    Route::post('/antrian-ptsp/{ticket}/call', [PtspQueueController::class, 'call'])->name('lawangsewu.ptsp.call');
+    Route::post('/antrian-ptsp/{ticket}/serve', [PtspQueueController::class, 'serve'])->name('lawangsewu.ptsp.serve');
+    Route::post('/antrian-ptsp/{ticket}/skip', [PtspQueueController::class, 'skip'])->name('lawangsewu.ptsp.skip');
+
+    Route::post('/antrian-sidang-v2', [SidangQueueController::class, 'store'])->name('lawangsewu.sidang.store');
+    Route::post('/antrian-sidang-v2/{ticket}/call', [SidangQueueController::class, 'call'])->name('lawangsewu.sidang.call');
+    Route::post('/antrian-sidang-v2/{ticket}/complete', [SidangQueueController::class, 'complete'])->name('lawangsewu.sidang.complete');
+    Route::post('/antrian-sidang-v2/{ticket}/postpone', [SidangQueueController::class, 'postpone'])->name('lawangsewu.sidang.postpone');
+
+    Route::post('/sipp-hub/refresh', [SippHubController::class, 'refreshCache'])->name('lawangsewu.sipp.refresh');
+});
+
 Route::middleware(['auth', 'active', 'role:viewer,operator,admin'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.save');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
@@ -119,6 +148,16 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
     Route::post('/users', [UserAccessController::class, 'store'])->name('users.store');
     Route::patch('/users/{user}', [UserAccessController::class, 'update'])->name('users.update');
+    Route::post('/users/allowlist', [UserAccessController::class, 'storeAllowlist'])->name('users.allowlist.store');
+    Route::patch('/users/allowlist/{entry}', [UserAccessController::class, 'updateAllowlist'])->name('users.allowlist.update');
+    Route::delete('/users/allowlist/{entry}', [UserAccessController::class, 'destroyAllowlist'])->name('users.allowlist.destroy');
+    Route::get('/pendopo', [PendopoAdminController::class, 'index'])->name('pendopo.index');
+    Route::patch('/pendopo/settings', [PendopoAdminController::class, 'updateSettings'])->name('pendopo.settings.update');
+    Route::post('/pendopo/sync-legacy', [PendopoAdminController::class, 'syncLegacy'])->name('pendopo.sync');
+    Route::delete('/pendopo/entries/{entry}', [PendopoAdminController::class, 'destroyEntry'])->name('pendopo.entries.destroy');
+    Route::get('/cctv', [CctvCameraController::class, 'index'])->name('cctv.index');
+    Route::post('/cctv', [CctvCameraController::class, 'store'])->name('cctv.store');
+    Route::patch('/cctv/{camera}', [CctvCameraController::class, 'update'])->name('cctv.update');
 });
 
 require __DIR__.'/auth.php';

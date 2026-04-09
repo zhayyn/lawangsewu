@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GuestbookEntry;
+use App\Models\GuestbookSetting;
 use App\Support\LawangsewuPortal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ class GuestbookController extends Controller
 {
     public function form()
     {
+        $settings = $this->settings();
+
         $instansiRows = GuestbookEntry::query()
             ->select('institution')
             ->whereNotNull('institution')
@@ -83,6 +86,7 @@ class GuestbookController extends Controller
             'navGroups' => LawangsewuPortal::navGroups(),
             'idTamu' => $jakartaNow->format('YmdHis') . random_int(100, 999),
             'instansiOptionsByCategory' => $instansiOptionsByCategory,
+            'settings' => $settings,
         ]);
     }
 
@@ -160,6 +164,7 @@ class GuestbookController extends Controller
 
     public function listing(string $period = 'all')
     {
+        $settings = $this->settings();
         $allowedPeriods = ['all', 'day', 'month', 'year'];
         if (! in_array($period, $allowedPeriods, true)) {
             $period = 'all';
@@ -183,11 +188,12 @@ class GuestbookController extends Controller
             $query->whereBetween('checkin', [$now->copy()->startOfYear(), $now->copy()->endOfYear()]);
         }
 
-        $perPage = 10;
+        $perPage = max(5, min(100, (int) ($settings->per_page ?? 10)));
         $entries = $query->paginate($perPage)->withQueryString();
 
         $statsAll = GuestbookEntry::query()->count();
         $statsDay = GuestbookEntry::query()->whereBetween('checkin', [$now->copy()->startOfDay(), $now->copy()->endOfDay()])->count();
+        $statsWeek = GuestbookEntry::query()->whereBetween('checkin', [$now->copy()->startOfWeek(Carbon::MONDAY), $now->copy()->endOfWeek(Carbon::SUNDAY)])->count();
         $statsMonth = GuestbookEntry::query()->whereBetween('checkin', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()])->count();
         $statsYear = GuestbookEntry::query()->whereBetween('checkin', [$now->copy()->startOfYear(), $now->copy()->endOfYear()])->count();
 
@@ -195,9 +201,11 @@ class GuestbookController extends Controller
             'entries' => $entries,
             'period' => $period,
             'periodTitle' => $titleByPeriod[$period],
+            'settings' => $settings,
             'stats' => [
                 'all' => $statsAll,
                 'day' => $statsDay,
+                'week' => $statsWeek,
                 'month' => $statsMonth,
                 'year' => $statsYear,
             ],
@@ -418,5 +426,17 @@ class GuestbookController extends Controller
         }
 
         return 9;
+    }
+
+    private function settings(): GuestbookSetting
+    {
+        return GuestbookSetting::query()->firstOrCreate(
+            ['id' => '1'],
+            [
+                'per_page' => 10,
+                'require_identity_fields' => true,
+                'event_name' => 'Pendopo Pengadilan Agama Semarang',
+            ]
+        );
     }
 }

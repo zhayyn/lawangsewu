@@ -139,6 +139,12 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::get('/buku-tamu/detail/{id}', [GuestbookController::class, 'detail'])->name('lawangsewu.guestbook.detail');
     Route::get('/buku-tamu/cetak/{id}', [GuestbookController::class, 'printCard'])->name('lawangsewu.guestbook.cetak');
     Route::match(['get', 'post'], '/buku-tamu/laporan', [GuestbookController::class, 'report'])->name('lawangsewu.guestbook.report');
+    
+    // Guestbook Management (Kelola Pendopo)
+    Route::get('/buku-tamu/kelola', [GuestbookController::class, 'manage'])->name('lawangsewu.guestbook.manage');
+    Route::delete('/buku-tamu/kelola/{id}', [GuestbookController::class, 'destroy'])->name('lawangsewu.guestbook.destroy');
+    Route::post('/buku-tamu/kelola/bulk-delete', [GuestbookController::class, 'bulkDestroy'])->name('lawangsewu.guestbook.bulk-delete');
+    Route::post('/buku-tamu/kelola/settings', [GuestbookController::class, 'saveSettings'])->name('lawangsewu.guestbook.settings');
 
     // WA Caraka Dashboard & Operator Tools
     Route::get('/wa-caraka', [WaCarakaController::class, 'index'])->name('lawangsewu.wacaraka.index');
@@ -186,6 +192,8 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function 
     Route::get('/tailscale', [TailscaleDashboardController::class, 'index'])->name('lawangsewu.tailscale.index');
     Route::get('/tailscale/network-status', [TailscaleDashboardController::class, 'networkStatus'])->name('lawangsewu.tailscale.network-status');
     Route::get('/tailscale/device/{deviceKey}', [TailscaleDashboardController::class, 'deviceDetail'])->name('lawangsewu.tailscale.device');
+    Route::get('/tailscale/ping-all', [TailscaleDashboardController::class, 'pingAll'])->name('lawangsewu.tailscale.ping-all');
+    Route::get('/tailscale/cli-info', [TailscaleDashboardController::class, 'tailscaleCliInfo'])->name('lawangsewu.tailscale.cli-info');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')->name('admin.')->group(function () {

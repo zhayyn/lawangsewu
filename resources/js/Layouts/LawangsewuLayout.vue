@@ -32,13 +32,13 @@ const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
 const isOperator = computed(() => page.props.auth?.user?.role === 'operator');
-const viewerRouteKeys = ['dashboard', 'cctv', 'chat', 'satellite.pendopo'];
+const viewerRouteKeys = ['dashboard', 'cctv', 'chat', 'guestbook'];
 const operatorRouteKeys = ['ptsp', 'wacaraka', 'chat'];
-const safeRoute = (name) => {
+const safeRoute = (name, fallback = '#') => {
     try {
         return route(name);
     } catch {
-        return '#';
+        return fallback;
     }
 };
 
@@ -77,28 +77,35 @@ const displayNavGroups = computed(() => {
                     label: 'Monitor Sistem',
                     short: 'MS',
                     routeKey: 'admin-system-monitor',
-                    href: safeRoute('admin.system-monitor.index'),
+                    href: safeRoute('admin.system-monitor.index', '/admin/system-monitor'),
                     badge: 'Admin',
                 },
                 {
-                    label: 'Kelola Pendopo',
-                    short: 'PD',
-                    routeKey: 'admin-pendopo',
-                    href: safeRoute('admin.pendopo.index'),
+                    label: 'Laporan',
+                    short: 'LR',
+                    routeKey: 'admin-laporan',
+                    href: safeRoute('admin.laporan.index', '/admin/laporan'),
                     badge: 'Admin',
+                },
+                {
+                    label: 'Tailscale Network',
+                    short: 'TS',
+                    routeKey: 'tailscale',
+                    href: safeRoute('lawangsewu.tailscale.index', '/tailscale'),
+                    badge: 'Superadmin',
                 },
                 {
                     label: 'Kelola CCTV',
                     short: 'CC',
                     routeKey: 'admin-cctv',
-                    href: safeRoute('admin.cctv.index'),
+                    href: safeRoute('admin.cctv.index', '/admin/cctv'),
                     badge: 'Admin',
                 },
                 {
                     label: 'Kelola User',
                     short: 'US',
                     routeKey: 'admin-users',
-                    href: safeRoute('admin.users.index'),
+                    href: safeRoute('admin.users.index', '/admin/users'),
                     badge: 'Admin',
                 },
             ],

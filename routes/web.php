@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CctvCameraController;
-use App\Http\Controllers\Admin\PendopoAdminController;
+use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\SystemMonitorController;
 use App\Http\Controllers\Admin\UserAccessController;
 use App\Http\Controllers\Admin\WaCarakaAdminController;
@@ -12,6 +12,7 @@ use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SidangQueueController;
 use App\Http\Controllers\SippHubController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TailscaleDashboardController;
 use App\Http\Controllers\WidgetCompatController;
 use App\Http\Controllers\WaCarakaController;
 use Illuminate\Support\Facades\Auth;
@@ -111,9 +112,17 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
     Route::get('/chat/media/{message}', [\App\Http\Controllers\ChatController::class, 'media'])->name('lawangsewu.chat.media');
 
-    // Satellite Integration
-    Route::get('/satellite/pendopo', [\App\Http\Controllers\SatelliteController::class, 'pendopo'])->name('lawangsewu.satellite.pendopo');
-    Route::get('/satellite/pendopo/metric', [\App\Http\Controllers\SatelliteController::class, 'metric'])->name('lawangsewu.satellite.pendopo.metric');
+    // Backward-compatibility redirect: Pendopo is consolidated into Buku Tamu.
+    Route::get('/satellite/pendopo', function () {
+        return redirect()->route('lawangsewu.guestbook.form', ['embedded' => 1]);
+    })->name('lawangsewu.satellite.pendopo');
+
+    Route::get('/satellite/pendopo/metric', function () {
+        return response()->json([
+            'status' => 'deprecated',
+            'message' => 'Pendopo module has been consolidated into Buku Tamu.',
+        ], 410);
+    })->name('lawangsewu.satellite.pendopo.metric');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin,admin'])->group(function () {
@@ -173,6 +182,12 @@ Route::middleware(['auth', 'verified', 'active', 'role:admin,useradmin'])->prefi
     });
 });
 
+Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function () {
+    Route::get('/tailscale', [TailscaleDashboardController::class, 'index'])->name('lawangsewu.tailscale.index');
+    Route::get('/tailscale/network-status', [TailscaleDashboardController::class, 'networkStatus'])->name('lawangsewu.tailscale.network-status');
+    Route::get('/tailscale/device/{deviceKey}', [TailscaleDashboardController::class, 'deviceDetail'])->name('lawangsewu.tailscale.device');
+});
+
 Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')->name('admin.')->group(function () {
     Route::patch('/permissions/role', [UserAccessController::class, 'updateRoleFeaturePermission'])->name('permissions.role.update');
     Route::patch('/permissions/user', [UserAccessController::class, 'updateUserFeaturePermission'])->name('permissions.user.update');
@@ -182,11 +197,9 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
         Route::get('/system-monitor', [SystemMonitorController::class, 'index'])->name('system-monitor.index');
     });
 
-    Route::middleware('permission:admin.pendopo')->group(function () {
-        Route::get('/pendopo', [PendopoAdminController::class, 'index'])->name('pendopo.index');
-        Route::patch('/pendopo/settings', [PendopoAdminController::class, 'updateSettings'])->name('pendopo.settings.update');
-        Route::post('/pendopo/sync-legacy', [PendopoAdminController::class, 'syncLegacy'])->name('pendopo.sync');
-        Route::delete('/pendopo/entries/{entry}', [PendopoAdminController::class, 'destroyEntry'])->name('pendopo.entries.destroy');
+    Route::middleware('permission:admin.laporan')->group(function () {
+        Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
+        Route::post('/laporan/generate', [LaporanController::class, 'generate'])->name('laporan.generate');
     });
 
     Route::middleware('permission:admin.cctv')->group(function () {

@@ -42,6 +42,8 @@ const iconType = computed(() => ({
     'admin-system-monitor': 'server',
     'admin-cctv': 'camera',
     'admin-users': 'users',
+    'admin-laporan': 'laporan',
+    'tailscale': 'network',
 }[props.routeKey] || 'dashboard'));
 
 const gradientClass = computed(() => ({
@@ -61,6 +63,8 @@ const gradientClass = computed(() => ({
     sparkles: 'from-fuchsia-400 via-violet-400 to-sky-400',
     palette: 'from-rose-400 via-fuchsia-400 to-violet-500',
     sliders: 'from-blue-400 via-cyan-400 to-teal-400',
+    network: 'from-teal-400 via-cyan-500 to-sky-500',
+    laporan: 'from-violet-500 via-purple-400 to-fuchsia-500',
 }[iconType.value] || 'from-sky-500 via-cyan-400 to-blue-600'));
 
 const tintClass = computed(() => ({
@@ -80,6 +84,8 @@ const tintClass = computed(() => ({
     sparkles: 'text-fuchsia-600',
     palette: 'text-pink-600',
     sliders: 'text-blue-600',
+    network: 'text-teal-600',
+    laporan: 'text-violet-600',
 }[iconType.value] || 'text-sky-600'));
 
 const wrapperClasses = computed(() => {
@@ -384,6 +390,42 @@ const iconClasses = computed(() => {
             <circle cx="7.5" cy="10" r="0.9" fill="currentColor" stroke="none" />
             <circle cx="10.5" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
             <circle cx="14.5" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+        </svg>
+
+        <svg
+            v-else-if="iconType === 'network'"
+            :class="iconClasses"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.55"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="5" cy="19" r="2" />
+            <circle cx="19" cy="19" r="2" />
+            <path d="M12 7v4" />
+            <path d="M12 11l-5.5 6" />
+            <path d="M12 11l5.5 6" />
+        </svg>
+
+        <svg
+            v-else-if="iconType === 'laporan'"
+            :class="iconClasses"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.55"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <!-- Document with bar chart inside -->
+            <path d="M8 3.5h6l4 4V20a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2z" />
+            <path d="M14 3.5V8h4" />
+            <path d="M9 17v-3" />
+            <path d="M12 17v-5" />
+            <path d="M15 17v-2" />
         </svg>
 
         <svg

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\FeaturePermission;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -12,15 +13,17 @@ class Permission
         $user = $request->user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return $request->expectsJson()
+                ? response()->json(['error' => 'Unauthorized'], 401)
+                : redirect()->route('login');
         }
 
-        $hasPermission = method_exists($user, 'hasPermission')
-            ? $user->hasPermission($permission)
-            : false;
+        $hasPermission = FeaturePermission::hasAccess($user, $permission);
 
         if (!$hasPermission) {
-            return response()->json(['error' => 'Forbidden'], 403);
+            return $request->expectsJson()
+                ? response()->json(['error' => 'Forbidden'], 403)
+                : abort(403, 'Anda tidak memiliki akses ke fitur ini.');
         }
 
         return $next($request);

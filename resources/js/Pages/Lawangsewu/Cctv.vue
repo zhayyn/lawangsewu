@@ -12,6 +12,8 @@ const props = defineProps({
 
 const STORAGE_KEY = 'lawangsewu-cctv-zone';
 const IDLE_TIMEOUT = 10 * 60 * 1000;
+// Setelah 8 detik tanpa iframe load event, tampilkan fallback "tidak tersedia"
+const IFRAME_LOAD_TIMEOUT_MS = 8_000;
 
 const expandedCameraIndex = ref(null);
 const selectedZone = ref('all');
@@ -19,8 +21,14 @@ const isIdle = ref(false);
 const isFullscreen = ref(false);
 const lastActivity = ref(Date.now());
 const gridContainer = ref(null);
+const isCameraHeaderExpanded = ref(true);
+
+// Track iframe load state per kunci kamera: null=loading, true=loaded, false=failed
+const iframeState = ref({});
 
 let idleTimer = null;
+let cameraHeaderTimer = null;
+const iframeTimers = {};
 
 const zoneCatalog = computed(() => {
     const counts = props.cameras.reduce((summary, camera) => {
@@ -81,6 +89,18 @@ function resetIdleTimer() {
     }, IDLE_TIMEOUT);
 }
 
+function resetCameraHeaderTimer() {
+    isCameraHeaderExpanded.value = true;
+
+    if (cameraHeaderTimer) {
+        clearTimeout(cameraHeaderTimer);
+    }
+
+    cameraHeaderTimer = window.setTimeout(() => {
+        isCameraHeaderExpanded.value = false;
+    }, 3000);
+}
+
 function toggleFullscreenApp() {
     if (!gridContainer.value) {
         return;
@@ -111,10 +131,12 @@ function selectZone(zoneKey) {
     selectedZone.value = zoneKey;
     expandedCameraIndex.value = null;
     resetIdleTimer();
+    resetCameraHeaderTimer();
 }
 
 function resumeStreams() {
     resetIdleTimer();
+    resetCameraHeaderTimer();
 }
 
 function handleKeydown(event) {
@@ -126,6 +148,38 @@ function handleKeydown(event) {
     resetIdleTimer();
 }
 
+// ──────────────────────────────────────────────
+// Iframe load state helpers
+// ──────────────────────────────────────────────
+
+function startIframeTimer(key) {
+    iframeState.value[key] = null; // loading
+    if (iframeTimers[key]) clearTimeout(iframeTimers[key]);
+    iframeTimers[key] = setTimeout(() => {
+        // Jika setelah timeout belum ada event load, tandai sebagai gagal
+        if (iframeState.value[key] === null) {
+            iframeState.value[key] = false;
+        }
+    }, IFRAME_LOAD_TIMEOUT_MS);
+}
+
+function onIframeLoad(key) {
+    if (iframeTimers[key]) clearTimeout(iframeTimers[key]);
+    iframeState.value[key] = true;
+}
+
+function onIframeError(key) {
+    if (iframeTimers[key]) clearTimeout(iframeTimers[key]);
+    iframeState.value[key] = false;
+}
+
+function retryIframe(key) {
+    iframeState.value[key] = null;
+    startIframeTimer(key);
+    // Force re-render dengan set ulang ke null dan trigger di nextTick
+    // Vue akan meng-unmount dan mount ulang iframe via key change trick di template
+}
+
 onMounted(() => {
     const storedZone = window.localStorage.getItem(STORAGE_KEY);
 
@@ -133,7 +187,11 @@ onMounted(() => {
         selectedZone.value = storedZone;
     }
 
+    // Mulai timer untuk setiap kamera yang tampil
+    visibleCameras.value.forEach((camera) => startIframeTimer(camera.key));
+
     resetIdleTimer();
+    resetCameraHeaderTimer();
     window.addEventListener('mousedown', resetIdleTimer);
     window.addEventListener('touchstart', resetIdleTimer, { passive: true });
     window.addEventListener('keydown', handleKeydown);
@@ -145,6 +203,12 @@ onUnmounted(() => {
         clearTimeout(idleTimer);
     }
 
+    if (cameraHeaderTimer) {
+        clearTimeout(cameraHeaderTimer);
+    }
+
+    Object.values(iframeTimers).forEach((t) => clearTimeout(t));
+
     window.removeEventListener('mousedown', resetIdleTimer);
     window.removeEventListener('touchstart', resetIdleTimer);
     window.removeEventListener('keydown', handleKeydown);
@@ -153,6 +217,8 @@ onUnmounted(() => {
 
 watch(selectedZone, (value) => {
     window.localStorage.setItem(STORAGE_KEY, value);
+    // Reset dan mulai timer untuk kamera yang tampil setelah ganti zona
+    visibleCameras.value.forEach((camera) => startIframeTimer(camera.key));
 });
 </script>
 
@@ -345,22 +411,64 @@ watch(selectedZone, (value) => {
                             loading="lazy"
                             allow="autoplay; fullscreen"
                             referrerpolicy="strict-origin-when-cross-origin"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                            @load="onIframeLoad(camera.key)"
+                            @error="onIframeError(camera.key)"
                         />
+
+                        <!-- Overlay: loading saat belum ada event -->
+                        <div
+                            v-if="iframeState[camera.key] === null"
+                            class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60"
+                        >
+                            <svg class="h-6 w-6 animate-spin text-cyan-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" />
+                            </svg>
+                        </div>
+
+                        <!-- Overlay: gagal memuat (timeout atau error) -->
+                        <div
+                            v-else-if="iframeState[camera.key] === false"
+                            class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 text-center"
+                        >
+                            <svg class="h-8 w-8 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18.364 5.636a9 9 0 11-12.728 12.728A9 9 0 0118.364 5.636z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4m0 4h.01" />
+                            </svg>
+                            <p class="text-[11px] font-black uppercase tracking-[0.15em] text-rose-300">Stream tidak tersedia</p>
+                            <button
+                                type="button"
+                                class="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-white transition hover:bg-white/20"
+                                @click.stop="retryIframe(camera.key)"
+                            >
+                                Coba lagi
+                            </button>
+                        </div>
 
                         <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
 
                         <div class="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
-                            <div class="min-w-0 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 backdrop-blur-md">
-                                <p class="truncate text-[11px] font-black uppercase tracking-[0.16em] text-white">
+                            <div
+                                class="min-w-0 rounded-xl border border-white/10 bg-black/45 px-2.5 py-1.5 backdrop-blur-md transition-all duration-300 group-hover:bg-black/60"
+                                :class="isCameraHeaderExpanded ? 'max-w-[72%]' : 'max-w-[55%]'"
+                            >
+                                <p
+                                    class="truncate font-black uppercase tracking-[0.13em] text-white transition-all duration-300"
+                                    :class="isCameraHeaderExpanded ? 'text-[10px]' : 'text-[9px]'"
+                                >
                                     {{ camera.name }}
                                 </p>
-                                <p class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                                <p
+                                    class="mt-0.5 truncate font-bold uppercase tracking-[0.13em] text-slate-300 transition-all duration-300"
+                                    :class="isCameraHeaderExpanded ? 'text-[9px] opacity-90' : 'text-[8px] opacity-60'"
+                                >
                                     {{ camera.zone }} · {{ camera.updatedAt }}
                                 </p>
                             </div>
 
                             <span
-                                class="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]"
+                                class="rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em]"
                                 :class="camera.status === 'LIVE' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'"
                             >
                                 {{ camera.status }}

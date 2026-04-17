@@ -17,7 +17,6 @@ defineProps({
 const user = usePage().props.auth.user;
 
 const form = useForm({
-    name: user.name,
     alias: user.alias,
     email: user.email,
 });
@@ -31,7 +30,7 @@ const form = useForm({
             </h2>
 
             <p class="mt-1 text-sm text-[var(--text-2)]">
-                Perbarui nama resmi atau alias Anda untuk komunikasi internal.
+                Anda dapat mengubah alias dan email. Nama resmi hanya dapat diubah oleh Superadmin.
             </p>
         </header>
 
@@ -39,20 +38,16 @@ const form = useForm({
             @submit.prevent="form.post(route('profile.save'))"
             class="mt-6 space-y-6"
         >
+            <!-- Nama Resmi: read-only -->
             <div>
                 <InputLabel for="name" value="Nama Lengkap Resmi" />
-
-                <TextInput
-                    id="name"
-                    type="text"
-                    class="mt-1 block w-full !bg-[var(--surface-1)] !border-[var(--border)]"
-                    v-model="form.name"
-                    required
-                    autofocus
-                    autocomplete="name"
-                />
-
-                <InputError class="mt-2" :message="form.errors.name" />
+                <div class="mt-1 flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 opacity-70 cursor-not-allowed">
+                    <svg class="h-4 w-4 shrink-0 text-[var(--text-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span class="text-sm font-semibold text-[var(--text-2)]">{{ user.name }}</span>
+                    <span class="ml-auto text-[9px] font-black uppercase tracking-widest text-[var(--text-3)]">Hanya Superadmin</span>
+                </div>
             </div>
 
             <div>

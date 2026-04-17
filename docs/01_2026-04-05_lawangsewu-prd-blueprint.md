@@ -5,7 +5,7 @@
 
 > **Filosofi & Analogi Besar:**
 > "Lawangsewu" (Seribu Pintu) melambangkan sebuah ekosistem besar dengan banyak pintu layanan (aplikasi) yang dikelola terpusat.
-> - **Lawangsewu Core (Laravel 11)** = Gedung utama, sistem keamanan pusat, lorong utama, dan ruang server utama (SSO).
+> - **Lawangsewu Core (Laravel 13)** = Gedung utama, sistem keamanan pusat, lorong utama, dan ruang server utama (SSO).
 > - **Pintu 1: Antrian PTSP & Antrian Sidang** = Ruang khusus pelayanan antrian publik.
 > - **Pintu 2: Buku Tamu** = Ruang khusus registrasi tamu & kehadiran.
 > - **Pintu 3: SIPP Hub** = Jalur khusus sinkronisasi data SIPP MA, berisi widget tabel dan statistik.
@@ -16,15 +16,15 @@
 
 ## 📌 1. Executive Summary
 
-Demi alasan penghematan anggaran (tidak bayar sewa Google Cloud/Firebase), kecepatan pengembangan, dan **Kedaulatan Data**, seluruh arsitektur yang tadinya terpencar kini disatukan secara kuat di dalam ranah **Laravel 11 Termutakhir**.
+Demi alasan penghematan anggaran (tidak bayar sewa Google Cloud/Firebase), kecepatan pengembangan, dan **Kedaulatan Data**, seluruh arsitektur yang tadinya terpencar kini disatukan secara kuat di dalam ranah **Laravel 13 Termutakhir** (telah di-upgrade dari versi 11).
 
 | Item | Detail |
 |:---|:---|
 | **Keluarga/Nama Ekosistem** | **Lawangsewu ekosistem digital internal** |
-| **Aplikasi Platform Utama** | **Lawangsewu Core** (dibangun dengan Laravel 11) |
+| **Aplikasi Platform Utama** | **Lawangsewu Core** (dibangun dengan Laravel 13) |
 | **Fungsi Platform Utama** | Pusat SSO, Manajemen User Global, Chatroom antar user, Modul CCTV, Dashboard Integrasi |
 | **Aplikasi Terintegrasi (Satelit)** | Pintu-pintu: **Buku Tamu, Antrian PTSP, Antrian Sidang, SIPP Hub, Jatidiri (Kepegawaian), PTIP, Umum/Keuangan, Pandanaran AI**, dll |
-| **Teknologi Core** | Laravel 11, PHP 8.3, Laravel Passport (OAuth2 SSO), Laravel Socialite (Login via Google), Laravel Reverb (WebSockets real-time untuk Chat), Vue 3 (Inertia.js) |
+| **Teknologi Core** | Laravel 13, PHP 8.3, Laravel Passport (OAuth2 SSO), Laravel Socialite (Login via Google), Laravel Reverb (WebSockets real-time untuk Chat), Vue 3 (Inertia.js) |
 | **Database** | MariaDB |
 
 ---
@@ -37,7 +37,7 @@ Demi alasan penghematan anggaran (tidak bayar sewa Google Cloud/Firebase), kecep
 │                                                                              │
 │                   ┌──────────────────────────────────┐                       │
 │                   │         LAWANGSEWU CORE          │                       │
-│                   │   (Laravel 11 + Vue 3 Inertia)   │                       │
+│                   │   (Laravel 13 + Vue 3 Inertia)   │                       │
 │                   │                                  │                       │
 │                   │  ┌───────┐ ┌────────┐ ┌───────┐  │                       │
 │                   │  │🔑 SSO │ │💬 Chat │ │🎥 CCTV│  │                       │

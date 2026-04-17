@@ -9,17 +9,24 @@ use App\Models\PtspQueueTicket;
 use App\Models\ServiceCounter;
 use App\Models\SidangQueueTicket;
 use App\Models\SippCache;
+use App\Models\WaCarakaLog;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
 class LawangsewuPortal
 {
+    protected static function routeOrNull(string $name): ?string
+    {
+        return Route::has($name) ? route($name) : null;
+    }
+
     public static function appMeta(): array
     {
         return [
             'name'    => 'Lawangsewu V2',
             'tagline' => 'Ekosistem digital internal PA Semarang',
-            'sprint'  => 'Sprint 4: Pilar Antrian Phase 2 — unified queue authority, service catalog, dan migrasi antrian ke Vue/Inertia.',
-            'status'  => 'Semua layanan inti berjalan normal.',
+            'sprint'  => 'Sprint 1-4 selesai: dashboard operasional, RBAC, WA Caraka, dan Pilar Antrian PASMG siap digunakan.',
+            'status'  => 'Semua sprint utama selesai dan layanan inti siap pakai.',
         ];
     }
 
@@ -34,26 +41,30 @@ class LawangsewuPortal
                         'short' => 'DB',
                         'routeKey' => 'dashboard',
                         'href' => route('lawangsewu.dashboard'),
-                        'badge' => 'Live',
+                        'badge' => 'Ready',
                     ],
                 ],
             ],
             [
                 'label' => 'Pelayanan',
                 'items' => [
-                    ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'guestbook', 'href' => route('lawangsewu.guestbook.form'), 'badge' => 'Sprint 2'],
-                    ['label' => 'Pendopo', 'short' => 'PD', 'routeKey' => 'satellite.pendopo', 'href' => route('lawangsewu.satellite.pendopo'), 'badge' => 'Live'],
-                    ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Sprint 2'],
-                    ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Sprint 2'],
-                    ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Sprint 3'],
+                    ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'guestbook', 'href' => route('lawangsewu.guestbook.form'), 'badge' => 'Ready'],
+                    ['label' => 'Pendopo', 'short' => 'PD', 'routeKey' => 'satellite.pendopo', 'href' => route('lawangsewu.satellite.pendopo'), 'badge' => 'Ready'],
+                    ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Ready'],
+                    ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Ready'],
+                    ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Ready'],
                 ],
             ],
             [
                 'label' => 'SIPP Hub & Data',
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
-                    ['label' => 'Chat Internal', 'short' => 'CH', 'routeKey' => 'chat', 'href' => route('lawangsewu.chat'), 'badge' => 'Live'],
-                    ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Sprint 3'],
+                    ['label' => 'Chat Internal', 'short' => 'CH', 'routeKey' => 'chat', 'href' => route('lawangsewu.chat'), 'badge' => 'Ready'],
+                    ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Ready'],
+                    ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
+                    ...(auth()->user()?->isSuperAdmin()
+                        ? [['label' => 'WA Caraka Admin', 'short' => 'WA⚙', 'routeKey' => 'wacaraka.admin', 'href' => self::routeOrNull('admin.wacaraka.index'), 'badge' => 'Admin']]
+                        : []),
                 ],
             ],
             [
@@ -85,6 +96,7 @@ class LawangsewuPortal
             ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral'],
             ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral'],
             ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent'],
+            ['label' => 'WA Live PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent'],
         ];
     }
 
@@ -116,14 +128,15 @@ class LawangsewuPortal
     public static function modules(): array
     {
         return [
-            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 2', 'href' => route('lawangsewu.guestbook.form')],
-            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.ptsp.index')],
-            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.sidang.index')],
-            ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Sprint 4', 'href' => route('lawangsewu.pilar.index')],
-            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Sprint 3', 'href' => route('lawangsewu.sipp.index')],
-            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Sprint 5', 'href' => null],
-            ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Sprint 5', 'href' => null],
-            ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Sprint 5', 'href' => null],
+            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.guestbook.form')],
+            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => route('lawangsewu.ptsp.index')],
+            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Ready', 'href' => route('lawangsewu.sidang.index')],
+            ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.pilar.index')],
+            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Ready', 'href' => route('lawangsewu.sipp.index')],
+            ['title' => 'WA Live PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index')],
+            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Ready', 'href' => null],
+            ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Ready', 'href' => null],
+            ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Pandanaran AI', 'description' => 'Asisten internal untuk tanya jawab cepat.', 'owner' => 'AI', 'badge' => 'Beta', 'href' => null],
         ];
     }
@@ -155,6 +168,8 @@ class LawangsewuPortal
 
     public static function dashboardPayload(): array
     {
+        $waCount = Schema::hasTable('wa_caraka_logs') ? WaCarakaLog::whereDate('created_at', today())->count() : 0;
+
         return [
             'appMeta' => self::appMeta(),
             'navGroups' => self::navGroups(),
@@ -164,10 +179,11 @@ class LawangsewuPortal
             'modules' => self::modules(),
             'alerts' => self::alerts(),
             'systemHealth' => [
-                ['label' => 'SSO', 'value' => 'Siap integrasi', 'tone' => 'emerald'],
-                ['label' => 'Reverb', 'value' => 'Ready untuk real-time', 'tone' => 'blue'],
+                ['label' => 'SSO', 'value' => 'Aktif — Google OAuth', 'tone' => 'emerald'],
+                ['label' => 'Reverb', 'value' => env('VITE_REVERB_ENABLED', 'false') === 'true' ? 'Real-time aktif' : 'Fallback polling', 'tone' => env('VITE_REVERB_ENABLED', 'false') === 'true' ? 'emerald' : 'amber'],
                 ['label' => 'CCTV', 'value' => sprintf('%d stream aktif', CctvCamera::query()->active()->count()), 'tone' => 'emerald'],
                 ['label' => 'SIPP Cache', 'value' => Schema::hasTable('sipp_caches') ? sprintf('%d cache aktif', SippCache::query()->active()->count()) : 'Inisialisasi', 'tone' => 'emerald'],
+                ['label' => 'WA Caraka', 'value' => $waCount > 0 ? $waCount . ' pesan hari ini' : 'Siap terhubung', 'tone' => 'emerald'],
             ],
             'cameras' => self::cameras(limit: 4, featuredOnly: true),
             'messages' => self::messages(limit: 4),
@@ -302,6 +318,26 @@ class LawangsewuPortal
         ];
     }
 
+    // ──────────────────────────────────────────────
+    // WA Caraka Module Payload
+    // ──────────────────────────────────────────────
+
+    public static function waCarakaPayload(): array
+    {
+        $stats = Schema::hasTable('wa_caraka_logs') ? [
+            'total'    => WaCarakaLog::count(),
+            'sent'     => WaCarakaLog::where('status', 'sent')->count(),
+            'failed'   => WaCarakaLog::where('status', 'failed')->count(),
+            'today'    => WaCarakaLog::whereDate('created_at', today())->count(),
+            'lastSent' => optional(WaCarakaLog::latest()->first())?->created_at?->diffForHumans() ?? 'Belum ada',
+        ] : ['total' => 0, 'sent' => 0, 'failed' => 0, 'today' => 0, 'lastSent' => 'Belum ada'];
+
+        return [
+            'appMeta'   => self::appMeta(),
+            'navGroups' => self::navGroups(),
+            'stats'     => $stats,
+        ];
+    }
 
     public static function cameras(?int $limit = null, bool $featuredOnly = false): array
     {
@@ -395,6 +431,7 @@ class LawangsewuPortal
             'senderName' => $senderName,
             'alias' => $senderAlias,
             'body' => $message->content,
+            'attachment' => ChatAttachment::present($message->metadata['attachment'] ?? null, $message),
             'avatar' => $message->user?->avatar,
             'sentAt' => optional($message->created_at)->setTimezone('Asia/Jakarta')->format('H:i').' WIB',
             'isOwn' => request()->user()?->id === $message->user_id,

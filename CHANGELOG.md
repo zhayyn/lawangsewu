@@ -1,5 +1,27 @@
 # Release Notes
 
+## [Lawangsewu v2026.04.17-permissions-audit]
+
+### Added
+- Feature permission model and matrix with role-level defaults and user-level overrides (`feature_permissions`).
+- Permission enforcement middleware integration for admin modules (`admin.users`, `admin.users.allowlist`, `admin.pendopo`, `admin.cctv`, `admin.wacaraka`, `admin.system-monitor`).
+- Permission audit trail via `permission_audit_logs` with actor, target, action, before/after state, scope, feature key, and request metadata.
+- Admin Users dashboard section for live permission matrix (role toggles), per-user override controls (allow/deny/reset), and audit timeline.
+
+### Changed
+- Useradmin authorization flow now formally validated against feature permission rules.
+- Superadmin access bypass is centralized in feature permission checks.
+- Admin access tests expanded to include permission gating, role/user override management, and audit-log assertions.
+
+### Database
+- New migration: `2026_04_17_105124_create_feature_permissions_table`.
+- New migration: `2026_04_17_230000_create_permission_audit_logs_table`.
+
+### Validation
+- Test suites passing:
+	- `tests/Feature/Admin/UserAccessApprovalTest.php`
+	- `tests/Feature/Admin/FeaturePermissionUiAndAuditTest.php`
+
 ## [Unreleased](https://github.com/laravel/laravel/compare/v11.6.0...11.x)
 
 ## [v11.6.0](https://github.com/laravel/laravel/compare/v11.5.1...v11.6.0) - 2025-01-21

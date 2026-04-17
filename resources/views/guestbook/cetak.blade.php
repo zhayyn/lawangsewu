@@ -19,6 +19,12 @@
         @php
             $fotoUrl = asset('guestbook/tanpafoto.jpg');
             foreach (['jpg', 'jpeg', 'png'] as $ext) {
+                $storageRelative = 'guestbook/photos/' . $entry->id . '.' . $ext;
+                if (\Illuminate\Support\Facades\Storage::disk('public')->exists($storageRelative)) {
+                    $fotoUrl = asset('storage/' . $storageRelative);
+                    break;
+                }
+
                 $candidate = public_path('guestbook/photos/' . $entry->id . '.' . $ext);
                 if (is_file($candidate)) {
                     $fotoUrl = asset('guestbook/photos/' . $entry->id . '.' . $ext);

@@ -1,5 +1,4 @@
 <script setup>
-import CameraTile from '@/Components/lawangsewu/CameraTile.vue';
 import ChatBubble from '@/Components/lawangsewu/ChatBubble.vue';
 import ModuleShortcutCard from '@/Components/lawangsewu/ModuleShortcutCard.vue';
 import SectionHeader from '@/Components/lawangsewu/SectionHeader.vue';
@@ -24,6 +23,11 @@ const props = defineProps({
 
 const page = usePage();
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
+const isOperator = computed(() => page.props.auth?.user?.role === 'operator');
+const waCarakaHref = computed(() => props.modules.find((module) => module.title === 'WA Caraka')?.href || null);
+const ptspQueueValue = computed(() => props.metrics.find((metric) => metric.title === 'Antrian PTSP')?.value ?? '-');
+const chatChannelCount = computed(() => props.channels.find((channel) => channel.key === 'interkom-umum')?.count ?? 0);
+const waStatus = computed(() => props.systemHealth.find((item) => item.label === 'WA Caraka')?.value ?? 'Siap terhubung');
 
 </script>
 
@@ -114,6 +118,84 @@ const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
         </div>
 
         <div v-else class="space-y-6">
+            <template v-if="isOperator">
+                <section class="card-surface overflow-hidden p-6 lg:p-8">
+                    <div class="space-y-5">
+                        <div class="inline-flex items-center gap-2 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-1)]">
+                            Operator workspace
+                        </div>
+
+                        <div class="space-y-2">
+                            <h1 class="text-2xl font-semibold tracking-tight text-[var(--text-1)] sm:text-3xl">
+                                Fokus kerja operator: PTSP, WA Caraka, dan Chat Internal.
+                            </h1>
+                            <p class="max-w-3xl text-sm leading-7 text-[var(--text-2)] md:text-base">
+                                Dashboard operator disederhanakan agar akses cepat ke modul inti tanpa distraksi menu atau widget yang tidak relevan.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="card-muted p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-2)]">Antrian PTSP</p>
+                                <p class="mt-2 text-2xl font-black text-[var(--text-1)]">{{ ptspQueueValue }}</p>
+                            </div>
+                            <div class="card-muted p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-2)]">Interkom Umum</p>
+                                <p class="mt-2 text-2xl font-black text-[var(--text-1)]">{{ chatChannelCount }}</p>
+                            </div>
+                            <div class="card-muted p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-2)]">WA Caraka</p>
+                                <p class="mt-2 text-sm font-semibold text-[var(--text-1)]">{{ waStatus }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid gap-5 lg:grid-cols-3">
+                    <Link
+                        :href="route('lawangsewu.ptsp.index')"
+                        class="group relative overflow-hidden rounded-[1.7rem] border border-blue-500/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_28%),linear-gradient(145deg,rgba(12,74,110,0.92),rgba(15,23,42,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-cyan-400/40"
+                    >
+                        <div class="space-y-3">
+                            <div class="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Utama</div>
+                            <h2 class="text-2xl font-black tracking-tight">Antrian PTSP</h2>
+                            <p class="text-sm leading-7 text-slate-200/85">Kelola tiket, panggilan loket, dan alur antrean layanan PTSP harian.</p>
+                            <span class="inline-flex items-center gap-2 text-sm font-bold text-cyan-200">Buka PTSP <span aria-hidden="true">→</span></span>
+                        </div>
+                    </Link>
+
+                    <component
+                        :is="waCarakaHref ? Link : 'div'"
+                        :href="waCarakaHref || undefined"
+                        class="group relative overflow-hidden rounded-[1.7rem] border border-emerald-500/20 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.16),transparent_28%),linear-gradient(145deg,rgba(6,78,59,0.92),rgba(15,23,42,0.98))] p-6 text-white transition duration-300"
+                        :class="waCarakaHref ? 'hover:-translate-y-1 hover:border-emerald-400/40' : 'opacity-70 cursor-not-allowed'"
+                    >
+                        <div class="space-y-3">
+                            <div class="inline-flex rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-200">Komunikasi</div>
+                            <h2 class="text-2xl font-black tracking-tight">WA Caraka Inbox</h2>
+                            <p class="text-sm leading-7 text-slate-200/85">Pantau pesan masuk dan distribusikan respons operasional dari dashboard internal.</p>
+                            <span class="inline-flex items-center gap-2 text-sm font-bold text-emerald-200">
+                                {{ waCarakaHref ? 'Buka WA Caraka' : 'Belum tersedia' }}
+                                <span aria-hidden="true">→</span>
+                            </span>
+                        </div>
+                    </component>
+
+                    <Link
+                        :href="route('lawangsewu.chat')"
+                        class="group relative overflow-hidden rounded-[1.7rem] border border-indigo-500/20 bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.16),transparent_28%),linear-gradient(145deg,rgba(55,48,163,0.9),rgba(15,23,42,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-indigo-400/40"
+                    >
+                        <div class="space-y-3">
+                            <div class="inline-flex rounded-full border border-indigo-300/20 bg-indigo-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Realtime</div>
+                            <h2 class="text-2xl font-black tracking-tight">Chat Internal</h2>
+                            <p class="text-sm leading-7 text-slate-200/85">Koordinasi lintas unit secara cepat dengan kanal interkom internal.</p>
+                            <span class="inline-flex items-center gap-2 text-sm font-bold text-indigo-200">Buka Chat <span aria-hidden="true">→</span></span>
+                        </div>
+                    </Link>
+                </section>
+            </template>
+
+            <template v-else>
             <section class="card-surface overflow-hidden p-6 lg:p-8">
                 <div class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr),360px]">
                     <div class="space-y-5">
@@ -293,31 +375,13 @@ const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
                                 v-for="module in modules"
                                 :key="module.title"
                                 :module="module"
+                                :hide-badge="isOperator"
                             />
                         </div>
                     </section>
                 </div>
 
                 <div class="space-y-6">
-                    <section class="card-surface p-6">
-                        <SectionHeader
-                            eyebrow="Live preview"
-                            title="CCTV prioritas"
-                            description="Empat stream utama dipasang langsung untuk memastikan dashboard tetap terasa operasional."
-                            action-label="Full screen CCTV"
-                            :action-href="route('lawangsewu.cctv')"
-                        />
-
-                        <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                            <CameraTile
-                                v-for="camera in cameras"
-                                :key="camera.key"
-                                :camera="camera"
-                                preview-height="h-40"
-                            />
-                        </div>
-                    </section>
-
                     <section class="card-surface p-6">
                         <SectionHeader
                             eyebrow="Interkom"
@@ -353,12 +417,13 @@ const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
                     </section>
                 </div>
             </div>
+            </template>
         </div>
 
         <!-- Dashboard Footer -->
         <div class="mt-12 py-10 border-t border-[var(--border)] flex flex-col items-center gap-6">
             <div class="flex items-center gap-8 opacity-40">
-                <span class="text-[10px] font-black uppercase tracking-[0.3em]">Sprint v1.2</span>
+                <span class="text-[10px] font-black uppercase tracking-[0.3em]">Sprint Complete</span>
                 <div class="w-1.5 h-1.5 rounded-full bg-[var(--border-strong)]"></div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Internal System</span>
             </div>

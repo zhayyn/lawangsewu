@@ -16,3 +16,30 @@ use Illuminate\Support\Facades\Broadcast;
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
+
+Broadcast::channel('lawangsewu.wacaraka.inbox', function ($user) {
+    if (! $user) {
+        return false;
+    }
+
+    return $user->isSuperAdmin() || in_array($user->role, ['operator', 'admin'], true);
+});
+
+// Queue real-time update channels (PTSP dan Sidang)
+Broadcast::channel('lawangsewu.queue.ptsp', function ($user) {
+    if (! $user) {
+        return false;
+    }
+
+    return $user->is_active &&
+        (in_array($user->role, ['viewer', 'operator', 'admin'], true) || $user->isSuperAdmin());
+});
+
+Broadcast::channel('lawangsewu.queue.sidang', function ($user) {
+    if (! $user) {
+        return false;
+    }
+
+    return $user->is_active &&
+        (in_array($user->role, ['viewer', 'operator', 'admin'], true) || $user->isSuperAdmin());
+});

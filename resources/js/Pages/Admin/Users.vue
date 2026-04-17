@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     users: {
@@ -12,6 +13,18 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    featureCatalog: {
+        type: Array,
+        default: () => [],
+    },
+    roleFeaturePermissions: {
+        type: Object,
+        default: () => ({}),
+    },
+    userFeaturePermissions: {
+        type: Array,
+        default: () => [],
+    },
     allowlist: {
         type: Array,
         required: true,
@@ -20,13 +33,26 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    loginHistories: {
+        type: Array,
+        default: () => [],
+    },
+    permissionAuditLogs: {
+        type: Array,
+        default: () => [],
+    },
     status: {
         type: String,
         default: null,
     },
 });
 
+const page = usePage();
+const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
+const inlineError = ref('');
+
 const showCreateForm = ref(false);
+const selectedPermissionUserId = ref(null);
 const newUserForm = useForm({
     name: '',
     email: '',
@@ -53,6 +79,10 @@ const submitAllowlist = () => {
     allowlistForm.post(route('admin.users.allowlist.store'), {
         onSuccess: () => {
             allowlistForm.reset();
+            inlineError.value = '';
+        },
+        onError: () => {
+            inlineError.value = 'Gagal menyimpan allowlist. Pastikan akun Anda superadmin.';
         },
     });
 };
@@ -63,6 +93,9 @@ const toggleAllowlist = (entry) => {
     }, {
         preserveScroll: true,
         preserveState: true,
+        onError: () => {
+            inlineError.value = 'Gagal update allowlist. Hanya superadmin yang dapat mengubah allowlist.';
+        },
     });
 };
 
@@ -70,6 +103,9 @@ const removeAllowlist = (entryId) => {
     router.delete(route('admin.users.allowlist.destroy', entryId), {
         preserveScroll: true,
         preserveState: true,
+        onError: () => {
+            inlineError.value = 'Gagal menghapus allowlist. Hanya superadmin yang dapat menghapus allowlist.';
+        },
     });
 };
 
@@ -80,6 +116,8 @@ const syncFormState = (users) => {
         formState[user.id] = {
             role: user.role ?? 'viewer',
             is_active: Boolean(user.is_active),
+            name: user.name ?? '',
+            alias: user.alias ?? '',
         };
     });
 
@@ -108,6 +146,100 @@ const filteredUsers = computed(() => {
     return props.users.filter((user) => Boolean(user.google_id) && !Boolean(user.is_active));
 });
 
+const roleOrder = ['admin', 'useradmin', 'operator', 'viewer'];
+const manageablePermissionUsers = computed(() => props.users.filter((user) => user.role !== 'admin' && !user.is_superadmin));
+
+watch(
+    manageablePermissionUsers,
+    (users) => {
+        if (!users.length) {
+            selectedPermissionUserId.value = null;
+            return;
+        }
+
+        const existing = users.some((item) => item.id === selectedPermissionUserId.value);
+        if (!existing) {
+            selectedPermissionUserId.value = users[0].id;
+        }
+    },
+    { immediate: true },
+);
+
+const selectedPermissionUser = computed(() =>
+    manageablePermissionUsers.value.find((user) => user.id === selectedPermissionUserId.value) || null,
+);
+
+const userPermissionMap = computed(() => {
+    const map = {};
+
+    props.userFeaturePermissions.forEach((entry) => {
+        map[`${entry.user_id}:${entry.feature_key}`] = Boolean(entry.enabled);
+    });
+
+    return map;
+});
+
+const rolePermissionEnabled = (featureKey, role) =>
+    Boolean(props.roleFeaturePermissions?.[featureKey]?.[role]);
+
+const updateRolePermission = (role, featureKey, enabled) => {
+    inlineError.value = '';
+
+    router.patch(route('admin.permissions.role.update'), {
+        role,
+        feature_key: featureKey,
+        enabled,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal memperbarui permission role.';
+        },
+    });
+};
+
+const userOverrideValue = (userId, featureKey) => {
+    const key = `${userId}:${featureKey}`;
+    return Object.prototype.hasOwnProperty.call(userPermissionMap.value, key)
+        ? userPermissionMap.value[key]
+        : null;
+};
+
+const setUserOverride = (userId, featureKey, enabled) => {
+    inlineError.value = '';
+
+    router.patch(route('admin.permissions.user.update'), {
+        user_id: userId,
+        feature_key: featureKey,
+        enabled,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal memperbarui override permission user.';
+        },
+    });
+};
+
+const resetUserOverride = (userId, featureKey) => {
+    inlineError.value = '';
+
+    router.delete(route('admin.permissions.user.clear'), {
+        data: {
+            user_id: userId,
+            feature_key: featureKey,
+        },
+        preserveScroll: true,
+        preserveState: true,
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal mereset override ke default role.';
+        },
+    });
+};
+
 const isRecentlyPending = (user) => {
     if (!user?.created_at || Boolean(user.is_active)) {
         return false;
@@ -124,12 +256,53 @@ const isRecentlyPending = (user) => {
 };
 
 const saveUser = (userId) => {
-    const payload = formState[userId];
+    inlineError.value = '';
+
+    if (!formState[userId]) {
+        inlineError.value = 'Data pengguna tidak ditemukan di form.';
+        return;
+    }
+
+    const { role, is_active, name, alias } = formState[userId];
+    const payload = { role, is_active, name: name || null, alias: alias || null };
 
     router.patch(route('admin.users.update', userId), payload, {
         preserveScroll: true,
         preserveState: true,
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal memperbarui pengguna. Cek hak akses dan data yang dikirim.';
+        },
     });
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleString('id-ID', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+};
+
+const permissionActionLabel = (action) => ({
+    role_permission_update: 'Update Role',
+    user_permission_override_set: 'Set Override User',
+    user_permission_override_cleared: 'Reset Override User',
+}[action] || action || '-');
+
+const permissionStateLabel = (value) => {
+    if (value === null || value === undefined) return 'default';
+    return value ? 'allow' : 'deny';
+};
+
+const permissionStateClass = (value) => {
+    if (value === null || value === undefined) {
+        return 'bg-slate-500/10 text-slate-500 border border-[var(--border)]';
+    }
+
+    return value
+        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+        : 'bg-rose-500/10 text-rose-600 border border-rose-500/20';
 };
 </script>
 
@@ -161,6 +334,13 @@ const saveUser = (userId) => {
                 >
                     <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                     {{ status }}
+                </div>
+
+                <div
+                    v-if="inlineError"
+                    class="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-600"
+                >
+                    {{ inlineError }}
                 </div>
 
                 <!-- Form Registrasi Manual -->
@@ -199,7 +379,7 @@ const saveUser = (userId) => {
                 </div>
 
                 <!-- Allowlist Google -->
-                <div class="card-surface p-8 border-amber-500/30 bg-amber-500/[0.02]">
+                <div class="card-surface p-8 border-amber-500/30 bg-amber-500/[0.02]" v-if="isSuperAdmin">
                     <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
                         <div>
                             <h3 class="text-lg font-black uppercase tracking-[0.2em] text-amber-600">
@@ -286,6 +466,115 @@ const saveUser = (userId) => {
                     </div>
                 </div>
 
+                <div v-if="isSuperAdmin" class="card-surface p-8 border-violet-500/30 bg-violet-500/[0.03] space-y-6">
+                    <div>
+                        <h3 class="text-lg font-black uppercase tracking-[0.2em] text-violet-600">
+                            Permission Fitur (Role & User)
+                        </h3>
+                        <p class="mt-2 text-xs text-[var(--text-3)] font-semibold">
+                            Role menentukan default akses modul. Override user akan mengalahkan default role.
+                        </p>
+                    </div>
+
+                    <div class="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-1)]">
+                        <table class="min-w-full divide-y divide-[var(--border)] text-sm">
+                            <thead class="bg-[var(--surface-2)]">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Fitur</th>
+                                    <th
+                                        v-for="role in roleOrder"
+                                        :key="`head-${role}`"
+                                        class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]"
+                                    >
+                                        {{ role }}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--border)]">
+                                <tr v-for="feature in featureCatalog" :key="feature.key">
+                                    <td class="px-4 py-3 align-top">
+                                        <p class="font-bold text-[var(--text-1)]">{{ feature.name }}</p>
+                                        <p class="text-[11px] text-[var(--text-3)]">{{ feature.key }}</p>
+                                    </td>
+                                    <td v-for="role in roleOrder" :key="`${feature.key}-${role}`" class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-3 !text-[10px]"
+                                            :class="rolePermissionEnabled(feature.key, role) ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-slate-600 hover:!bg-slate-700'"
+                                            @click="updateRolePermission(role, feature.key, !rolePermissionEnabled(feature.key, role))"
+                                        >
+                                            {{ rolePermissionEnabled(feature.key, role) ? 'ON' : 'OFF' }}
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="featureCatalog.length === 0">
+                                    <td colspan="5" class="px-4 py-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
+                                        Tidak ada feature catalog terdeteksi
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] p-5">
+                        <div class="flex flex-wrap items-end gap-4">
+                            <div class="space-y-2 min-w-[17rem]">
+                                <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Pilih User Override</label>
+                                <select v-model="selectedPermissionUserId" class="input-surface w-full">
+                                    <option v-for="user in manageablePermissionUsers" :key="user.id" :value="user.id">
+                                        {{ user.name || user.email }} ({{ user.role }})
+                                    </option>
+                                </select>
+                            </div>
+                            <p v-if="selectedPermissionUser" class="text-xs text-[var(--text-3)] font-semibold">
+                                Override aktif untuk: <span class="font-black text-[var(--text-1)]">{{ selectedPermissionUser.email }}</span>
+                            </p>
+                        </div>
+
+                        <div v-if="selectedPermissionUser" class="mt-4 space-y-3">
+                            <div
+                                v-for="feature in featureCatalog"
+                                :key="`override-${feature.key}`"
+                                class="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
+                            >
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-bold text-[var(--text-1)]">{{ feature.name }}</p>
+                                        <p class="text-[11px] text-[var(--text-3)]">{{ feature.key }}</p>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-3)]">
+                                            Role default: {{ rolePermissionEnabled(feature.key, selectedPermissionUser.role) ? 'ON' : 'OFF' }}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-3 !text-[10px] !bg-emerald-600 hover:!bg-emerald-700"
+                                            @click="setUserOverride(selectedPermissionUser.id, feature.key, true)"
+                                        >Allow</button>
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-3 !text-[10px] !bg-rose-600 hover:!bg-rose-700"
+                                            @click="setUserOverride(selectedPermissionUser.id, feature.key, false)"
+                                        >Deny</button>
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-3 !text-[10px] !bg-slate-600 hover:!bg-slate-700"
+                                            @click="resetUserOverride(selectedPermissionUser.id, feature.key)"
+                                        >Reset</button>
+                                        <span
+                                            class="text-[10px] font-black uppercase tracking-widest"
+                                            :class="userOverrideValue(selectedPermissionUser.id, feature.key) === null ? 'text-slate-500' : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'text-emerald-600' : 'text-rose-600')"
+                                        >
+                                            {{ userOverrideValue(selectedPermissionUser.id, feature.key) === null ? 'DEFAULT' : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'OVERRIDE: ALLOW' : 'OVERRIDE: DENY') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Filter & Stats -->
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-5 py-4">
                     <label class="inline-flex items-center gap-3 font-bold text-sm text-[var(--text-2)] cursor-pointer group">
@@ -309,7 +598,7 @@ const saveUser = (userId) => {
                     <table class="min-w-full divide-y divide-[var(--border)] text-sm">
                         <thead class="bg-[var(--surface-2)]">
                             <tr>
-                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Nama</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Nama Resmi / Alias</th>
                                 <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Kontak / Email</th>
                                 <th class="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Provider</th>
                                 <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Role Hak Akses</th>
@@ -319,7 +608,24 @@ const saveUser = (userId) => {
                         </thead>
                         <tbody class="divide-y divide-[var(--border)]">
                             <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-[var(--surface-2)]/[0.4] transition-colors">
-                                <td class="px-6 py-4 font-bold text-[var(--text-1)]">{{ user.name }}</td>
+                                <td class="px-6 py-4">
+                                    <div class="space-y-1.5">
+                                        <input
+                                            v-model="formState[user.id].name"
+                                            type="text"
+                                            class="input-surface !py-1.5 !text-xs !rounded-xl w-full"
+                                            placeholder="Nama resmi..."
+                                            :disabled="!user.can_manage"
+                                        />
+                                        <input
+                                            v-model="formState[user.id].alias"
+                                            type="text"
+                                            class="input-surface !py-1.5 !text-xs !rounded-xl w-full opacity-70"
+                                            placeholder="Alias (opsional)..."
+                                            :disabled="!user.can_manage"
+                                        />
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 font-medium text-[var(--text-2)]">{{ user.email }}</td>
                                 <td class="px-6 py-4 text-center">
                                     <span
@@ -333,6 +639,7 @@ const saveUser = (userId) => {
                                     <select
                                         v-model="formState[user.id].role"
                                         class="input-surface !py-1.5 !text-xs !rounded-xl"
+                                        :disabled="!user.can_manage"
                                     >
                                         <option v-for="role in roles" :key="role" :value="role">
                                             {{ role.toUpperCase() }}
@@ -346,6 +653,7 @@ const saveUser = (userId) => {
                                                 v-model="formState[user.id].is_active"
                                                 type="checkbox"
                                                 class="rounded-lg border-[var(--border)] text-emerald-600 shadow-sm focus:ring-emerald-500 focus:ring-offset-0 bg-[var(--surface-2)]"
+                                                :disabled="!user.can_manage"
                                             >
                                         </div>
                                         <span :class="[
@@ -370,9 +678,13 @@ const saveUser = (userId) => {
                                         type="button"
                                         class="github-button !py-2 !px-4 !text-[11px] !bg-indigo-600 hover:!bg-indigo-700"
                                         @click="saveUser(user.id)"
+                                        :disabled="!user.can_manage"
                                     >
                                         Update
                                     </button>
+                                    <p v-if="!user.can_manage" class="mt-1 text-[10px] font-bold uppercase tracking-widest text-amber-600">
+                                        Hanya superadmin utama
+                                    </p>
                                 </td>
                             </tr>
                             <tr v-if="filteredUsers.length === 0">
@@ -385,7 +697,167 @@ const saveUser = (userId) => {
                         </tbody>
                     </table>
                 </div>
+                <!-- Tabel Login History -->
+                <div class="mt-8">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-xl font-black uppercase tracking-[0.2em] text-[var(--text-1)]">
+                            Riwayat Aktivitas Login
+                        </h3>
+                        <span class="text-xs font-semibold text-[var(--text-3)] bg-[var(--surface-2)] px-3 py-1 rounded-full">
+                            100 Login Terakhir
+                        </span>
+                    </div>
+                    
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] rounded-[28px] border border-[var(--border)] bg-[var(--surface-1)] shadow-2xl shadow-black/5 custom-scrollbar">
+                        <table class="min-w-full divide-y divide-[var(--border)] text-sm">
+                            <thead class="bg-[var(--surface-2)] sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Waktu Login</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Pengguna</th>
+                                    <th class="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Device</th>
+                                    <th class="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Sistem & Browser</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Alamat IP</th>
+                                    <th class="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Metode</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--border)]">
+                                <tr v-for="history in loginHistories" :key="history.id" class="hover:bg-[var(--surface-2)]/[0.4] transition-colors">
+                                    <td class="px-6 py-4 font-semibold text-[var(--text-2)] whitespace-nowrap">
+                                        {{ formatDate(history.logged_in_at) }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div v-if="history.user">
+                                            <p class="font-bold text-[var(--text-1)]">{{ history.user.name }}</p>
+                                            <p class="text-xs text-[var(--text-3)]">{{ history.user.email }}</p>
+                                        </div>
+                                        <span v-else class="text-[var(--text-3)] italic">User Dihapus</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="inline-flex rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest border"
+                                            :class="{
+                                                'bg-indigo-500/10 text-indigo-500 border-indigo-500/20': history.device_type === 'desktop',
+                                                'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': history.device_type === 'mobile',
+                                                'bg-amber-500/10 text-amber-500 border-amber-500/20': history.device_type === 'tablet',
+                                                'bg-[var(--surface-3)] text-[var(--text-3)] border-[var(--border)]': !['desktop', 'mobile', 'tablet'].includes(history.device_type)
+                                            }">
+                                            {{ history.device_type }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-center text-[var(--text-2)] whitespace-nowrap">
+                                        <span class="font-bold text-[var(--text-1)]">{{ history.platform }}</span> 
+                                        <span class="mx-1 text-[var(--text-3)]">/</span> 
+                                        {{ history.browser }}
+                                    </td>
+                                    <td class="px-6 py-4 font-mono text-xs text-[var(--text-2)] whitespace-nowrap">
+                                        {{ history.ip_address || 'Tidak Terdeteksi' }}
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span
+                                            class="inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.15em]"
+                                            :class="history.login_method === 'google' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'bg-slate-500/10 text-slate-500 border border-[var(--border)]'"
+                                        >
+                                            {{ history.login_method === 'google' ? 'Google' : 'User/Pass' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr v-if="loginHistories.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center">
+                                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
+                                            Belum ada riwayat login
+                                        </p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div v-if="isSuperAdmin" class="mt-8">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-xl font-black uppercase tracking-[0.2em] text-[var(--text-1)]">
+                            Riwayat Audit Permission
+                        </h3>
+                        <span class="text-xs font-semibold text-[var(--text-3)] bg-[var(--surface-2)] px-3 py-1 rounded-full">
+                            120 Perubahan Terakhir
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] rounded-[28px] border border-[var(--border)] bg-[var(--surface-1)] shadow-2xl shadow-black/5 custom-scrollbar">
+                        <table class="min-w-full divide-y divide-[var(--border)] text-sm">
+                            <thead class="bg-[var(--surface-2)] sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Waktu</th>
+                                    <th class="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Aktor</th>
+                                    <th class="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Target</th>
+                                    <th class="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Aksi</th>
+                                    <th class="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Feature</th>
+                                    <th class="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">State</th>
+                                    <th class="px-4 py-4 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">IP</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--border)]">
+                                <tr v-for="log in permissionAuditLogs" :key="log.id" class="hover:bg-[var(--surface-2)]/[0.4] transition-colors">
+                                    <td class="px-4 py-3 font-semibold text-[var(--text-2)] whitespace-nowrap">{{ formatDate(log.created_at) }}</td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-bold text-[var(--text-1)]">{{ log.actor?.name || 'System' }}</p>
+                                        <p class="text-xs text-[var(--text-3)]">{{ log.actor?.email || '-' }}</p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-bold text-[var(--text-1)]">{{ log.target_user?.name || (log.role ? `Role: ${log.role}` : '-') }}</p>
+                                        <p class="text-xs text-[var(--text-3)]">{{ log.target_user?.email || '-' }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest bg-violet-500/10 text-violet-600 border border-violet-500/20">
+                                            {{ permissionActionLabel(log.action) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-mono text-xs text-[var(--text-2)]">{{ log.feature_key }}</p>
+                                        <p class="text-[10px] text-[var(--text-3)]">{{ log.scope.toUpperCase() }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <div class="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider">
+                                            <span class="rounded-full px-2 py-0.5" :class="permissionStateClass(log.old_enabled)">
+                                                {{ permissionStateLabel(log.old_enabled) }}
+                                            </span>
+                                            <span class="text-[var(--text-3)]">→</span>
+                                            <span class="rounded-full px-2 py-0.5" :class="permissionStateClass(log.new_enabled)">
+                                                {{ permissionStateLabel(log.new_enabled) }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-xs text-[var(--text-2)] whitespace-nowrap">{{ log.ip_address || '-' }}</td>
+                                </tr>
+                                <tr v-if="permissionAuditLogs.length === 0">
+                                    <td colspan="7" class="px-6 py-12 text-center">
+                                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
+                                            Belum ada riwayat audit permission
+                                        </p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--surface-1);
+    border-radius: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--border);
+}
+</style>

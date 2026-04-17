@@ -5,6 +5,7 @@ namespace Tests\Feature\Portal;
 use App\Models\GuestbookEntry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class GuestbookFlowTest extends TestCase
@@ -31,6 +32,8 @@ class GuestbookFlowTest extends TestCase
 
     public function test_active_operator_can_submit_guestbook_entry_with_photo(): void
     {
+        Storage::fake('public');
+
         $user = User::factory()->create([
             'is_active' => true,
             'role' => 'operator',
@@ -59,6 +62,8 @@ class GuestbookFlowTest extends TestCase
             'name' => 'Andi Saputra',
             'institution' => 'Pemerintah Kota Semarang',
         ]);
+
+        Storage::disk('public')->assertExists('guestbook/photos/20260406010101999.jpg');
     }
 
     public function test_guestbook_list_detail_and_report_pages_are_accessible(): void

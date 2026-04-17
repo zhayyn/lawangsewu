@@ -23,9 +23,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            PilarServiceCatalogSeeder::class,
             CctvCameraSeeder::class,
             ChatAliasSeeder::class,
             ChatDemoSeeder::class,
+            WaCarakaMenuSeeder::class,
         ]);
     }
 }

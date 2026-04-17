@@ -6,7 +6,25 @@ export default defineConfig({
     build: {
         rollupOptions: {
             output: {
-                manualChunks: undefined,
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) {
+                        return undefined;
+                    }
+
+                    if (id.includes('/vue/') || id.includes('@vue') || id.includes('@inertiajs')) {
+                        return 'vendor-vue';
+                    }
+
+                    if (id.includes('laravel-echo') || id.includes('pusher-js')) {
+                        return 'vendor-realtime';
+                    }
+
+                    if (id.includes('emoji-picker-element')) {
+                        return 'vendor-chat';
+                    }
+
+                    return 'vendor-misc';
+                },
             },
         },
     },

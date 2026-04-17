@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\ChatMessage;
+use App\Support\ChatAttachment;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -37,6 +38,10 @@ class ChatMessageSent implements ShouldBroadcastNow
                 'user_id' => $message->user_id,
                 'type' => $message->type,
                 'content' => $message->content,
+                'metadata' => [
+                    ...($message->metadata ?? []),
+                    'attachment' => ChatAttachment::present($message->metadata['attachment'] ?? null, $message),
+                ],
                 'created_at' => optional($message->created_at)->toISOString(),
                 'user' => [
                     'id' => $message->user?->id,

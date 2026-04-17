@@ -6,6 +6,10 @@ defineProps({
         type: Object,
         required: true,
     },
+    hideBadge: {
+        type: Boolean,
+        default: false,
+    },
 });
 </script>
 
@@ -20,7 +24,10 @@ defineProps({
                 <h3 class="text-base font-semibold text-[var(--text-1)]">
                     {{ module.title }}
                 </h3>
-                <span class="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-2)]">
+                <span
+                    v-if="module.badge && !hideBadge"
+                    class="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-2)]"
+                >
                     {{ module.badge }}
                 </span>
             </div>

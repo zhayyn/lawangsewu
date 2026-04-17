@@ -1,0 +1,19 @@
+[Unit]
+Description=Lawangsewu Laravel Reverb Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lawangsewu
+Environment=APP_ENV=production
+ExecStart=/usr/bin/php artisan reverb:start --host=0.0.0.0 --port=8080
+ExecReload=/usr/bin/php artisan reverb:restart
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

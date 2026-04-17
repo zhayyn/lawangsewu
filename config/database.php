@@ -112,6 +112,39 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+
+        // ─── SIPP (Sistem Informasi Penelusuran Perkara) ─────────────────────
+        // Koneksi READ-ONLY independen ke server SIPP (192.168.88.10).
+        // Digunakan oleh SippService untuk chatbot menu 7-11.
+        //
+        // Security hardening:
+        //  - PDO::ATTR_EMULATE_PREPARES = false  → true parameterized queries
+        //  - PDO::ATTR_TIMEOUT           = 3     → fail-fast on unreachable host
+        //  - PDO::MYSQL_ATTR_FOUND_ROWS  = true  → correct row counts
+        //  - No default fallback value for credentials (fail if env missing)
+        'sipp' => [
+            'driver'    => 'mysql',
+            'host'      => env('SIPP_DB_HOST'),           // no default — must be set in .env
+            'port'      => env('SIPP_DB_PORT', '3306'),
+            'database'  => env('SIPP_DB_DATABASE', 'sipp'),
+            'username'  => env('SIPP_DB_USERNAME'),       // no default — must be set in .env
+            'password'  => env('SIPP_DB_PASSWORD'),       // no default — must be set in .env
+            'charset'   => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix'    => '',
+            'strict'    => false,  // SIPP schema may have non-strict SQL; don't break on it
+            'options'   => extension_loaded('pdo_mysql') ? [
+                // True parameterized queries — prevents any second-order SQL injection
+                \PDO::ATTR_EMULATE_PREPARES          => false,
+                // Fail fast: 3-second connection timeout (prevents blocking workers)
+                \PDO::ATTR_TIMEOUT                   => 3,
+                // Return correct affected/found row counts
+                \PDO::MYSQL_ATTR_FOUND_ROWS           => true,
+                // Disable multi-statement execution — prevents stacked query attacks
+                \PDO::MYSQL_ATTR_MULTI_STATEMENTS     => false,
+            ] : [],
+        ],
+
     ],
 
     /*

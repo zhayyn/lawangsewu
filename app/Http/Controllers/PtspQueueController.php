@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\QueueTicketUpdated;
 use App\Models\PtspQueueTicket;
 use App\Models\ServiceCounter;
 use App\Services\PilarQueueAuthority;
@@ -92,6 +93,13 @@ class PtspQueueController extends Controller
 
         $this->queueAuthority->syncPtspTicket($ticket, $request->user()?->id);
 
+        QueueTicketUpdated::dispatch('ptsp', 'created', [
+            'id'            => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'service_desk'  => $ticket->service_desk,
+            'status'        => $ticket->status,
+        ], $this->buildPtspSummary());
+
         return redirect()
             ->route('lawangsewu.ptsp.index')
             ->with('status', 'Nomor antrian baru berhasil dibuat.');
@@ -109,7 +117,16 @@ class PtspQueueController extends Controller
             'called_at' => now(),
         ]);
 
-        $this->queueAuthority->syncPtspTicket($ticket->fresh(), request()->user()?->id);
+        $fresh = $ticket->fresh();
+        $this->queueAuthority->syncPtspTicket($fresh, request()->user()?->id);
+
+        QueueTicketUpdated::dispatch('ptsp', 'called', [
+            'id'            => $fresh->id,
+            'ticket_number' => $fresh->ticket_number,
+            'service_desk'  => $fresh->service_desk,
+            'status'        => $fresh->status,
+            'called_at'     => optional($fresh->called_at)?->setTimezone('Asia/Jakarta')->format('H:i:s'),
+        ], $this->buildPtspSummary());
 
         return redirect()
             ->route('lawangsewu.ptsp.index')
@@ -125,6 +142,13 @@ class PtspQueueController extends Controller
 
         $this->queueAuthority->syncPtspTicket($ticket->fresh(), request()->user()?->id);
 
+        QueueTicketUpdated::dispatch('ptsp', 'served', [
+            'id'            => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'service_desk'  => $ticket->service_desk,
+            'status'        => 'served',
+        ], $this->buildPtspSummary());
+
         return redirect()
             ->route('lawangsewu.ptsp.index')
             ->with('status', 'Nomor ' . $ticket->ticket_number . ' telah dilayani.');
@@ -139,8 +163,26 @@ class PtspQueueController extends Controller
 
         $this->queueAuthority->syncPtspTicket($ticket->fresh(), request()->user()?->id);
 
+        QueueTicketUpdated::dispatch('ptsp', 'skipped', [
+            'id'            => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'service_desk'  => $ticket->service_desk,
+            'status'        => 'skipped',
+        ], $this->buildPtspSummary());
+
         return redirect()
             ->route('lawangsewu.ptsp.index')
             ->with('status', 'Nomor ' . $ticket->ticket_number . ' dilewati.');
+    }
+
+    private function buildPtspSummary(): array
+    {
+        $today = today();
+        return [
+            'waiting' => PtspQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'waiting')->count(),
+            'called'  => PtspQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'called')->count(),
+            'served'  => PtspQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'served')->count(),
+            'skipped' => PtspQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'skipped')->count(),
+        ];
     }
 }

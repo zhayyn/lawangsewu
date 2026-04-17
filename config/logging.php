@@ -73,6 +73,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'slow_request' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/slow-request.log'),
+            'level' => env('LOG_SLOW_LEVEL', 'warning'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

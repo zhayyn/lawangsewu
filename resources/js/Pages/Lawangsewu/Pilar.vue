@@ -12,6 +12,8 @@ defineProps({
     legacySources: { type: Array, default: () => [] },
     launchers: { type: Array, default: () => [] },
     phases: { type: Array, default: () => [] },
+    ptspCounters: { type: Array, default: () => [] },
+    sidangCounters: { type: Array, default: () => [] },
 });
 </script>
 
@@ -148,6 +150,57 @@ defineProps({
                     </div>
                 </section>
             </div>
+
+            <!-- Phase 2: Service Catalog -->
+            <section v-if="ptspCounters.length || sidangCounters.length" class="card-surface p-6">
+                <SectionHeader
+                    eyebrow="Phase 2 — Service Catalog"
+                    title="Loket & ruang sidang terdaftar"
+                    description="Katalog resmi yang menjadi sumber kebenaran tunggal untuk queue authority. Data ini menggantikan konfigurasi hardcode di legacy pilarpasmg."
+                />
+
+                <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                    <div v-if="ptspCounters.length">
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-2)]">Loket PTSP ({{ ptspCounters.length }})</p>
+                        <div class="space-y-2">
+                            <div
+                                v-for="counter in ptspCounters"
+                                :key="counter.code"
+                                class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-4 py-3"
+                            >
+                                <div>
+                                    <p class="text-sm font-semibold text-[var(--text-1)]">{{ counter.displayLabel }}</p>
+                                    <p class="mt-0.5 text-xs text-[var(--text-3)]">{{ counter.callLabel }}</p>
+                                </div>
+                                <span
+                                    :class="counter.isActive ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-500/15 text-zinc-400'"
+                                    class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                >{{ counter.isActive ? 'Aktif' : 'Nonaktif' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="sidangCounters.length">
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-2)]">Ruang Sidang ({{ sidangCounters.length }})</p>
+                        <div class="space-y-2">
+                            <div
+                                v-for="counter in sidangCounters"
+                                :key="counter.code"
+                                class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-4 py-3"
+                            >
+                                <div>
+                                    <p class="text-sm font-semibold text-[var(--text-1)]">{{ counter.displayLabel }}</p>
+                                    <p class="mt-0.5 text-xs text-[var(--text-3)]">{{ counter.callLabel }}</p>
+                                </div>
+                                <span
+                                    :class="counter.isActive ? 'bg-sky-500/15 text-sky-400' : 'bg-zinc-500/15 text-zinc-400'"
+                                    class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                                >{{ counter.isActive ? 'Aktif' : 'Nonaktif' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <section class="card-surface p-6">
                 <SectionHeader

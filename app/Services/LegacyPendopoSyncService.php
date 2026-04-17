@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\GuestbookEntry;
 use App\Models\GuestbookSetting;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
@@ -59,6 +60,13 @@ class LegacyPendopoSyncService
     }
 
     public function dashboardSummary(): array
+    {
+        return Cache::remember('pendopo:dashboard-summary:v1', now()->addSeconds(45), function () {
+            return $this->buildDashboardSummary();
+        });
+    }
+
+    private function buildDashboardSummary(): array
     {
         $now = now('Asia/Jakarta');
 

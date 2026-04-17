@@ -8,76 +8,24 @@ use App\Support\LawangsewuPortal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class GuestbookController extends Controller
 {
+    private const INSTANSI_OPTIONS_CACHE_KEY = 'guestbook:instansi-options:v2';
+
     public function form()
     {
         $settings = $this->settings();
 
-        $instansiRows = GuestbookEntry::query()
-            ->select('institution')
-            ->whereNotNull('institution')
-            ->whereRaw("TRIM(institution) <> ''")
-            ->whereRaw("TRIM(institution) <> '-'")
-            ->distinct()
-            ->orderBy('institution')
-            ->limit(1000)
-            ->get();
-
-        $instansiOptionsByCategory = [
-            'MAHKAMAH_AGUNG' => [
-                'Pengadilan Agama (PA)',
-                'Pengadilan Tinggi Agama (PTA)',
-                'Pengadilan Negeri (PN)',
-            ],
-            'INSTANSI_PERUSAHAAN' => [
-                'Pemerintah Kota Semarang',
-                'Instansi Pemerintah Lainnya',
-            ],
-            'UNIVERSITAS_SEKOLAH' => [
-                'Mahasiswa',
-                'Universitas / Sekolah',
-            ],
-            'PERSEORANGAN' => [
-                'Perseorangan',
-            ],
-        ];
-
-        foreach ($instansiRows as $row) {
-            $normalized = $this->normalizeInstansiUnit((string) $row->institution);
-            if ($normalized === '') {
-                continue;
-            }
-
-            $category = $this->categorizeInstansi($normalized);
-            if ($category !== 'MAHKAMAH_AGUNG') {
-                continue;
-            }
-
-            if (! $this->isMahkamahCourtLabel($normalized)) {
-                continue;
-            }
-
-            $instansiOptionsByCategory[$category][] = $normalized;
-        }
-
-        foreach ($instansiOptionsByCategory as $category => $options) {
-            $options = array_values(array_unique(array_filter($options, static fn (string $value) => trim($value) !== '')));
-
-            if ($category === 'MAHKAMAH_AGUNG') {
-                $options = $this->sortMahkamahOptions($options);
-            } else {
-                natcasesort($options);
-                $options = array_values($options);
-            }
-
-            $instansiOptionsByCategory[$category] = $options;
-        }
+        $instansiOptionsByCategory = Cache::remember(self::INSTANSI_OPTIONS_CACHE_KEY, now()->addMinutes(15), function () {
+            return $this->buildInstansiOptionsByCategory();
+        });
 
         $jakartaNow = now('Asia/Jakarta');
 
@@ -143,18 +91,26 @@ class GuestbookController extends Controller
             'checkin' => now('Asia/Jakarta')->format('Y-m-d H:i:s'),
         ]);
 
-        $photoDirectory = public_path('guestbook/photos');
-        if (! File::exists($photoDirectory)) {
-            File::makeDirectory($photoDirectory, 0775, true);
+        $storagePath = 'guestbook/photos/' . $entry->id . '.jpg';
+        $savedToStorage = Storage::disk('public')->put($storagePath, $imgData);
+
+        if (! $savedToStorage) {
+            // Fallback untuk kompatibilitas server lama yang membaca langsung dari public/guestbook/photos.
+            $photoDirectory = public_path('guestbook/photos');
+            if (! File::exists($photoDirectory)) {
+                File::makeDirectory($photoDirectory, 0775, true);
+            }
+
+            $saved = file_put_contents($photoDirectory . DIRECTORY_SEPARATOR . $entry->id . '.jpg', $imgData);
+            if ($saved === false) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data tamu tersimpan, tetapi foto gagal disimpan.',
+                ], 500);
+            }
         }
 
-        $saved = file_put_contents($photoDirectory . DIRECTORY_SEPARATOR . $entry->id . '.jpg', $imgData);
-        if ($saved === false) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Data tamu tersimpan, tetapi foto gagal disimpan.',
-            ], 500);
-        }
+        Cache::forget(self::INSTANSI_OPTIONS_CACHE_KEY);
 
         return response()->json([
             'status' => 'success',
@@ -438,5 +394,70 @@ class GuestbookController extends Controller
                 'event_name' => 'Pendopo Pengadilan Agama Semarang',
             ]
         );
+    }
+
+    private function buildInstansiOptionsByCategory(): array
+    {
+        $instansiRows = GuestbookEntry::query()
+            ->select('institution')
+            ->whereNotNull('institution')
+            ->where('institution', '!=', '')
+            ->where('institution', '!=', '-')
+            ->whereBetween('checkin', [now('Asia/Jakarta')->subYears(2), now('Asia/Jakarta')])
+            ->orderByDesc('checkin')
+            ->limit(600)
+            ->get();
+
+        $instansiOptionsByCategory = [
+            'MAHKAMAH_AGUNG' => [
+                'Pengadilan Agama (PA)',
+                'Pengadilan Tinggi Agama (PTA)',
+                'Pengadilan Negeri (PN)',
+            ],
+            'INSTANSI_PERUSAHAAN' => [
+                'Pemerintah Kota Semarang',
+                'Instansi Pemerintah Lainnya',
+            ],
+            'UNIVERSITAS_SEKOLAH' => [
+                'Mahasiswa',
+                'Universitas / Sekolah',
+            ],
+            'PERSEORANGAN' => [
+                'Perseorangan',
+            ],
+        ];
+
+        foreach ($instansiRows as $row) {
+            $normalized = $this->normalizeInstansiUnit((string) $row->institution);
+            if ($normalized === '') {
+                continue;
+            }
+
+            $category = $this->categorizeInstansi($normalized);
+            if ($category !== 'MAHKAMAH_AGUNG') {
+                continue;
+            }
+
+            if (! $this->isMahkamahCourtLabel($normalized)) {
+                continue;
+            }
+
+            $instansiOptionsByCategory[$category][] = $normalized;
+        }
+
+        foreach ($instansiOptionsByCategory as $category => $options) {
+            $options = array_values(array_unique(array_filter($options, static fn (string $value) => trim($value) !== '')));
+
+            if ($category === 'MAHKAMAH_AGUNG') {
+                $options = $this->sortMahkamahOptions($options);
+            } else {
+                natcasesort($options);
+                $options = array_values($options);
+            }
+
+            $instansiOptionsByCategory[$category] = $options;
+        }
+
+        return $instansiOptionsByCategory;
     }
 }

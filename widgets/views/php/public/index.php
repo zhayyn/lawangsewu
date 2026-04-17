@@ -85,9 +85,9 @@ $sections = [
         'caption' => 'Akses inti untuk operasional harian dan pengelolaan sistem yang membutuhkan sesi login aktif.',
         'items' => [
             [
-                'name' => 'WA Caraka Admin via SSO',
-                'path' => gateway_wa_admin_sso_url('dashboard'),
-                'desc' => 'Masuk ke operator dashboard, messages, devices, LLM, dan kontrol admin tanpa login ulang.',
+                'name' => 'WA Caraka di Lawangsewu',
+                'path' => lw_portal_public_url('/wa-caraka'),
+                'desc' => 'Masuk ke dashboard operator WA Caraka yang sudah ditanam langsung di modul Laravel Lawangsewu.',
                 'tag' => 'Aplikasi',
                 'kind' => 'internal',
             ],
@@ -110,13 +110,6 @@ $sections = [
                 'path' => gateway_mas_satset_url(),
                 'desc' => 'Laboratorium input knowledge dan uji cepat jawaban AI WA Caraka.',
                 'tag' => 'AI',
-                'kind' => 'internal',
-            ],
-            [
-                'name' => 'Swagger UI Internal',
-                'path' => lw_portal_public_url('/wa-caraka-admin/wa/docs/swagger'),
-                'desc' => 'Dokumentasi dan pengujian cepat endpoint internal admin WA Caraka.',
-                'tag' => 'API',
                 'kind' => 'internal',
             ],
         ],
@@ -889,7 +882,7 @@ $favoriteLeadItems = array_slice($allItems, 0, 4);
                 <h1>Satu meja kerja bersih untuk akses inti Lawangsewu.</h1>
                 <p>Semua akses utama diringkas agar cepat dipindai, mudah dibuka, dan tidak terasa ramai.</p>
                 <div class="hero-actions">
-                    <a class="cta" href="<?php echo htmlspecialchars(gateway_wa_admin_sso_url('dashboard'), ENT_QUOTES, 'UTF-8'); ?>">Buka WA Caraka</a>
+                    <a class="cta" href="<?php echo htmlspecialchars(lw_portal_public_url('/wa-caraka'), ENT_QUOTES, 'UTF-8'); ?>">Buka WA Caraka</a>
                     <a class="cta" href="<?php echo htmlspecialchars(lw_portal_public_url('/daftar-widget'), ENT_QUOTES, 'UTF-8'); ?>">Daftar Widget</a>
                 </div>
             </div>

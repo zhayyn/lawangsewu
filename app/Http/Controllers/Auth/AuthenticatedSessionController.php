@@ -39,7 +39,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+        $displayName = ($user->alias ?? '') ?: ($user->name ?? '') ?: explode('@', $user->email)[0];
+
+        return redirect()->intended(route('dashboard', absolute: false))
+            ->with('login_success', $displayName);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\GoogleAccessAllowlist;
+use App\Models\LoginHistory;
 use App\Models\User;
 use App\Services\GoogleIdTokenVerifier;
 use Illuminate\Http\JsonResponse;
@@ -250,8 +251,20 @@ class GoogleController extends Controller
 
         Auth::login($user, true);
 
+        // Record login history
+        LoginHistory::recordLogin(
+            userId: $user->id,
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent() ?? 'Unknown',
+            loginMethod: 'google',
+            sessionId: session()->getId(),
+        );
+
         Log::info('User logged in via Google', ['id' => $user->id, 'email' => $user->email]);
 
-        return redirect()->intended(route('dashboard'));
+        $displayName = $user->alias ?: $user->name ?: explode('@', $user->email)[0];
+
+        return redirect()->intended(route('dashboard'))
+            ->with('login_success', $displayName);
     }
 }

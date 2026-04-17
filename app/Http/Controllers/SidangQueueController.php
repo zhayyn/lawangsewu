@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\QueueTicketUpdated;
 use App\Models\ServiceCounter;
 use App\Models\SidangQueueTicket;
 use App\Services\PilarQueueAuthority;
@@ -98,6 +99,14 @@ class SidangQueueController extends Controller
 
         $this->queueAuthority->syncSidangTicket($ticket, $request->user()?->id);
 
+        QueueTicketUpdated::dispatch('sidang', 'created', [
+            'id'             => $ticket->id,
+            'ticket_number'  => $ticket->ticket_number,
+            'courtroom'      => $ticket->courtroom,
+            'hearing_number' => $ticket->hearing_number,
+            'status'         => $ticket->status,
+        ], $this->buildSidangSummary());
+
         return redirect()
             ->route('lawangsewu.sidang.index')
             ->with('status', 'Antrian sidang baru berhasil dibuat.');
@@ -115,7 +124,17 @@ class SidangQueueController extends Controller
             'called_at' => now(),
         ]);
 
-        $this->queueAuthority->syncSidangTicket($ticket->fresh(), request()->user()?->id);
+        $fresh = $ticket->fresh();
+        $this->queueAuthority->syncSidangTicket($fresh, request()->user()?->id);
+
+        QueueTicketUpdated::dispatch('sidang', 'called', [
+            'id'             => $fresh->id,
+            'ticket_number'  => $fresh->ticket_number,
+            'courtroom'      => $fresh->courtroom,
+            'hearing_number' => $fresh->hearing_number,
+            'status'         => $fresh->status,
+            'called_at'      => optional($fresh->called_at)?->setTimezone('Asia/Jakarta')->format('H:i:s'),
+        ], $this->buildSidangSummary());
 
         return redirect()
             ->route('lawangsewu.sidang.index')
@@ -131,6 +150,13 @@ class SidangQueueController extends Controller
 
         $this->queueAuthority->syncSidangTicket($ticket->fresh(), request()->user()?->id);
 
+        QueueTicketUpdated::dispatch('sidang', 'completed', [
+            'id'            => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'courtroom'     => $ticket->courtroom,
+            'status'        => 'completed',
+        ], $this->buildSidangSummary());
+
         return redirect()
             ->route('lawangsewu.sidang.index')
             ->with('status', 'Nomor ' . $ticket->ticket_number . ' selesai disidangkan.');
@@ -145,8 +171,26 @@ class SidangQueueController extends Controller
 
         $this->queueAuthority->syncSidangTicket($ticket->fresh(), request()->user()?->id);
 
+        QueueTicketUpdated::dispatch('sidang', 'postponed', [
+            'id'            => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'courtroom'     => $ticket->courtroom,
+            'status'        => 'postponed',
+        ], $this->buildSidangSummary());
+
         return redirect()
             ->route('lawangsewu.sidang.index')
             ->with('status', 'Nomor ' . $ticket->ticket_number . ' ditunda.');
+    }
+
+    private function buildSidangSummary(): array
+    {
+        $today = today();
+        return [
+            'waiting'   => SidangQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'waiting')->count(),
+            'called'    => SidangQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'called')->count(),
+            'completed' => SidangQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'completed')->count(),
+            'postponed' => SidangQueueTicket::query()->whereDate('queue_date', $today)->where('status', 'postponed')->count(),
+        ];
     }
 }

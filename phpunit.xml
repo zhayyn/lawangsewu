@@ -30,6 +30,12 @@
         <env name="DB_DATABASE" value="lawangsewu_test"/>
         <env name="DB_USERNAME" value="dbprakom"/>
         <env name="DB_PASSWORD" value="semakinhebat@26"/>
+        <env name="DB_SOCKET" value="/var/run/mysqld/mysqld.sock"/>
+        <!-- SIPP: use same socket server for testing (will fail gracefully if unreachable) -->
+        <env name="SIPP_DB_HOST" value="192.168.88.10"/>
+        <env name="SIPP_DB_DATABASE" value="sipp"/>
+        <env name="SIPP_DB_USERNAME" value="admin"/>
+        <env name="SIPP_DB_PASSWORD" value="R4h4514@"/>
         <env name="LOG_CHANNEL" value="stderr"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

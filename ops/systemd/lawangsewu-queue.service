@@ -1,0 +1,19 @@
+[Unit]
+Description=Lawangsewu Laravel Queue Worker
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/lawangsewu
+Environment=APP_ENV=production
+ExecStart=/usr/bin/php artisan queue:work --sleep=1 --tries=3 --max-time=3600
+ExecReload=/usr/bin/php artisan queue:restart
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

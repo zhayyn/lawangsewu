@@ -2,6 +2,10 @@
 
 @section('title', 'Register Buku Tamu')
 
+@php
+    $isEmbedded = request()->boolean('embedded');
+@endphp
+
 @push('styles')
 <style>
     .guest-shell {
@@ -166,14 +170,99 @@
         padding: 0.45rem 0.8rem;
         text-transform: lowercase;
     }
+
+    .guest-shell.embedded-lite {
+        min-height: 100dvh;
+        padding-top: 0.5rem;
+        background: #f4f8fc;
+    }
+
+    .guest-shell.embedded-lite::before {
+        opacity: 0;
+    }
+
+    .guest-shell.embedded-lite .guest-card {
+        border-radius: 1rem;
+        box-shadow: 0 12px 28px rgba(18, 38, 63, 0.1);
+        background: #ffffff;
+        backdrop-filter: none;
+        border-color: rgba(143, 173, 204, 0.25);
+    }
+
+    .guest-shell.embedded-lite .form-control.form-control-lg {
+        min-height: 3.3rem;
+    }
+
+    .embed-lite-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.7rem;
+        padding: 0.5rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(18, 51, 79, 0.06);
+        color: #1e4364;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    @media (max-width: 768px) {
+        .guest-shell {
+            padding: 0.75rem 0 1.1rem;
+        }
+
+        .guest-shell.embedded-lite {
+            padding-top: 0.45rem;
+        }
+
+        .camera-frame {
+            max-width: 100%;
+            aspect-ratio: 3 / 4;
+        }
+
+        .camera-toolbar {
+            align-items: stretch;
+        }
+
+        .camera-power-button,
+        .submit-text-button {
+            min-width: 100%;
+        }
+
+        .action-stack {
+            gap: 0.65rem;
+        }
+
+        .control-button {
+            width: 64px;
+            height: 64px;
+            border-width: 3px;
+        }
+
+        .bypass-toggle {
+            right: 10px;
+            bottom: calc(10px + env(safe-area-inset-bottom));
+            font-size: 0.78rem;
+            padding: 0.35rem 0.7rem;
+        }
+    }
 </style>
 @endpush
 
 @section('content')
-<div class="guest-shell">
+<div class="guest-shell {{ $isEmbedded ? 'embedded-lite' : '' }}">
     <div class="container-fluid px-3 px-md-4">
         <div class="row justify-content-center">
             <div class="col-12 col-xxl-11">
+                @if($isEmbedded)
+                <div class="embed-lite-title">
+                    <i class="bi bi-person-vcard"></i> Form Pendopo Cepat
+                </div>
+                @endif
+
+                @if(!$isEmbedded)
                 <section class="batik-hero mb-4">
                     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
                         <div>
@@ -188,6 +277,7 @@
                         </div>
                     </div>
                 </section>
+                @endif
 
                 <div class="card guest-card">
                     <div class="card-body p-3 p-lg-4">
@@ -196,9 +286,11 @@
                                 <h2 class="h4 mb-1">Formulir Kunjungan</h2>
                                 <p class="section-note mb-0">Lengkapi data terlebih dahulu, lalu ambil foto untuk menyimpan kunjungan.</p>
                             </div>
+                            @if(!$isEmbedded)
                             <span class="batik-chip text-dark" style="background: rgba(18, 51, 79, 0.06); border-color: rgba(18, 51, 79, 0.08); color: #12334f;">
                                 <i class="bi bi-camera"></i> Kamera aktif setelah data siap
                             </span>
+                            @endif
                         </div>
 
                         <div id="formAlert" class="alert alert-danger d-none" role="alert"></div>
@@ -299,7 +391,12 @@
     </div>
 </div>
 
+@if(!$isEmbedded)
 <button type="button" id="toggleBypass" class="btn btn-glass bypass-toggle">bypas foto</button>
+@endif
+@if($isEmbedded)
+<button type="button" id="toggleBypass" class="btn btn-glass bypass-toggle" style="position: static; margin-top: 0.65rem;">bypas foto</button>
+@endif
 
 <div class="modal fade" id="modalSuccess" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">

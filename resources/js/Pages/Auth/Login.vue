@@ -1,13 +1,13 @@
 <script setup>
 import Checkbox from '@/Components/Checkbox.vue';
-import ThemeToggleElectric from '@/Components/lawangsewu/ThemeToggleElectric.vue';
+import ThemeToggle from '@/Components/lawangsewu/ThemeToggle.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
     canResetPassword: {
@@ -36,6 +36,10 @@ const googleBusy = ref(false);
 const googleReady = ref(false);
 const googleBusyLabel = ref('Menyiapkan login Google...');
 const googleError = ref('');
+const isDark = ref(true);
+const isPasswordVisible = ref(false);
+const isGoogleRedirectMode = ref(false);
+const passwordRevealTimer = ref(null);
 let googleIdentityScriptPromise = null;
 
 const form = useForm({
@@ -48,6 +52,20 @@ const submit = () => {
     form.post(route('login'), {
         onFinish: () => form.reset('password'),
     });
+};
+
+const passwordInputType = computed(() => (isPasswordVisible.value ? 'text' : 'password'));
+
+const toggleTheme = () => {
+    isDark.value = !isDark.value;
+
+    window.dispatchEvent(new CustomEvent('lawangsewu-theme-change', {
+        detail: {
+            theme: isDark.value ? 'dark' : 'light',
+        },
+    }));
+
+    localStorage.setItem('lawangsewu-theme', isDark.value ? 'dark' : 'light');
 };
 
 const loadGoogleIdentityScript = () => {
@@ -81,6 +99,75 @@ const loadGoogleIdentityScript = () => {
     });
 
     return googleIdentityScriptPromise;
+};
+
+const isAppleTouchDevice = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    const userAgent = window.navigator.userAgent || '';
+    const platform = window.navigator.platform || '';
+    const maxTouchPoints = window.navigator.maxTouchPoints || 0;
+
+    return /iPad|iPhone|iPod/.test(userAgent)
+        || (platform === 'MacIntel' && maxTouchPoints > 1);
+};
+
+const shouldUseGoogleRedirect = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
+    return isGoogleRedirectMode.value || isAppleTouchDevice() || Boolean(coarsePointer && /Safari/i.test(window.navigator.userAgent || '') && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(window.navigator.userAgent || ''));
+};
+
+const openGoogleRedirect = () => {
+    window.location.assign(route('auth.google'));
+};
+
+const handleGoogleButtonPress = () => {
+    if (googleBusy.value) {
+        return;
+    }
+
+    if (shouldUseGoogleRedirect() || !googleReady.value) {
+        googleBusy.value = true;
+        googleBusyLabel.value = 'Mengalihkan ke Google...';
+        openGoogleRedirect();
+        return;
+    }
+
+    const renderedButton = googleButtonContainer.value?.querySelector('div[role="button"]');
+    const renderedFrame = googleButtonContainer.value?.querySelector('iframe');
+
+    if (renderedButton instanceof HTMLElement) {
+        renderedButton.click();
+        return;
+    }
+
+    if (renderedFrame instanceof HTMLElement) {
+        renderedFrame.click();
+        return;
+    }
+
+    googleError.value = 'Tombol Google belum siap. Browser akan dialihkan ke mode login yang lebih stabil.';
+    isGoogleRedirectMode.value = true;
+    openGoogleRedirect();
+};
+
+const revealPasswordTemporarily = () => {
+    isPasswordVisible.value = true;
+
+    if (passwordRevealTimer.value) {
+        clearTimeout(passwordRevealTimer.value);
+    }
+
+    passwordRevealTimer.value = setTimeout(() => {
+        isPasswordVisible.value = false;
+        passwordRevealTimer.value = null;
+    }, 3000);
 };
 
 const handleGoogleCredential = async (response) => {
@@ -139,7 +226,8 @@ const renderGoogleButton = async () => {
             client_id: props.googleClientId,
             callback: handleGoogleCredential,
             context: 'signin',
-            ux_mode: 'popup',
+            ux_mode: shouldUseGoogleRedirect() ? 'redirect' : 'popup',
+            login_uri: route('auth.google'),
             auto_select: false,
             cancel_on_tap_outside: true,
         });
@@ -162,6 +250,11 @@ const renderGoogleButton = async () => {
         }
 
         googleReady.value = true;
+
+        if (shouldUseGoogleRedirect()) {
+            googleBusy.value = false;
+            googleBusyLabel.value = 'Lanjutkan dengan Google';
+        }
     } catch (scriptError) {
         googleError.value = scriptError?.message
             || 'Tombol Google tidak berhasil dimuat di browser ini.';
@@ -171,7 +264,25 @@ const renderGoogleButton = async () => {
 };
 
 onMounted(() => {
+    const storedTheme = localStorage.getItem('lawangsewu-theme');
+
+    if (storedTheme) {
+        isDark.value = storedTheme === 'dark';
+    }
+
+    window.dispatchEvent(new CustomEvent('lawangsewu-theme-change', {
+        detail: {
+            theme: isDark.value ? 'dark' : 'light',
+        },
+    }));
+
     renderGoogleButton();
+});
+
+onBeforeUnmount(() => {
+    if (passwordRevealTimer.value) {
+        clearTimeout(passwordRevealTimer.value);
+    }
 });
 </script>
 
@@ -193,8 +304,10 @@ onMounted(() => {
             <div class="google-glow-shell relative">
                 <button
                     type="button"
-                    class="google-glow-button flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-white px-5 text-gray-900 ring-1 ring-gray-200 transition-all duration-300"
-                    :class="(!googleReady || googleBusy) ? 'cursor-wait opacity-80' : ''"
+                    @click="handleGoogleButtonPress"
+                    data-testid="google-signin-button"
+                    class="google-glow-button flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-white px-4 text-sm text-gray-900 ring-1 ring-gray-200 transition-all duration-300 sm:px-5 sm:text-base"
+                    :class="googleBusy ? 'cursor-wait opacity-80' : ''"
                 >
                     <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -211,7 +324,7 @@ onMounted(() => {
                 <div
                     ref="googleButtonContainer"
                     class="google-button-hitbox absolute inset-0 overflow-hidden rounded-2xl opacity-0"
-                    :class="googleReady && !googleBusy ? 'pointer-events-auto' : 'pointer-events-none'"
+                    :class="googleReady && !googleBusy && !shouldUseGoogleRedirect() ? 'pointer-events-auto' : 'pointer-events-none'"
                     aria-hidden="true"
                 />
             </div>
@@ -220,12 +333,9 @@ onMounted(() => {
                 {{ googleError }}
             </div>
 
-            <a
-                :href="route('auth.google')"
-                class="text-center text-xs font-semibold text-gray-500 underline decoration-dotted underline-offset-4 transition hover:text-blue-500"
-            >
-                Pakai mode redirect klasik Google
-            </a>
+            <p v-if="shouldUseGoogleRedirect()" class="text-center text-xs font-semibold text-sky-600">
+                Browser ini memakai alur Google yang paling stabil untuk perangkat sentuh.
+            </p>
         </div>
 
         <form @submit.prevent="submit" class="space-y-4">
@@ -248,14 +358,36 @@ onMounted(() => {
             <div>
                 <InputLabel for="password" value="Password" />
 
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="current-password"
-                />
+                <div class="relative mt-1">
+                    <TextInput
+                        id="password"
+                        data-testid="password-input"
+                        :type="passwordInputType"
+                        class="block w-full pr-11"
+                        v-model="form.password"
+                        required
+                        autocomplete="current-password"
+                    />
+
+                    <button
+                        type="button"
+                        data-testid="password-visibility-toggle"
+                        class="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center text-gray-400 transition hover:text-blue-500"
+                        @click="revealPasswordTemporarily"
+                        aria-label="Tampilkan password selama 3 detik"
+                    >
+                        <svg v-if="!isPasswordVisible" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3l18 18" />
+                            <path d="M10.6 10.7a3 3 0 0 0 4 4" />
+                            <path d="M9.9 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a19.6 19.6 0 0 1-4 5.2" />
+                            <path d="M6.6 6.7C4 8.5 2 12 2 12a19.1 19.1 0 0 0 7.5 6" />
+                        </svg>
+                    </button>
+                </div>
 
                 <InputError class="mt-2" :message="form.errors.password" />
             </div>
@@ -275,7 +407,7 @@ onMounted(() => {
                 </Link>
             </div>
 
-            <div class="pt-2 flex items-center gap-3">
+            <div class="pt-2 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 <Link
                     v-if="canRegister"
                     :href="route('register')"
@@ -295,7 +427,10 @@ onMounted(() => {
         </form>
 
         <div class="mt-8 flex flex-col items-center gap-6">
-            <ThemeToggleElectric />
+            <ThemeToggle
+                :dark="isDark"
+                @toggle="toggleTheme"
+            />
 
             <footer class="text-center">
                 <p class="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em]">
@@ -321,5 +456,17 @@ onMounted(() => {
 
 .google-glow-shell:active .google-glow-button {
     transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+    .google-glow-button {
+        min-height: 52px;
+    }
+
+    .google-glow-button span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 </style>

@@ -48,6 +48,12 @@
 @php
     $photo = asset('guestbook/tanpafoto.jpg');
     foreach (['jpg', 'jpeg', 'png'] as $ext) {
+        $storageRelative = 'guestbook/photos/' . $entry->id . '.' . $ext;
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($storageRelative)) {
+            $photo = asset('storage/' . $storageRelative);
+            break;
+        }
+
         $candidate = public_path('guestbook/photos/' . $entry->id . '.' . $ext);
         if (is_file($candidate)) {
             $photo = asset('guestbook/photos/' . $entry->id . '.' . $ext);

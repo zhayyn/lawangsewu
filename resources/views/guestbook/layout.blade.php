@@ -218,9 +218,11 @@
 <div class="page-layer" @if($isEmbedded) style="padding-top:0" @endif>
     @yield('content')
 
+    @if(!$isEmbedded)
     <footer class="site-footer-signature">
         Developed with <i class="bi bi-heart-fill" style="color:#d1495b"></i> by Dubes Prakom
     </footer>
+    @endif
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

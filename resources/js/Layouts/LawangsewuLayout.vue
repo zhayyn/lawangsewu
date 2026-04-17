@@ -1,5 +1,7 @@
 <script setup>
+import NavItemIcon from '@/Components/lawangsewu/NavItemIcon.vue';
 import ThemeToggle from '@/Components/lawangsewu/ThemeToggle.vue';
+import LoginToast from '@/Components/lawangsewu/LoginToast.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -22,13 +24,24 @@ const page = usePage();
 const isDark = ref(true);
 const isSidebarOpen = ref(false);
 const isSidebarCollapsed = ref(false);
+const isSidebarAnimating = ref(false);
+let sidebarAnimationTimer = null;
 
 const shellTheme = computed(() => (isDark.value ? 'theme-dark' : 'theme-light'));
 const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?.user?.name || 'Operator PTIP');
-const userRole = computed(() => page.props.auth?.user?.email ?? 'Prototype internal mode');
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
+const isOperator = computed(() => page.props.auth?.user?.role === 'operator');
 const viewerRouteKeys = ['dashboard', 'cctv', 'chat', 'satellite.pendopo'];
+const operatorRouteKeys = ['ptsp', 'wacaraka', 'chat'];
+const safeRoute = (name) => {
+    try {
+        return route(name);
+    } catch {
+        return '#';
+    }
+};
+
 const displayNavGroups = computed(() => {
     const accessibleGroups = props.navGroups
         .map(group => ({
@@ -40,6 +53,10 @@ const displayNavGroups = computed(() => {
 
                 if (isViewer.value) {
                     return viewerRouteKeys.includes(item.routeKey);
+                }
+
+                if (isOperator.value) {
+                    return operatorRouteKeys.includes(item.routeKey);
                 }
 
                 return true;
@@ -57,42 +74,40 @@ const displayNavGroups = computed(() => {
             label: 'Superadmin',
             items: [
                 {
+                    label: 'Monitor Sistem',
+                    short: 'MS',
+                    routeKey: 'admin-system-monitor',
+                    href: safeRoute('admin.system-monitor.index'),
+                    badge: 'Admin',
+                },
+                {
                     label: 'Kelola Pendopo',
                     short: 'PD',
                     routeKey: 'admin-pendopo',
-                    href: route('admin.pendopo.index'),
+                    href: safeRoute('admin.pendopo.index'),
                     badge: 'Admin',
                 },
                 {
                     label: 'Kelola CCTV',
                     short: 'CC',
                     routeKey: 'admin-cctv',
-                    href: route('admin.cctv.index'),
+                    href: safeRoute('admin.cctv.index'),
                     badge: 'Admin',
                 },
                 {
                     label: 'Kelola User',
                     short: 'US',
                     routeKey: 'admin-users',
-                    href: route('admin.users.index'),
+                    href: safeRoute('admin.users.index'),
                     badge: 'Admin',
                 },
             ],
         },
     ];
 });
-const primaryNav = computed(() => {
-    return displayNavGroups.value
-        .flatMap((group) => group.items)
-        .filter((item) => ['dashboard', 'cctv', 'chat', 'satellite.pendopo', 'admin-pendopo', 'admin-cctv', 'admin-users'].includes(item.routeKey));
-});
-
-const linkClasses = (item) => [
-    'group flex items-center gap-3 rounded-2xl border px-3 py-3 transition duration-200',
-    item.routeKey === props.currentRoute
-        ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--text-1)]'
-        : 'border-transparent text-[var(--text-2)] hover:border-[var(--border)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)]',
-].join(' ');
+function shouldShowNavBadge(item) {
+    return Boolean(item.badge) && !isOperator.value;
+}
 
 function toggleTheme() {
     isDark.value = !isDark.value;
@@ -102,15 +117,39 @@ function toggleSidebar() {
     isSidebarOpen.value = !isSidebarOpen.value;
 }
 
+function toggleSidebarCollapsed() {
+    isSidebarAnimating.value = true;
+
+    if (sidebarAnimationTimer) {
+        clearTimeout(sidebarAnimationTimer);
+    }
+
+    isSidebarCollapsed.value = !isSidebarCollapsed.value;
+
+    sidebarAnimationTimer = setTimeout(() => {
+        isSidebarAnimating.value = false;
+        sidebarAnimationTimer = null;
+    }, 340);
+}
+
 watch(isDark, (value) => {
     localStorage.setItem('lawangsewu-theme', value ? 'dark' : 'light');
 });
 
+watch(isSidebarCollapsed, (value) => {
+    localStorage.setItem('lawangsewu-sidebar-collapsed', value ? '1' : '0');
+});
+
 onMounted(() => {
     const storedTheme = localStorage.getItem('lawangsewu-theme');
+    const storedSidebarState = localStorage.getItem('lawangsewu-sidebar-collapsed');
 
     if (storedTheme) {
         isDark.value = storedTheme === 'dark';
+    }
+
+    if (storedSidebarState !== null) {
+        isSidebarCollapsed.value = storedSidebarState === '1';
     }
 
     if (window.innerWidth < 1440) {
@@ -127,39 +166,55 @@ onMounted(() => {
         >
             <div class="flex min-h-screen">
                 <aside
-                    class="hidden border-r border-[var(--border)] bg-[var(--surface-0)]/85 backdrop-blur xl:flex xl:flex-col"
-                    :class="isSidebarCollapsed ? 'xl:w-24' : 'xl:w-[19rem]'"
+                    class="relative hidden overflow-visible border-r border-[var(--border)] bg-[var(--surface-0)]/85 backdrop-blur transition-[width] duration-300 ease-[cubic-bezier(.4,0,.2,1)] lg:flex lg:flex-col"
+                    :class="isSidebarCollapsed ? 'lg:w-24' : 'lg:w-[19rem]'"
                 >
                     <div class="flex items-center justify-between gap-3 px-6 py-8">
                         <div class="flex items-center gap-3">
-                            <div class="relative group">
-                                <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-                                <div class="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black text-sm font-black text-white">
-                                    LS
+                            <div class="relative group cursor-pointer flex-shrink-0 transition-transform duration-500 hover:scale-105 active:scale-95">
+                                <div class="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-700 group-hover:duration-200"></div>
+                                <div class="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 shadow-xl overflow-hidden">
+                                    <!-- 3D Geometric Isometric Logo representing 'L' and 'S' or layered doors -->
+                                    <svg class="w-7 h-7 text-white drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] group-hover:drop-shadow-[0_0_12px_rgba(99,102,241,0.8)] transition-all duration-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <g stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
+                                            <!-- Isometric Cube / Door Layers -->
+                                            <path d="M12 2L3 7.2l9 5.2l9-5.2L12 2z" fill="url(#topGradient)" fill-opacity="0.9" />
+                                            <path d="M3 7.2v10l9 5.2v-10l-9-5.2z" fill="url(#leftGradient)" fill-opacity="0.8" />
+                                            <path d="M21 7.2v10l-9 5.2v-10l9-5.2z" fill="url(#rightGradient)" fill-opacity="0.6" />
+                                            <!-- Decorative Inner Lines / Arches (Lawangsewu / Thousand doors theme) -->
+                                            <path d="M12 11.5v9M7.5 9v10M16.5 9v10" stroke="rgba(255,255,255,0.4)" stroke-width="0.75" />
+                                            <path d="M12 2v5.2" stroke="rgba(255,255,255,0.3)" stroke-width="0.75" />
+                                        </g>
+                                        <defs>
+                                            <linearGradient id="topGradient" x1="12" y1="2" x2="12" y2="12" gradientUnits="userSpaceOnUse">
+                                                <stop stop-color="#60A5FA" />
+                                                <stop offset="1" stop-color="#3B82F6" />
+                                            </linearGradient>
+                                            <linearGradient id="leftGradient" x1="3" y1="7.2" x2="12" y2="22.4" gradientUnits="userSpaceOnUse">
+                                                <stop stop-color="#2563EB" />
+                                                <stop offset="1" stop-color="#1E3A8A" />
+                                            </linearGradient>
+                                            <linearGradient id="rightGradient" x1="21" y1="7.2" x2="12" y2="22.4" gradientUnits="userSpaceOnUse">
+                                                <stop stop-color="#3B82F6" />
+                                                <stop offset="1" stop-color="#1E40AF" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                 </div>
                             </div>
-                            <div v-if="!isSidebarCollapsed" class="leading-tight">
-                                <p class="text-sm font-bold text-[var(--text-1)] tracking-tight">
+                            <div
+                                class="leading-tight overflow-hidden origin-left transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+                                :class="isSidebarCollapsed ? 'max-w-0 opacity-0 -translate-x-1' : 'max-w-[14rem] opacity-100 translate-x-0'"
+                            >
+                                <p class="text-sm font-black text-[var(--text-1)] tracking-tight whitespace-nowrap bg-gradient-to-r from-[var(--text-1)] to-[var(--text-2)] bg-clip-text text-transparent">
                                     {{ appMeta.name }}
                                 </p>
-                                <p class="text-[10px] text-[var(--text-3)] font-medium uppercase tracking-wider">
+                                <p class="text-[9px] text-[var(--text-3)] font-bold uppercase tracking-[0.1em] whitespace-nowrap">
                                     {{ appMeta.tagline }}
                                 </p>
                             </div>
                         </div>
-
-                        <!-- Futuristic Burger Toggle -->
-                        <button
-                            type="button"
-                            class="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-all group"
-                            @click="isSidebarCollapsed = !isSidebarCollapsed"
-                        >
-                            <div class="flex flex-col gap-1.5 w-4">
-                                <span :class="['h-0.5 bg-[var(--text-2)] transition-all duration-300 rounded-full', isSidebarCollapsed ? 'w-full' : 'w-full group-hover:w-2']"></span>
-                                <span :class="['h-0.5 bg-[var(--text-2)] transition-all duration-300 rounded-full', isSidebarCollapsed ? 'w-2' : 'w-full']"></span>
-                                <span :class="['h-0.5 bg-[var(--text-2)] transition-all duration-300 rounded-full', isSidebarCollapsed ? 'w-full' : 'w-3 group-hover:w-full']"></span>
-                            </div>
-                        </button>
                     </div>
 
                     <div class="flex-1 space-y-8 overflow-y-auto px-4 pb-6 scrollbar-none">
@@ -169,47 +224,51 @@ onMounted(() => {
                             class="space-y-2"
                         >
                             <p
-                                v-if="!isSidebarCollapsed"
-                                class="px-4 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-3)] opacity-60"
+                                class="px-4 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-3)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+                                :class="isSidebarCollapsed ? 'max-h-0 opacity-0 -translate-y-1 overflow-hidden pointer-events-none' : 'max-h-5 opacity-60 translate-y-0'"
                             >
                                 {{ group.label }}
                             </p>
 
                             <div class="space-y-1">
                                 <template
-                                    v-for="item in group.items"
+                                    v-for="(item, itemIndex) in group.items"
                                     :key="item.label"
                                 >
                                     <Link
                                         v-if="item.href"
                                         :href="item.href"
                                         :class="[
-                                            'group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 relative',
+                                            'nav-tilt group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-500 relative isolate overflow-hidden will-change-transform',
                                             item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600/5 text-blue-500 font-semibold'
-                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)]'
+                                                ? 'bg-blue-600/5 text-blue-500 font-semibold shadow-[0_10px_30px_-24px_rgba(37,99,235,0.75)]'
+                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)] hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.5)]'
                                         ]"
                                     >
+                                        <div class="pointer-events-none absolute inset-0 rounded-xl bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.08),transparent)] opacity-0 translate-x-[-120%] transition-all duration-700 group-hover:translate-x-[120%] group-hover:opacity-100"></div>
+                                        <div class="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"></div>
+
                                         <!-- Active Indicator Dot -->
                                         <div v-if="item.routeKey === props.currentRoute" class="absolute left-0 w-1 h-5 bg-blue-500 rounded-r-full"></div>
 
-                                        <div :class="[
-                                            'flex h-8 w-8 items-center justify-center rounded-lg text-[10px] font-bold transition-all duration-300',
-                                            item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 rotate-0'
-                                                : 'bg-[var(--surface-2)] text-[var(--text-3)] group-hover:text-[var(--text-1)] group-hover:scale-110'
-                                        ]">
-                                            {{ item.short }}
-                                        </div>
+                                        <NavItemIcon
+                                            :route-key="item.routeKey"
+                                            :active="item.routeKey === props.currentRoute"
+                                            :dark="isDark"
+                                        />
                                         
-                                        <div v-if="!isSidebarCollapsed" class="flex-1 min-w-0">
+                                        <div
+                                            class="min-w-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+                                            :class="isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-1 overflow-hidden' : 'flex-1 opacity-100 translate-x-0'"
+                                        >
                                             <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
                                         </div>
 
                                         <span
-                                            v-if="item.badge && !isSidebarCollapsed"
+                                            v-if="shouldShowNavBadge(item)"
                                             :class="[
-                                                'px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border',
+                                                'px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]',
+                                                isSidebarCollapsed ? 'max-w-0 scale-90 opacity-0 pointer-events-none overflow-hidden px-0 py-0 border-transparent' : 'max-w-20 scale-100 opacity-100',
                                                 item.badge === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-[var(--surface-3)] border-[var(--border)] text-[var(--text-3)]'
                                             ]"
                                         >
@@ -221,10 +280,11 @@ onMounted(() => {
                                         v-else
                                         class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group transition-all"
                                     >
-                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-3)] text-[10px] font-bold">
-                                            {{ item.short }}
-                                        </div>
-                                        <div v-if="!isSidebarCollapsed" class="flex-1 min-w-0">
+                                        <NavItemIcon :route-key="item.routeKey" :dark="isDark" />
+                                        <div
+                                            class="min-w-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+                                            :class="isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-1 overflow-hidden' : 'flex-1 opacity-100 translate-x-0'"
+                                        >
                                             <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
                                         </div>
                                     </div>
@@ -232,6 +292,30 @@ onMounted(() => {
                             </div>
                         </section>
                     </div>
+
+                    <button
+                        type="button"
+                        class="group absolute -right-3 top-1/2 z-20 hidden h-11 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-2)] shadow-[0_12px_26px_-20px_rgba(15,23,42,0.65)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] hover:w-7 hover:border-[var(--accent-border)] hover:text-[var(--text-1)] lg:flex"
+                        :class="isSidebarAnimating ? 'scale-95' : 'scale-100'"
+                        :aria-label="isSidebarCollapsed ? 'Tampilkan menu samping' : 'Sembunyikan menu samping'"
+                        @click="toggleSidebarCollapsed"
+                    >
+                        <span class="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.2),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <svg
+                            class="h-4 w-4 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+                            :class="isSidebarCollapsed ? 'translate-x-[1px] rotate-0' : '-translate-x-[1px] rotate-0'"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path v-if="isSidebarCollapsed" d="m9 18 6-6-6-6" />
+                            <path v-else d="m15 18-6-6 6-6" />
+                        </svg>
+                    </button>
                 </aside>
 
                 <div class="flex min-w-0 flex-1 flex-col">
@@ -239,13 +323,19 @@ onMounted(() => {
                         <div class="mx-auto flex max-w-[1800px] items-center gap-3 px-4 py-4 sm:px-6 xl:px-8">
                             <button
                                 type="button"
-                                class="secondary-button xl:hidden"
+                                class="group relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-1)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--accent-border)] hover:bg-[var(--surface-2)] hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.65)] lg:hidden"
                                 @click="toggleSidebar"
+                                aria-label="Buka menu samping"
                             >
-                                Menu
+                                <span class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.16),transparent_60%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                                <span class="relative h-4 w-4">
+                                    <span class="absolute left-0 top-0 h-0.5 w-4 rounded-full bg-current transition-all duration-300 group-hover:w-3"></span>
+                                    <span class="absolute left-0 top-[7px] h-0.5 w-4 rounded-full bg-current transition-all duration-300 group-hover:translate-x-0.5"></span>
+                                    <span class="absolute left-0 top-[14px] h-0.5 w-4 rounded-full bg-current transition-all duration-300 group-hover:w-3 group-hover:translate-x-1"></span>
+                                </span>
                             </button>
 
-                            <div v-if="!isViewer" class="hidden min-w-0 flex-1 md:block">
+                            <div v-if="!isViewer && !isOperator" class="hidden min-w-0 flex-1 md:block">
                                 <input
                                     type="text"
                                     class="input-surface w-full"
@@ -253,17 +343,31 @@ onMounted(() => {
                                 >
                             </div>
 
-                            <div v-if="!isViewer" class="hidden items-center gap-2 lg:flex">
-                                <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] overflow-hidden transition-all hover:border-[var(--accent-border)]">
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Ecosystem</span>
-                                    <svg class="w-2.5 h-2.5 text-[var(--text-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-blue-500 whitespace-nowrap">
-                                        {{ props.currentRoute === 'dashboard' ? 'Overview' : props.currentRoute.replace('lawangsewu.', '').replace('.', ' > ').toUpperCase() }}
-                                    </span>
-                                </div>
-                                <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">
-                                    Semua sistem normal
-                                </span>
+                            <div v-if="!isViewer && !isOperator" class="hidden items-center gap-4 lg:flex ml-2">
+                                <!-- Elegant Breadcrumb -->
+                                <Link :href="safeRoute('lawangsewu.dashboard')" class="group relative flex items-center gap-3 px-1 py-1 rounded-full bg-gradient-to-r from-[var(--surface-1)] to-[var(--surface-2)] p-1 border border-[var(--border)] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer">
+                                    <div class="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    
+                                    <div class="pl-3 pr-2 flex items-center gap-2">
+                                        <!-- Animated Glowing Dot -->
+                                        <div class="relative flex h-2 w-2 items-center justify-center">
+                                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                                            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                        </div>
+                                        <span class="text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-3)] group-hover:text-[var(--text-2)] transition-colors">Workspace</span>
+                                    </div>
+
+                                    <div class="flex items-center text-[var(--text-3)]/40">
+                                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                                    </div>
+
+                                    <div class="relative bg-[var(--surface-0)] rounded-full px-4 py-1.5 border border-[var(--border)] shadow-sm z-10 transition-transform duration-300 group-hover:-translate-y-0.5 overflow-hidden">
+                                        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-indigo-500/0 opacity-0 group-hover:opacity-100 translate-x-[-100%] group-hover:translate-x-[100%] transition-all duration-1000 ease-in-out"></div>
+                                        <span class="relative text-[10px] font-black uppercase tracking-[0.2em] bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent drop-shadow-sm whitespace-nowrap">
+                                            {{ props.currentRoute === 'dashboard' ? 'Overview' : props.currentRoute.replace('lawangsewu.', '').replace('.', ' > ').toUpperCase() }}
+                                        </span>
+                                    </div>
+                                </Link>
                             </div>
 
                             <ThemeToggle
@@ -315,7 +419,7 @@ onMounted(() => {
                         </div>
                     </header>
 
-                    <main class="mx-auto w-full max-w-[1800px] flex-1 px-4 py-5 pb-24 sm:px-6 xl:px-8 xl:pb-10">
+                    <main class="mx-auto w-full max-w-[1800px] flex-1 px-4 py-5 pb-8 sm:px-6 lg:px-8 xl:pb-10">
                         <slot />
                     </main>
                 </div>
@@ -323,21 +427,32 @@ onMounted(() => {
 
             <div
                 v-if="isSidebarOpen"
-                class="fixed inset-0 z-50 bg-black/50 xl:hidden"
+                class="fixed inset-0 z-50 bg-black/50 lg:hidden"
                 @click="isSidebarOpen = false"
             >
                 <aside
-                    class="h-full w-[19rem] border-r border-[var(--border)] bg-[var(--surface-0)] px-4 py-5"
+                    class="flex h-full w-[85vw] max-w-[19rem] flex-col border-r border-[var(--border)] bg-[var(--surface-0)] px-4 py-5 shadow-[0_22px_60px_-30px_rgba(15,23,42,0.8)]"
                     @click.stop
                 >
                     <div class="mb-6 flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-semibold text-[var(--text-1)]">
-                                {{ appMeta.name }}
-                            </p>
-                            <p class="text-xs text-[var(--text-2)]">
-                                {{ appMeta.tagline }}
-                            </p>
+                        <div class="flex items-center gap-3">
+                            <div class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 shadow-lg shrink-0">
+                                <svg class="w-6 h-6 text-white drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <g stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
+                                        <path d="M12 2L3 7.2l9 5.2l9-5.2L12 2z" fill="url(#topGradient)" fill-opacity="0.9" />
+                                        <path d="M3 7.2v10l9 5.2v-10l-9-5.2z" fill="url(#leftGradient)" fill-opacity="0.8" />
+                                        <path d="M21 7.2v10l-9 5.2v-10l9-5.2z" fill="url(#rightGradient)" fill-opacity="0.6" />
+                                    </g>
+                                </svg>
+                            </div>
+                            <div class="leading-tight">
+                                <p class="text-sm font-black text-[var(--text-1)] tracking-tight bg-gradient-to-r from-[var(--text-1)] to-[var(--text-2)] bg-clip-text text-transparent">
+                                    {{ appMeta.name }}
+                                </p>
+                                <p class="text-[9px] text-[var(--text-3)] font-bold uppercase tracking-[0.1em]">
+                                    {{ appMeta.tagline }}
+                                </p>
+                            </div>
                         </div>
 
                         <button
@@ -349,7 +464,7 @@ onMounted(() => {
                         </button>
                     </div>
 
-                    <div class="space-y-5 overflow-y-auto">
+                    <div class="space-y-5 border-b border-[var(--border)] pb-5">
                         <div class="space-y-2">
                             <Link
                                 v-if="isSuperAdmin"
@@ -371,7 +486,7 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <div class="space-y-6 overflow-y-auto scrollbar-none pb-10">
+                    <div class="mt-5 flex-1 space-y-6 overflow-y-auto scrollbar-none pb-10">
                         <section
                             v-for="group in displayNavGroups"
                             :key="group.label"
@@ -390,26 +505,24 @@ onMounted(() => {
                                         v-if="item.href"
                                         :href="item.href"
                                         :class="[
-                                            'group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 relative',
+                                            'nav-tilt-mobile group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 relative isolate overflow-hidden',
                                             item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600/5 text-blue-500 font-semibold'
-                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)]'
+                                                ? 'bg-blue-600/5 text-blue-500 font-semibold shadow-[0_10px_24px_-22px_rgba(37,99,235,0.8)]'
+                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)]'
                                         ]"
                                         @click="isSidebarOpen = false"
                                     >
-                                        <div :class="[
-                                            'flex h-8 w-8 items-center justify-center rounded-lg text-[10px] font-bold transition-all duration-300',
-                                            item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                                                : 'bg-[var(--surface-2)] text-[var(--text-3)]'
-                                        ]">
-                                            {{ item.short }}
-                                        </div>
+                                        <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.08),transparent)] opacity-0 translate-x-[-120%] transition-all duration-700 group-hover:translate-x-[120%] group-hover:opacity-100"></div>
+                                        <NavItemIcon
+                                            :route-key="item.routeKey"
+                                            :active="item.routeKey === props.currentRoute"
+                                            :dark="isDark"
+                                        />
                                         <div class="min-w-0 flex-1">
                                             <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
                                         </div>
                                         <span
-                                            v-if="item.badge"
+                                            v-if="shouldShowNavBadge(item)"
                                             :class="[
                                                 'px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border',
                                                 item.badge === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-[var(--surface-3)] border-[var(--border)] text-[var(--text-3)]'
@@ -423,9 +536,7 @@ onMounted(() => {
                                         v-else
                                         class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group"
                                     >
-                                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-3)] text-[10px] font-bold">
-                                            {{ item.short }}
-                                        </div>
+                                        <NavItemIcon :route-key="item.routeKey" :dark="isDark" />
                                         <div class="min-w-0 flex-1">
                                             <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
                                         </div>
@@ -437,19 +548,31 @@ onMounted(() => {
                 </aside>
             </div>
 
-            <nav class="fixed inset-x-4 bottom-4 z-40 xl:hidden">
-                <div class="card-surface grid grid-cols-3 p-2">
-                    <Link
-                        v-for="item in primaryNav"
-                        :key="item.routeKey"
-                        :href="item.href"
-                        class="rounded-2xl px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.2em] transition"
-                        :class="item.routeKey === currentRoute ? 'bg-[var(--accent-soft)] text-[var(--text-1)]' : 'text-[var(--text-2)]'"
-                    >
-                        {{ item.short }}
-                    </Link>
-                </div>
-            </nav>
         </div>
+
+        <!-- Login success toast -->
+        <LoginToast />
     </div>
 </template>
+
+<style scoped>
+.nav-tilt {
+    transform-style: preserve-3d;
+}
+
+.nav-tilt:hover {
+    transform: perspective(960px) rotateX(4deg) rotateY(-7deg) translateX(4px) translateY(-1px);
+}
+
+.nav-tilt > * {
+    transform: translateZ(0);
+}
+
+.nav-tilt:hover > * {
+    transform: translateZ(10px);
+}
+
+.nav-tilt-mobile:hover {
+    transform: translateX(4px) scale(1.01);
+}
+</style>

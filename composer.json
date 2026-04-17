@@ -6,14 +6,14 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "inertiajs/inertia-laravel": "^2.0",
-        "laravel/framework": "^11.31",
+        "laravel/framework": "^13.0",
         "laravel/passport": "^13.7",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.26",
-        "laravel/tinker": "^2.9",
+        "laravel/tinker": "^3.0",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {
@@ -24,7 +24,7 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.1",
-        "phpunit/phpunit": "^11.0.1"
+        "phpunit/phpunit": "^11.0.1|^12.0"
     },
     "autoload": {
         "psr-4": {

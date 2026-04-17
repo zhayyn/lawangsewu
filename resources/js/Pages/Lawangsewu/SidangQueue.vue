@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
+import { useReverb } from '@/composables/useReverb';
 
 const props = defineProps({
     appMeta: { type: Object, required: true },
@@ -23,6 +24,12 @@ const form = ref({
 
 const submitting = ref(false);
 const actionLoading = ref(null);
+const todayTickets = ref([...props.todayTickets]);
+const summary = ref({ ...props.summary });
+const activeCall = ref(props.activeCall ? { ...props.activeCall } : null);
+
+const { connected: reverbConnected, reconnecting: reverbReconnecting, error: reverbError, subscribeQueue } = useReverb();
+let unsubscribeQueue = null;
 
 function submitTicket() {
     submitting.value = true;
@@ -73,6 +80,51 @@ const courtroomOptions = computed(() =>
         ? props.counters.map(c => c.name)
         : ['Ruang Sidang 1', 'Ruang Sidang 2', 'Ruang Sidang 3', 'Ruang Mediasi']
 );
+
+onMounted(() => {
+    unsubscribeQueue = subscribeQueue('sidang', (event) => {
+        if (event?.summary) {
+            summary.value = { ...event.summary };
+        }
+
+        if (event?.ticket?.id) {
+            const idx = todayTickets.value.findIndex((item) => item.id === event.ticket.id);
+            if (idx >= 0) {
+                todayTickets.value[idx] = {
+                    ...todayTickets.value[idx],
+                    ...event.ticket,
+                };
+            } else {
+                todayTickets.value.unshift({ ...event.ticket });
+            }
+        }
+
+        if (event?.ticket?.status === 'called') {
+            activeCall.value = {
+                id: event.ticket.id,
+                ticket_number: event.ticket.ticket_number,
+                courtroom: event.ticket.courtroom,
+                hearing_number: event.ticket.hearing_number,
+                called_at: event.ticket.called_at ?? null,
+            };
+        } else if (activeCall.value?.id === event?.ticket?.id) {
+            const stillCalled = todayTickets.value.find((item) => item.status === 'called');
+            activeCall.value = stillCalled
+                ? {
+                    id: stillCalled.id,
+                    ticket_number: stillCalled.ticket_number,
+                    courtroom: stillCalled.courtroom,
+                    hearing_number: stillCalled.hearing_number,
+                    called_at: stillCalled.called_at ?? null,
+                }
+                : null;
+        }
+    });
+});
+
+onUnmounted(() => {
+    unsubscribeQueue?.();
+});
 </script>
 
 <template>
@@ -96,6 +148,12 @@ const courtroomOptions = computed(() =>
                     <p class="max-w-xl text-sm leading-7 text-[var(--text-2)]">
                         Kelola antrean pemanggilan sidang per ruang sidang secara cepat dan terstruktur.
                     </p>
+                    <div class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]"
+                        :class="reverbConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'">
+                        <span class="h-2 w-2 rounded-full" :class="reverbConnected ? 'bg-emerald-300' : 'bg-amber-300'" />
+                        {{ reverbConnected ? 'Realtime aktif' : (reverbReconnecting ? 'Realtime reconnecting' : 'Realtime fallback polling') }}
+                    </div>
+                    <p v-if="reverbError" class="text-xs text-amber-300">{{ reverbError }}</p>
                 </div>
 
                 <!-- Active Call Banner -->

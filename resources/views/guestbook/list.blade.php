@@ -52,15 +52,15 @@
     $user = auth()->user();
     $canInspectGuestbook = $user && in_array($user->role, ['operator', 'admin'], true);
     $photoUrl = static function (string $id): string {
-        $candidates = [
-            public_path('guestbook/photos/' . $id . '.jpg'),
-            public_path('guestbook/photos/' . $id . '.jpeg'),
-            public_path('guestbook/photos/' . $id . '.png'),
-        ];
+        foreach (['jpg', 'jpeg', 'png'] as $ext) {
+            $storageRelative = 'guestbook/photos/' . $id . '.' . $ext;
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($storageRelative)) {
+                return asset('storage/' . $storageRelative);
+            }
 
-        foreach ($candidates as $path) {
-            if (is_file($path)) {
-                return asset('guestbook/photos/' . basename($path));
+            $legacyPath = public_path('guestbook/photos/' . $id . '.' . $ext);
+            if (is_file($legacyPath)) {
+                return asset('guestbook/photos/' . $id . '.' . $ext);
             }
         }
 

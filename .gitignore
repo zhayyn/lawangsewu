@@ -21,3 +21,26 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Sensitive secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Additional local env files
+.env.local
+.env.*.local
+
+# WA runtime sensitive/volatile artifacts
+wa-runtime/baileys_auth_info/
+wa-runtime/server.log
+wa-runtime/*.log
+wa-runtime/logs/
+wa-runtime/.cache/

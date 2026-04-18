@@ -388,9 +388,28 @@ tvDuration.addEventListener('change', () => {
         startTvMode();
     }
 });
+
+// Auto-refresh data secara background setiap 2 menit
+let dataRefreshTimer = null;
+function startDataAutoRefresh() {
+    if (dataRefreshTimer) clearInterval(dataRefreshTimer);
+    dataRefreshTimer = window.setInterval(() => {
+        const year = new Date().getFullYear();
+        fetchStatistikPerkara(year).then(json => {
+            if(json && json.ok) {
+                cachedRows = Array.isArray(json.rows) ? json.rows : [];
+                cachedTotals = json.totals || cachedTotals;
+                setSums(cachedTotals);
+                renderRows();
+                renderCharts(year, cachedTotals, cachedRows);
+            }
+        }).catch(err => console.error("Auto-refresh gagal:", err));
+    }, 120000); // 120,000 ms = 2 menit
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     tvSlides.forEach(slide => slide.classList.add('active'));
-    loadData();
+    loadData().then(startDataAutoRefresh);
 });
 </script>
 </body>

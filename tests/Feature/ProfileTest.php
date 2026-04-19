@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -34,7 +36,7 @@ class ProfileTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'alias' => 'Operator Satu',
                 'email' => 'test@example.com',
             ]);
 
@@ -44,9 +46,39 @@ class ProfileTest extends TestCase
 
         $user->refresh();
 
-        $this->assertSame('Test User', $user->name);
+        $this->assertSame('Operator Satu', $user->alias);
+        $this->assertSame($user->getOriginal('name'), $user->name);
         $this->assertSame('test@example.com', $user->email);
         $this->assertNull($user->email_verified_at);
+    }
+
+    public function test_profile_avatar_can_be_updated(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'is_active' => true,
+            'role' => 'viewer',
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post('/profile/update', [
+                'alias' => 'Viewer QA',
+                'email' => $user->email,
+                'avatar_file' => UploadedFile::fake()->image('avatar.png', 300, 300),
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame('Viewer QA', $user->alias);
+        $this->assertNotNull($user->avatar);
+        $this->assertStringStartsWith('/storage/profile-avatars/', $user->avatar);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $user->avatar));
     }
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
@@ -70,7 +102,7 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_user_cannot_delete_their_own_account(): void
     {
         $user = User::factory()->create([
             'is_active' => true,
@@ -83,15 +115,13 @@ class ProfileTest extends TestCase
                 'password' => 'password',
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
+        $response->assertForbidden();
 
-        $this->assertGuest();
-        $this->assertNull($user->fresh());
+        $this->assertAuthenticated();
+        $this->assertNotNull($user->fresh());
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_delete_account_request_is_always_forbidden_even_with_wrong_password(): void
     {
         $user = User::factory()->create([
             'is_active' => true,
@@ -100,14 +130,11 @@ class ProfileTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->from('/profile')
             ->delete('/profile', [
                 'password' => 'wrong-password',
             ]);
 
-        $response
-            ->assertSessionHasErrors('password')
-            ->assertRedirect('/profile');
+        $response->assertForbidden();
 
         $this->assertNotNull($user->fresh());
     }

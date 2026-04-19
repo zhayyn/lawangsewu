@@ -62,6 +62,7 @@ class WaCarakaController extends Controller
             'stats'         => $this->waService->stats(),
             'messageStats'  => $this->waService->messageStats(),
             'convoStats'    => $this->getConvoStats(),
+            'reportStats'   => $this->operatorReplyStatsData(),
             'ticketStats'   => WaCarakaTicket::ticketStats(),
             'recentTickets' => WaCarakaTicket::recent(30),
         ]);
@@ -171,6 +172,7 @@ class WaCarakaController extends Controller
                     'status' => 200,
                     'data' => $this->reportStatsData(),
                 ]),
+                'operator-stats' => response()->json($this->operatorReplyStatsData()),
 
                 // ──────────────────────────────────────────────
                 // 5. Admin Tools
@@ -885,6 +887,25 @@ class WaCarakaController extends Controller
             ];
         })->values();
 
+        return [
+            'generatedAt' => now()->toIso8601String(),
+            'summary' => [
+                'inboundToday' => WaCarakaMessage::query()->where('direction', 'inbound')->whereDate('created_at', today())->count(),
+                'inboundWeek' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfWeek(Carbon::MONDAY), now()->endOfWeek(Carbon::SUNDAY)])->count(),
+                'inboundMonth' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
+                'activeConversations' => WaCarakaConversation::query()->whereIn('status', ['open', 'pending'])->count(),
+            ],
+            'dailyInbound' => $daily,
+            'weeklyInbound' => $weekly,
+            'monthlyInbound' => $monthly,
+            'operatorStats' => $this->operatorReplyStatsData()['operatorStats'],
+        ];
+    }
+
+    protected function operatorReplyStatsData(): array
+    {
+        $today = now()->startOfDay();
+
         $conversationCounts = WaCarakaConversation::query()
             ->select('claimed_by', DB::raw('COUNT(*) as total'))
             ->whereNotNull('claimed_by')
@@ -898,31 +919,47 @@ class WaCarakaController extends Controller
             ->groupBy('user_id')
             ->pluck('total', 'user_id');
 
+        $replyCountsToday = WaCarakaMessage::query()
+            ->select('user_id', DB::raw('COUNT(*) as total'))
+            ->where('direction', 'outbound')
+            ->whereNotNull('user_id')
+            ->whereBetween('created_at', [$today, now()])
+            ->groupBy('user_id')
+            ->pluck('total', 'user_id');
+
+        $lastReplyAt = WaCarakaMessage::query()
+            ->select('user_id', DB::raw('MAX(created_at) as last_reply_at'))
+            ->where('direction', 'outbound')
+            ->whereNotNull('user_id')
+            ->groupBy('user_id')
+            ->pluck('last_reply_at', 'user_id');
+
+        $operatorIds = $conversationCounts->keys()
+            ->merge($replyCounts->keys())
+            ->merge($replyCountsToday->keys())
+            ->unique()
+            ->values();
+
         $operators = User::query()
-            ->whereIn('id', $conversationCounts->keys()->merge($replyCounts->keys())->unique()->values())
+            ->whereIn('id', $operatorIds)
             ->get(['id', 'name', 'alias'])
-            ->map(function (User $user) use ($conversationCounts, $replyCounts) {
+            ->map(function (User $user) use ($conversationCounts, $replyCounts, $replyCountsToday, $lastReplyAt) {
                 return [
                     'id' => $user->id,
                     'name' => $user->alias ?: $user->name,
                     'conversations' => (int) ($conversationCounts[$user->id] ?? 0),
                     'outboundMessages' => (int) ($replyCounts[$user->id] ?? 0),
+                    'outboundToday' => (int) ($replyCountsToday[$user->id] ?? 0),
+                    'lastReplyAt' => isset($lastReplyAt[$user->id])
+                        ? Carbon::parse($lastReplyAt[$user->id])->timezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB'
+                        : null,
                 ];
             })
-            ->sortByDesc(fn (array $row) => $row['conversations'])
+            ->sortByDesc(fn (array $row) => ($row['outboundToday'] * 1000000) + ($row['outboundMessages'] * 1000) + $row['conversations'])
             ->values();
 
         return [
             'generatedAt' => now()->toIso8601String(),
-            'summary' => [
-                'inboundToday' => WaCarakaMessage::query()->where('direction', 'inbound')->whereDate('created_at', today())->count(),
-                'inboundWeek' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfWeek(Carbon::MONDAY), now()->endOfWeek(Carbon::SUNDAY)])->count(),
-                'inboundMonth' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-                'activeConversations' => WaCarakaConversation::query()->whereIn('status', ['open', 'pending'])->count(),
-            ],
-            'dailyInbound' => $daily,
-            'weeklyInbound' => $weekly,
-            'monthlyInbound' => $monthly,
             'operatorStats' => $operators,
         ];
     }

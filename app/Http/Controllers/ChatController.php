@@ -136,4 +136,25 @@ class ChatController extends Controller
             ],
         );
     }
+
+    public function destroy(Request $request, ChatMessage $message): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->isSuperAdmin(), 403);
+
+        $attachment = $message->metadata['attachment'] ?? null;
+        if (is_array($attachment) && !empty($attachment['path'])) {
+            $disk = $attachment['disk'] ?? 'public';
+            if (Storage::disk($disk)->exists($attachment['path'])) {
+                Storage::disk($disk)->delete($attachment['path']);
+            }
+        }
+
+        $message->delete();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Pesan chat internal berhasil dihapus.',
+        ]);
+    }
 }

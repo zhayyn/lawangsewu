@@ -29,6 +29,7 @@ const MAX_BACKOFF_MS = 20000;
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const messages = ref([...props.initialMessages]);
 const showContacts = ref(false);
 const scrollContainer = ref(null);
@@ -449,6 +450,26 @@ const sendMessage = () => {
     });
 };
 
+const deleteMessage = (messageId) => {
+    if (!isSuperAdmin.value || !messageId) {
+        return;
+    }
+
+    if (!window.confirm('Hapus pesan chat internal ini secara permanen?')) {
+        return;
+    }
+
+    router.post(route('lawangsewu.chat.destroy', messageId), {
+        _method: 'delete',
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            messages.value = messages.value.filter((item) => item.id !== messageId);
+            syncMessagesNow();
+        },
+    });
+};
+
 watch(() => props.initialMessages, (newMessages) => {
     const wasAtBottom = scrollContainer.value
         && (scrollContainer.value.scrollHeight - scrollContainer.value.scrollTop <= scrollContainer.value.clientHeight + 100);
@@ -515,21 +536,30 @@ watch(() => props.initialMessages, (newMessages) => {
                         class="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-[var(--border)]"
                     >
                         <template v-if="messages.length">
-                            <ChatBubble
-                                v-for="msg in messages"
-                                :key="msg.id"
-                                :message="{
-                                    ...msg,
-                                    user_id: msg.user_id,
-                                    alias: msg.user.alias || msg.user.name,
-                                    realName: msg.user.name,
-                                    avatar: msg.user.avatar,
-                                    body: msg.content,
-                                    attachment: msg.metadata?.attachment || msg.attachment || null,
-                                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                }"
-                                :own="msg.user_id === user.id"
-                            />
+                            <div v-for="msg in messages" :key="msg.id" class="space-y-1.5">
+                                <ChatBubble
+                                    :message="{
+                                        ...msg,
+                                        user_id: msg.user_id,
+                                        alias: msg.user.alias || msg.user.name,
+                                        realName: msg.user.name,
+                                        avatar: msg.user.avatar,
+                                        body: msg.content,
+                                        attachment: msg.metadata?.attachment || msg.attachment || null,
+                                        time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    }"
+                                    :own="msg.user_id === user.id"
+                                />
+                                <div v-if="isSuperAdmin" class="flex" :class="msg.user_id === user.id ? 'justify-end' : 'justify-start'">
+                                    <button
+                                        type="button"
+                                        class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-700 transition hover:bg-rose-100"
+                                        @click="deleteMessage(msg.id)"
+                                    >
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
                         </template>
                         <div v-else class="h-full flex flex-col items-center justify-center opacity-30 gap-4">
                             <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,7 +1,6 @@
 <script setup>
 import NavItemIcon from '@/Components/lawangsewu/NavItemIcon.vue';
 import ThemeToggle from '@/Components/lawangsewu/ThemeToggle.vue';
-import LoginToast from '@/Components/lawangsewu/LoginToast.vue';
 import LawangsewuAtomCubeLogo from '@/Components/lawangsewu/LawangsewuAtomCubeLogo.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -33,6 +32,17 @@ const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
 const isOperator = computed(() => page.props.auth?.user?.role === 'operator');
+const profileHref = computed(() => safeRoute('profile.edit', '/profile'));
+const userRoleLabel = computed(() => {
+    if (isSuperAdmin.value) return 'Superadmin';
+
+    return {
+        useradmin: 'Admin',
+        viewer: 'Viewer',
+        operator: 'Operator',
+        admin: 'Superadmin',
+    }[page.props.auth?.user?.role] || 'Operator';
+});
 // operatorRouteKeys kept for badge suppression; nav filtering is now backend-driven.
 const operatorRouteKeys = ['ptsp', 'wacaraka', 'chat'];
 const safeRoute = (name, fallback = '#') => {
@@ -366,51 +376,59 @@ onMounted(() => {
                                 </Link>
                             </div>
 
-                            <ThemeToggle
-                                :dark="isDark"
-                                @toggle="toggleTheme"
-                            />
+                            <div class="ml-auto flex items-center gap-2 md:gap-3">
+                                <ThemeToggle
+                                    :dark="isDark"
+                                    @toggle="toggleTheme"
+                                />
 
-                            <div class="hidden items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 md:flex group hover:border-[var(--accent-border)] transition-all duration-300">
-                                <div class="relative">
-                                    <img 
-                                        v-if="page.props.auth?.user?.avatar" 
-                                        :src="page.props.auth.user.avatar" 
-                                        class="h-9 w-9 rounded-xl object-cover ring-2 ring-transparent group-hover:ring-[var(--accent-soft)] transition-all"
-                                        alt="Avatar"
-                                    >
-                                    <div v-else class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface-2)] text-xs font-black text-[var(--text-3)] shadow-inner">
-                                        {{ userName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() }}
+                                <Link
+                                    :href="profileHref"
+                                    class="hidden items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 transition-all duration-300 hover:border-[var(--accent-border)] md:flex"
+                                >
+                                    <div class="relative">
+                                        <img 
+                                            v-if="page.props.auth?.user?.avatar" 
+                                            :src="page.props.auth.user.avatar" 
+                                            class="h-9 w-9 rounded-xl object-cover ring-2 ring-transparent transition-all hover:ring-[var(--accent-soft)]"
+                                            alt="Avatar"
+                                        >
+                                        <div v-else class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface-2)] text-xs font-black text-[var(--text-3)] shadow-inner">
+                                            {{ userName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() }}
+                                        </div>
+                                        <div class="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-[var(--surface-1)] bg-emerald-500 shadow-sm animate-pulse-slow"></div>
                                     </div>
-                                    <div class="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-[var(--surface-1)] bg-emerald-500 shadow-sm animate-pulse-slow"></div>
-                                </div>
-                                <div class="flex flex-col pr-1">
-                                    <p class="text-[13px] font-black text-[var(--text-1)] tracking-tight leading-none mb-1">
-                                        {{ userName }}
-                                    </p>
-                                    <p class="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest leading-none opacity-80">
-                                        {{ isSuperAdmin ? 'Superadmin' : (isViewer ? 'Viewer' : 'Operator') }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="hidden items-center gap-2 md:flex">
-                                <Link
-                                    v-if="isSuperAdmin"
-                                    :href="route('admin.users.index')"
-                                    class="secondary-button"
-                                >
-                                    Kelola User
+                                    <div class="flex flex-col pr-1 text-left">
+                                        <p class="mb-1 text-[13px] font-black leading-none tracking-tight text-[var(--text-1)]">
+                                            {{ userName }}
+                                        </p>
+                                        <p class="text-[10px] font-bold uppercase leading-none tracking-widest text-[var(--accent)] opacity-80">
+                                            {{ userRoleLabel }}
+                                        </p>
+                                    </div>
+                                    <span class="rounded-full border border-[var(--border)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-2)]">
+                                        Profil
+                                    </span>
                                 </Link>
 
-                                <Link
-                                    :href="route('logout')"
-                                    method="post"
-                                    as="button"
-                                    class="github-button"
-                                >
-                                    Logout
-                                </Link>
+                                <div class="hidden items-center gap-2 md:flex">
+                                    <Link
+                                        v-if="isSuperAdmin"
+                                        :href="route('admin.users.index')"
+                                        class="secondary-button"
+                                    >
+                                        Kelola User
+                                    </Link>
+
+                                    <Link
+                                        :href="route('logout')"
+                                        method="post"
+                                        as="button"
+                                        class="github-button"
+                                    >
+                                        Logout
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </header>
@@ -545,9 +563,6 @@ onMounted(() => {
             </div>
 
         </div>
-
-        <!-- Login success toast -->
-        <LoginToast />
     </div>
 </template>
 

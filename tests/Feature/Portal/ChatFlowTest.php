@@ -192,4 +192,57 @@ class ChatFlowTest extends TestCase
 
         $response->assertRedirect('/login');
     }
+
+    public function test_superadmin_can_delete_internal_chat_message(): void
+    {
+        $superadmin = User::factory()->create([
+            'is_active' => true,
+            'role' => 'admin',
+            'is_superadmin' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        $sender = User::factory()->create([
+            'is_active' => true,
+            'role' => 'operator',
+            'email_verified_at' => now(),
+        ]);
+
+        $message = ChatMessage::query()->create([
+            'user_id' => $sender->id,
+            'type' => 'global',
+            'content' => 'Pesan internal untuk diuji hapus.',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($superadmin)->delete(route('lawangsewu.chat.destroy', $message));
+
+        $response->assertOk();
+        $this->assertDatabaseMissing('messages', [
+            'id' => $message->id,
+        ]);
+    }
+
+    public function test_non_superadmin_cannot_delete_internal_chat_message(): void
+    {
+        $operator = User::factory()->create([
+            'is_active' => true,
+            'role' => 'operator',
+            'email_verified_at' => now(),
+        ]);
+
+        $message = ChatMessage::query()->create([
+            'user_id' => $operator->id,
+            'type' => 'global',
+            'content' => 'Pesan tidak boleh dihapus operator biasa.',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($operator)->delete(route('lawangsewu.chat.destroy', $message));
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('messages', [
+            'id' => $message->id,
+        ]);
+    }
 }

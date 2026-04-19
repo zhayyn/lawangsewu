@@ -115,6 +115,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
     Route::get('/cctv', [PortalController::class, 'cctv'])->name('lawangsewu.cctv');
     Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('lawangsewu.chat');
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
+    Route::delete('/chat/{message}', [\App\Http\Controllers\ChatController::class, 'destroy'])->name('lawangsewu.chat.destroy');
     Route::get('/chat/media/{message}', [\App\Http\Controllers\ChatController::class, 'media'])->name('lawangsewu.chat.media');
 
     // Backward-compatibility redirect: Pendopo is consolidated into Buku Tamu.

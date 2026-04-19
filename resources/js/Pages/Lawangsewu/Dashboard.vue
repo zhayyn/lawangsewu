@@ -1,8 +1,6 @@
 <script setup>
 import ChatBubble from '@/Components/lawangsewu/ChatBubble.vue';
-import ModuleShortcutCard from '@/Components/lawangsewu/ModuleShortcutCard.vue';
 import SectionHeader from '@/Components/lawangsewu/SectionHeader.vue';
-import StatCard from '@/Components/lawangsewu/StatCard.vue';
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -28,6 +26,23 @@ const waCarakaHref = computed(() => props.modules.find((module) => module.title 
 const ptspQueueValue = computed(() => props.metrics.find((metric) => metric.title === 'Antrian PTSP')?.value ?? '-');
 const chatChannelCount = computed(() => props.channels.find((channel) => channel.key === 'interkom-umum')?.count ?? 0);
 const waStatus = computed(() => props.systemHealth.find((item) => item.label === 'WA Caraka')?.value ?? 'Siap terhubung');
+const navRouteOrder = computed(() => props.navGroups.flatMap((group) => group.items || []).map((item) => item.routeKey));
+const activeModules = computed(() => {
+    const orderMap = new Map(navRouteOrder.value.map((routeKey, index) => [routeKey, index]));
+
+    return [...props.modules]
+        .filter((module) => Boolean(module?.href))
+        .sort((left, right) => {
+            const leftOrder = orderMap.has(left.routeKey) ? orderMap.get(left.routeKey) : Number.MAX_SAFE_INTEGER;
+            const rightOrder = orderMap.has(right.routeKey) ? orderMap.get(right.routeKey) : Number.MAX_SAFE_INTEGER;
+
+            if (leftOrder !== rightOrder) {
+                return leftOrder - rightOrder;
+            }
+
+            return String(left.title || '').localeCompare(String(right.title || ''));
+        });
+});
 
 </script>
 
@@ -197,7 +212,7 @@ const waStatus = computed(() => props.systemHealth.find((item) => item.label ===
 
             <template v-else>
             <section class="card-surface overflow-hidden p-6 lg:p-8">
-                <div class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr),360px]">
+                <div class="space-y-4">
                     <div class="space-y-5">
                         <div class="inline-flex items-center gap-2 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-1)]">
                             Portal internal premium
@@ -205,41 +220,29 @@ const waStatus = computed(() => props.systemHealth.find((item) => item.label ===
 
                         <div class="space-y-3">
                             <h1 class="max-w-4xl text-3xl font-semibold tracking-tight text-[var(--text-1)] sm:text-4xl xl:text-5xl">
-                                Satu komando untuk pelayanan, pemantauan CCTV, chat internal, dan kesiapan integrasi SIPP.
+                                Dashboard utama difokuskan ke komunikasi internal dan status operasional sistem.
                             </h1>
                             <p class="max-w-3xl text-sm leading-7 text-[var(--text-2)] md:text-base">
-                                Landing dashboard ini mengikuti blueprint Lawangsewu Sprint 1: shell internal yang bisa langsung
-                                dipakai sebagai fondasi frontend lanjutan, dengan fokus nyata pada monitoring live stream kamera
-                                dan koordinasi antarbagian.
+                                Panel utama menampilkan hanya tiga hal inti: Chat Internal, status monitoring server, dan status modul aktif yang sedang tersedia untuk akun Anda.
                             </p>
                         </div>
+                    </div>
+                </div>
+            </section>
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr),520px]">
+                <div class="space-y-6">
+                    <section class="card-surface p-6">
+                        <SectionHeader
+                            eyebrow="Monitoring Server"
+                            title="Status operasional sistem"
+                            description="Ringkasan status layanan inti yang aktif di portal Lawangsewu."
+                        />
 
-                        <div class="flex flex-wrap gap-3">
-                            <Link
-                                :href="route('lawangsewu.cctv')"
-                                class="github-button"
-                            >
-                                Buka Monitoring CCTV
-                            </Link>
-                            <Link
-                                :href="route('lawangsewu.chat')"
-                                class="secondary-button"
-                            >
-                                Buka Chat Internal
-                            </Link>
-                            <button
-                                type="button"
-                                class="secondary-button"
-                            >
-                                Sinkronisasi SIPP
-                            </button>
-                        </div>
-
-                        <div class="grid gap-3 md:grid-cols-3">
+                        <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div
                                 v-for="health in systemHealth"
                                 :key="health.label"
-                                class="card-muted p-4"
+                                class="rounded-[24px] border border-[var(--border)] bg-[var(--surface-2)] p-4"
                             >
                                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-2)]">
                                     {{ health.label }}
@@ -249,134 +252,34 @@ const waStatus = computed(() => props.systemHealth.find((item) => item.label ===
                                 </p>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="card-muted space-y-4 p-5">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-2)]">
-                                Status operasional
-                            </p>
-                            <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--text-1)]">
-                                {{ appMeta.status }}
-                            </h2>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div
-                                v-for="alert in alerts"
-                                :key="alert.title"
-                                class="rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] p-4"
-                            >
-                                <div class="flex items-start gap-3">
-                                    <span
-                                        class="mt-1 h-2.5 w-2.5 rounded-full"
-                                        :class="{
-                                            'bg-emerald-500': alert.tone === 'emerald',
-                                            'bg-amber-500': alert.tone === 'amber',
-                                            'bg-sky-500': alert.tone === 'blue',
-                                        }"
-                                    />
-                                    <div>
-                                        <p class="text-sm font-semibold text-[var(--text-1)]">
-                                            {{ alert.title }}
-                                        </p>
-                                        <p class="mt-1 text-sm leading-6 text-[var(--text-2)]">
-                                            {{ alert.detail }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-surface p-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-2)]">
-                                Kanal aktif
-                            </p>
-                            <div class="mt-3 space-y-3">
-                                <div
-                                    v-for="channel in channels"
-                                    :key="channel.key"
-                                    class="flex items-center justify-between text-sm"
-                                >
-                                    <span class="text-[var(--text-2)]">
-                                        {{ channel.label }}
-                                    </span>
-                                    <span class="font-semibold text-[var(--text-1)]">
-                                        {{ channel.count }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                    v-for="metric in metrics"
-                    :key="metric.title"
-                    :metric="metric"
-                />
-            </section>
-
-            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.45fr),520px]">
-                <div class="space-y-6">
-                    <section class="card-surface p-6">
-                        <SectionHeader
-                            eyebrow="Pelayanan & Persidangan"
-                            title="Jadwal sidang hari ini"
-                            description="Tabel ini meniru ruang kontrol internal untuk agenda persidangan. Nantinya bisa dihubungkan ke SIPP Hub begitu sinkronisasi backend siap."
-                        />
-
-                        <div class="mt-5 overflow-hidden rounded-[24px] border border-[var(--border)]">
-                            <div class="hidden grid-cols-[100px,1.2fr,1.5fr,1fr,1fr] gap-4 bg-[var(--surface-2)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-2)] md:grid">
-                                <span>Waktu</span>
-                                <span>Ruang</span>
-                                <span>Perkara</span>
-                                <span>Majelis</span>
-                                <span>Status</span>
-                            </div>
-
-                            <div class="divide-y divide-[var(--border)]">
-                                <div
-                                    v-for="hearing in hearings"
-                                    :key="`${hearing.time}-${hearing.case}`"
-                                    class="grid gap-3 px-5 py-4 md:grid-cols-[100px,1.2fr,1.5fr,1fr,1fr]"
-                                >
-                                    <div class="text-sm font-semibold text-[var(--text-1)]">
-                                        {{ hearing.time }}
-                                    </div>
-                                    <div class="text-sm text-[var(--text-2)]">
-                                        {{ hearing.room }}
-                                    </div>
-                                    <div class="text-sm text-[var(--text-1)]">
-                                        {{ hearing.case }}
-                                    </div>
-                                    <div class="text-sm text-[var(--text-2)]">
-                                        {{ hearing.judge }}
-                                    </div>
-                                    <div class="text-sm font-medium text-emerald-500">
-                                        {{ hearing.status }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </section>
 
                     <section class="card-surface p-6">
                         <SectionHeader
-                            eyebrow="Launcher"
-                            title="Shortcut modul satelit"
-                            description="Modul di luar Sprint 1 tetap ditampilkan sebagai pintu masuk yang konsisten dengan blueprint Lawangsewu."
+                            eyebrow="Modul Aktif"
+                            title="Status semua modul yang tersedia"
+                            description="Daftar modul aktif untuk akun yang sedang login."
                         />
 
-                        <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            <ModuleShortcutCard
-                                v-for="module in modules"
+                        <div class="mt-5 space-y-3">
+                            <div
+                                v-for="module in activeModules"
                                 :key="module.title"
-                                :module="module"
-                                :hide-badge="isOperator"
-                            />
+                                class="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
+                            >
+                                <div>
+                                    <p class="text-sm font-bold text-[var(--text-1)]">{{ module.title }}</p>
+                                    <p class="text-[11px] text-[var(--text-3)]">{{ module.owner }}</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">
+                                        {{ module.badge || 'Aktif' }}
+                                    </span>
+                                    <Link :href="module.href" class="secondary-button">
+                                        Buka
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </div>

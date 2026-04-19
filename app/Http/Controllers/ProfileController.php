@@ -6,8 +6,8 @@ use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,16 +30,46 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $user = $request->user();
+        $avatarFile = $request->file('avatar_file');
 
-        $request->user()->fill($validated);
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        if (!$user->isSuperAdmin()) {
+            unset($validated['name']);
         }
 
-        $request->user()->save();
+        unset($validated['avatar_file'], $validated['remove_avatar']);
+
+        if ($avatarFile) {
+            $this->deleteManagedAvatar($user->avatar);
+            $validated['avatar'] = Storage::disk('public')->url(
+                $avatarFile->store('profile-avatars', 'public')
+            );
+        } elseif ($request->boolean('remove_avatar')) {
+            $this->deleteManagedAvatar($user->avatar);
+            $validated['avatar'] = null;
+        }
+
+        $user->fill($validated);
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
+    }
+
+    private function deleteManagedAvatar(?string $avatar): void
+    {
+        if (!is_string($avatar) || !str_starts_with($avatar, '/storage/profile-avatars/')) {
+            return;
+        }
+
+        $path = ltrim(substr($avatar, strlen('/storage/')), '/');
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     /**
@@ -47,19 +77,6 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
-
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
+        abort(403, 'Penghapusan akun mandiri dinonaktifkan.');
     }
 }

@@ -11,6 +11,7 @@ const props = defineProps({
     stats:     { type: Object, default: () => ({ total: 0, sent: 0, failed: 0, today: 0, lastSent: 'Belum ada' }) },
     messageStats: { type: Object, default: () => ({ totalMessages: 0, inbound: 0, outbound: 0, unreplied: 0, todayInbound: 0, todayOutbound: 0, conversations: 0 }) },
     convoStats:   { type: Object, default: () => ({ total: 0, open: 0, pending: 0, closed: 0, pendingHandovers: 0 }) },
+    reportStats:  { type: Object, default: () => ({ operatorStats: [], generatedAt: null }) },
     ticketStats:  { type: Object, default: () => ({ total: 0, open: 0, replied: 0, sent: 0, closed: 0, pengaduan: 0, konsultasi: 0, umum: 0, todayTotal: 0 }) },
     recentTickets:{ type: Array,  default: () => [] },
 });
@@ -34,6 +35,8 @@ const runtimeInboxSupported = ref(true);
 
 const latestMsgStats    = ref({ ...props.messageStats });
 const latestConvoStats  = ref({ ...props.convoStats });
+const latestOperatorStats = ref(Array.isArray(props.reportStats?.operatorStats) ? props.reportStats.operatorStats : []);
+const operatorStatsGeneratedAt = ref(props.reportStats?.generatedAt || null);
 
 // Inbox
 const conversations         = ref([]);
@@ -86,6 +89,7 @@ const ticketTransferTo  = ref('');
 
 const isAdmin      = computed(() => Boolean(props.authUser?.isAdmin));
 const isSuperAdmin = computed(() => Boolean(props.authUser?.isSuperAdmin));
+const isOperator   = computed(() => props.authUser?.role === 'operator');
 const isConnected  = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
 const hasRealtime = computed(() => typeof window !== 'undefined' && Boolean(window.Echo));
 const myId = computed(() => props.authUser?.id);
@@ -106,6 +110,20 @@ const ownerPresenceLabel = computed(() => ({
     standby: 'operator standby',
     idle: 'operator idle',
 }[activeConvo.value?.ownerPresence] || ''));
+
+const operatorStatsUpdatedAtText = computed(() => {
+    if (!operatorStatsGeneratedAt.value) return 'Belum diperbarui';
+
+    return new Date(operatorStatsGeneratedAt.value).toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    }) + ' WIB';
+});
+
+const currentOperatorStat = computed(() => latestOperatorStats.value.find((item) => item.id === myId.value) || null);
 
 const statusClass = computed(() => ({
     ok:     'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
@@ -165,6 +183,12 @@ const markToneClass = (tone) => ({
     violet: 'bg-violet-100 text-violet-700 border-violet-200',
     slate: 'bg-slate-100 text-slate-700 border-slate-200',
 }[tone || 'amber'] || 'bg-amber-100 text-amber-700 border-amber-200');
+
+const conversationStatusLabel = (status) => ({
+    pending: 'belum dibaca',
+    open: 'open',
+    closed: 'closed',
+}[status] || status || '-');
 
 const markToneOptions = [
     { value: 'amber', label: 'Amber' },
@@ -904,7 +928,7 @@ const refreshAll = async () => {
     if (isLoading.value) return;
     isLoading.value = true;
     try {
-        await Promise.all([refreshHealth(), refreshStats(), refreshHistory(), refreshLidMappings()]);
+        await Promise.all([refreshHealth(), refreshStats(), refreshHistory(), refreshLidMappings(), refreshOperatorStats()]);
         
         // Only attempt heavier calls if connected or at least has health response
         if (runtimeHealth.value?.status) {
@@ -922,6 +946,18 @@ const refreshAll = async () => {
     } finally {
         isLoading.value = false;
         scheduleNextRefresh();
+    }
+};
+
+const refreshOperatorStats = async () => {
+    if (!isOperator.value) return;
+
+    try {
+        const data = await callApi('operator-stats');
+        latestOperatorStats.value = Array.isArray(data?.operatorStats) ? data.operatorStats : [];
+        operatorStatsGeneratedAt.value = data?.generatedAt || null;
+    } catch {
+        latestOperatorStats.value = Array.isArray(props.reportStats?.operatorStats) ? props.reportStats.operatorStats : [];
     }
 };
 
@@ -1384,7 +1420,7 @@ onUnmounted(() => {
                 <article v-for="card in [
                     { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
                     { label: 'Aktif', value: latestConvoStats.open, color: 'text-emerald-300' },
-                    { label: 'Pending', value: latestConvoStats.pending, color: 'text-amber-300' },
+                    { label: 'Belum Dibaca', value: latestConvoStats.pending, color: 'text-amber-300' },
                     { label: 'Selesai', value: latestConvoStats.closed, color: 'text-slate-300' },
                     { label: 'Pesan Masuk', value: latestMsgStats.todayInbound, color: 'text-cyan-300' },
                     { label: 'Belum Dibalas', value: latestMsgStats.unreplied, color: latestMsgStats.unreplied > 0 ? 'text-rose-300' : 'text-emerald-300' },
@@ -1461,7 +1497,7 @@ onUnmounted(() => {
                                               'bg-amber-500/15 text-amber-600': c.status === 'pending',
                                               'bg-slate-500/15 text-slate-500': c.status === 'closed',
                                           }">
-                                        {{ c.status === 'pending' ? 'belum dibaca' : c.status }}
+                                        {{ conversationStatusLabel(c.status) }}
                                     </span>
                                     <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
                                           :class="markToneClass(c.customerMark.tone)">
@@ -1559,14 +1595,13 @@ onUnmounted(() => {
                                           'bg-amber-100 text-amber-700': activeConvo.status === 'pending',
                                           'bg-slate-100 text-slate-500': activeConvo.status === 'closed',
                                       }">
-                                    {{ activeConvo.status }}
+                                    {{ conversationStatusLabel(activeConvo.status) }}
                                 </span>
                                 <!-- Owner -->
                                 <span v-if="activeConvo.owner" class="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 sm:px-2.5 sm:text-xs">
                                     Ditangani: {{ activeConvo.owner.alias || activeConvo.owner.name }}
                                     <span v-if="iMineConvo" class="ml-1 text-blue-400">(kamu)</span>
                                 </span>
-                                <span v-else class="rounded-full border border-dashed border-slate-300 px-2 py-1 text-[10px] text-slate-500 sm:px-2.5 sm:text-xs">Belum ada petugas</span>
                                 <span v-if="activeConvo.claimedAt" class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 sm:px-2.5 sm:text-xs">
                                     dikunci {{ activeConvo.claimedAt }}
                                 </span>
@@ -1807,7 +1842,7 @@ onUnmounted(() => {
 
 
         <!-- ░░ Tiket: Pengaduan & Konsultasi ░░ -->
-        <section class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">
+        <section v-if="!isOperator" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
                 <h2 class="text-lg font-black text-[var(--text-1)]">Tiket Masuk <span class="ml-2 text-sm font-normal text-[var(--text-2)]">Pengaduan &amp; Konsultasi</span></h2>
                 <div class="flex flex-wrap items-center gap-2">
@@ -1974,8 +2009,56 @@ onUnmounted(() => {
                 </div>
             </article>
 
+            <article v-if="isOperator" class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-black text-[var(--text-1)]">Statistik Balasan WA per User</h2>
+                        <p class="mt-1 text-xs text-[var(--text-2)]">Ringkasan operator yang paling aktif membalas percakapan WhatsApp.</p>
+                    </div>
+                    <span class="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-2)]">
+                        {{ operatorStatsUpdatedAtText }}
+                    </span>
+                </div>
+
+                <div v-if="currentOperatorStat" class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)]">Balasan Hari Ini</p>
+                        <p class="mt-2 text-2xl font-black text-emerald-600">{{ currentOperatorStat.outboundToday || 0 }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)]">Total Balasan</p>
+                        <p class="mt-2 text-2xl font-black text-sky-600">{{ currentOperatorStat.outboundMessages || 0 }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)]">Percakapan Aktif</p>
+                        <p class="mt-2 text-2xl font-black text-violet-600">{{ currentOperatorStat.conversations || 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-5 overflow-hidden rounded-3xl border border-[var(--border)]">
+                    <div class="grid grid-cols-[minmax(0,1.6fr),84px,84px] gap-3 border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-2)]">
+                        <span>Operator</span>
+                        <span class="text-right">Hari Ini</span>
+                        <span class="text-right">Total</span>
+                    </div>
+                    <div class="max-h-[340px] overflow-y-auto divide-y divide-[var(--border)]">
+                        <div v-for="row in latestOperatorStats" :key="row.id" class="grid grid-cols-[minmax(0,1.6fr),84px,84px] gap-3 px-4 py-3" :class="row.id === myId ? 'bg-sky-500/6' : 'bg-transparent'">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-black text-[var(--text-1)]">{{ row.name }}</p>
+                                <p class="mt-1 text-[11px] text-[var(--text-2)]">{{ row.conversations || 0 }} percakapan · {{ row.lastReplyAt || 'belum ada balasan' }}</p>
+                            </div>
+                            <p class="text-right text-sm font-black text-emerald-600">{{ row.outboundToday || 0 }}</p>
+                            <p class="text-right text-sm font-black text-sky-600">{{ row.outboundMessages || 0 }}</p>
+                        </div>
+                        <div v-if="latestOperatorStats.length === 0" class="px-4 py-8 text-center text-sm text-[var(--text-2)]">
+                            Belum ada data balasan operator.
+                        </div>
+                    </div>
+                </div>
+            </article>
+
             <!-- Device Status + QR -->
-            <article class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+            <article v-else class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-black text-[var(--text-1)]">Status Device WA</h2>
                     <div class="flex gap-2">
@@ -2067,7 +2150,7 @@ onUnmounted(() => {
         </section>
 
         <!-- ░░ Activity Log ░░ -->
-        <section class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+        <section v-if="isAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-black text-[var(--text-1)]">Activity Log</h2>
                 <button @click="requestLog = []" class="text-xs text-[var(--text-2)] hover:text-rose-500 transition">Bersihkan</button>

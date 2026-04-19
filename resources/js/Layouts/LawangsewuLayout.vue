@@ -102,7 +102,7 @@ const displayNavGroups = computed(() => {
     ];
 });
 function shouldShowNavBadge(item) {
-    return Boolean(item.badge) && !isOperator.value;
+    return Boolean(item.badge);
 }
 
 function getBadgeText(badge) {

@@ -1,5 +1,5 @@
-# 🚪 PRD & Blueprint — Lawangsewu Ekosistem Digital Internal
-**Portal Utama Digitalisasi Pengadilan Agama Semarang (V2)**
+# 🚪 PRD & Blueprint — Lawangsewu | Layanan Aplikasi Web Pengadilan Agama Semarang dan Workspace Utama Berupa Ekosistem Digital Internal PA Semarang
+**Portal Utama Digitalisasi Pengadilan Agama Semarang (V.2)**
 
 ---
 

@@ -5,7 +5,7 @@ import { Link } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const theme = ref('dark');
-const shellTheme = computed(() => (theme.value === 'dark' ? 'theme-dark' : 'theme-light'));
+const shellTheme = computed(() => (theme.value === 'dark' ? 'dark theme-dark' : 'theme-light'));
 
 function handleThemeChange(event) {
     const nextTheme = event?.detail?.theme;

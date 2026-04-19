@@ -89,7 +89,12 @@ const myId = computed(() => props.authUser?.id);
 // Ownership
 const iMineConvo = computed(() => activeConvo.value?.owner?.id === myId.value);
 const isUnclaimedConvo = computed(() => !activeConvo.value?.owner);
-const canReply = computed(() => iMineConvo.value || isUnclaimedConvo.value || isAdmin.value);
+// Allow reply if: my conversation, unclaimed, admin, OR explicitly not locked (ownership !== 'locked')
+const canReply = computed(() => {
+    if (iMineConvo.value || isUnclaimedConvo.value || isAdmin.value) return true;
+    // Allow reply unless explicitly locked by someone else
+    return activeConvo.value?.ownership !== 'locked';
+});
 const hasPendingHandover = computed(() => Boolean(activeConvo.value?.pendingHandover));
 const iRequestedHandover = computed(() =>
     activeConvo.value?.pendingHandover?.requestor?.id === myId.value
@@ -380,6 +385,47 @@ const isGroupByRemote = (remoteNumber) => {
     return value.endsWith('@g.us') || value.includes('group:');
 };
 
+const normalizeRemoteIdentifier = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    // Tolerate typo payload variants such as @llid.
+    return raw.replace(/@llid$/i, '@lid');
+};
+
+const isLidNumber = (value) => {
+    const normalized = normalizeRemoteIdentifier(value);
+    return String(normalized || '').endsWith('@lid');
+};
+
+const getCleanRemoteNumber = (value) => {
+    const normalized = normalizeRemoteIdentifier(value);
+    if (!normalized) return '-';
+    // Return only the number part without any suffix
+    const clean = normalized.replace(/@(g\.us|s\.whatsapp\.net|lid)$/i, '');
+    // LID: tampilkan nomor saja tanpa label "(LID)" agar tidak membingungkan operator
+    return clean;
+};
+
+const formatRemoteLabel = (value) => {
+    const normalized = normalizeRemoteIdentifier(value);
+    if (!normalized) return '-';
+
+    if (normalized.endsWith('@g.us')) {
+        return `${normalized.replace(/@g\.us$/i, '')} (grup)`;
+    }
+
+    if (normalized.endsWith('@s.whatsapp.net')) {
+        return `${normalized.replace(/@s\.whatsapp\.net$/i, '')} (wa)`;
+    }
+
+    if (normalized.endsWith('@lid')) {
+        return `${normalized.replace(/@lid$/i, '')} (lid)`;
+    }
+
+    return normalized;
+};
+
 const memberColorClassFor = (senderKey) => {
     const key = String(senderKey || 'guest');
     let hash = 0;
@@ -390,12 +436,17 @@ const memberColorClassFor = (senderKey) => {
 };
 
 const normalizeConversation = (raw = {}) => {
-    const isGroup = Boolean(raw.isGroup) || isGroupByRemote(raw.remoteNumber);
+    const remoteNumber = normalizeRemoteIdentifier(raw.remoteNumber || '');
+    const isGroup = Boolean(raw.isGroup) || isGroupByRemote(remoteNumber);
     const groupName = raw.groupName || (isGroup ? raw.remoteName : null);
-    const displayTitle = raw.displayTitle || (isGroup ? (groupName || 'Grup WhatsApp') : (raw.remoteName || raw.remoteNumber));
+    // Always use clean number for non-group displayTitle (without @lid/@wa suffix)
+    const displayTitle = isGroup 
+        ? (raw.displayTitle || groupName || 'Grup WhatsApp') 
+        : getCleanRemoteNumber(remoteNumber);
 
     return {
         ...raw,
+        remoteNumber,
         isGroup,
         groupName,
         displayTitle,
@@ -405,8 +456,14 @@ const normalizeConversation = (raw = {}) => {
 
 const normalizeMessage = (raw = {}) => {
     const metadata = raw?.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
-    const remoteNumber = raw.remoteNumber || activeConvo.value?.remoteNumber || '';
+    const remoteNumber = normalizeRemoteIdentifier(raw.remoteNumber || activeConvo.value?.remoteNumber || '');
     const isGroup = Boolean(raw.isGroup) || isGroupByRemote(remoteNumber) || Boolean(metadata.isGroup);
+    const media = metadata?.media && typeof metadata.media === 'object' ? metadata.media : {};
+    const mediaKind = raw.mediaKind || media.kind || (raw.type === 'sticker' ? 'sticker' : (raw.type === 'image' ? 'image' : null));
+    const mediaMime = raw.mediaMime || media.mimetype || metadata?.mimetype || null;
+    const mediaUrl = raw.mediaUrl || media.dataUrl || media.previewDataUrl || null;
+    const hasVisualMedia = Boolean(mediaUrl && (mediaKind === 'image' || mediaKind === 'sticker' || String(mediaMime || '').startsWith('image/')));
+    const mediaCaption = String(raw.text || media.caption || '').trim();
 
     const senderKey = String(
         raw.senderKey
@@ -423,9 +480,15 @@ const normalizeMessage = (raw = {}) => {
 
     return {
         ...raw,
+        remoteNumber,
         metadata,
         isGroup,
         groupName: raw.groupName || metadata.groupName || metadata.groupSubject || (isGroup ? (activeConvo.value?.groupName || activeConvo.value?.remoteName) : null),
+        mediaKind,
+        mediaMime,
+        mediaUrl,
+        hasVisualMedia,
+        mediaCaption,
         senderKey,
         senderDisplay,
         senderColorClass: raw.direction === 'outbound' ? 'member-color-self' : memberColorClassFor(senderKey),
@@ -467,6 +530,22 @@ const outgoingStatusClass = (msg) => ({
     sending: 'text-slate-500',
     failed: 'text-rose-500',
 }[msg.status] || '');
+
+const messageTypeLabel = (type, msg = null) => {
+    const normalized = String(type || '').toLowerCase();
+    if (normalized === 'text') return 'text';
+    if (normalized === 'image') return 'gambar';
+    if (normalized === 'sticker') return 'stiker';
+    if (normalized === 'document') return 'dokumen';
+    if (normalized === 'video') return 'video';
+    if (normalized === 'audio') return 'audio';
+
+    if (msg?.hasVisualMedia) {
+        return msg.mediaKind === 'sticker' ? 'stiker' : 'gambar';
+    }
+
+    return normalized || 'pesan';
+};
 
 const syncMarkFormFromActive = () => {
     const mark = activeConvo.value?.customerMark;
@@ -681,7 +760,12 @@ const refreshConvoMessages = async (convoId = activeConvoId.value) => {
     if (!convoId || !convo) { conversationMessages.value = []; return; }
     try {
         const data = await callApi('conversation', { params: { remote_number: convo.remoteNumber } });
-        conversationMessages.value = (data?.messages || []).map(normalizeMessage);
+        const serverMessages = (data?.messages || []).map(normalizeMessage);
+        // Preserve temp messages (sending/failed) that are not yet in DB
+        const pendingTemps = conversationMessages.value.filter(
+            (m) => m._tempId && ['sending', 'failed'].includes(m.status)
+        );
+        conversationMessages.value = [...serverMessages, ...pendingTemps];
         // Mark as read
         await callApi('mark-read', { method: 'post', data: { conversation_id: convoId } });
         // Scroll to bottom
@@ -1060,30 +1144,26 @@ onUnmounted(() => {
 
     <LawangsewuLayout current-route="wacaraka" :nav-groups="navGroups" :app-meta="appMeta">
 
-        <!-- ░░ Header Hero ░░ -->
-        <section class="relative overflow-hidden rounded-[2rem] border border-[var(--accent-border)] bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_36%),linear-gradient(145deg,rgba(5,10,23,0.96),rgba(15,23,42,0.95))] p-6 text-white shadow-[0_30px_80px_rgba(2,6,23,0.45)] lg:p-8">
+        <!-- ░░ Operator Desk Banner ░░ -->
+        <section class="relative overflow-hidden rounded-3xl border border-[var(--accent-border)] bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_36%),linear-gradient(145deg,rgba(5,10,23,0.96),rgba(15,23,42,0.95))] p-4 text-white shadow-[0_20px_60px_rgba(2,6,23,0.45)] lg:px-6 lg:py-4 mb-6">
             <div class="absolute -right-10 -top-10 h-52 w-52 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
             <div class="absolute -bottom-12 left-1/3 h-44 w-44 rounded-full bg-cyan-400/8 blur-3xl pointer-events-none" />
 
-            <div class="relative z-10 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <p class="text-xs font-black uppercase tracking-[0.25em] text-sky-300/90">WA Live PTSP • Operator Desk</p>
-                    <h1 class="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Inbox Layanan WhatsApp PTSP</h1>
-                    <p class="mt-2 max-w-2xl text-sm text-slate-300">Panel kerja operator untuk membaca pesan masuk, membalas cepat, dan memantau status pengambilalihan chat secara realtime.</p>
-                </div>
+            <div class="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                <p class="text-[10px] font-black uppercase tracking-[0.3em] text-sky-300/90">WA Live PTSP • Operator Desk</p>
+                
                 <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition" :class="statusClass">
+                    <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="statusClass">
                         <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
                         {{ statusText }}
                     </span>
-                    <button @click="refreshAll" :disabled="isLoading" class="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-sky-400/20 transition disabled:opacity-40">
+                    <button @click="refreshAll" :disabled="isLoading" class="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1 text-[11px] font-bold text-sky-200 hover:bg-sky-400/20 transition disabled:opacity-40">
                         {{ isLoading ? 'Memuat...' : '↻ Refresh' }}
                     </button>
                 </div>
             </div>
 
-            <!-- Mini stats -->
-            <div class="relative z-10 mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            <div class="relative z-10 mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                 <article v-for="card in [
                     { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
                     { label: 'Aktif', value: latestConvoStats.open, color: 'text-emerald-300' },
@@ -1092,57 +1172,57 @@ onUnmounted(() => {
                     { label: 'Pesan Masuk', value: latestMsgStats.todayInbound, color: 'text-cyan-300' },
                     { label: 'Belum Dibalas', value: latestMsgStats.unreplied, color: latestMsgStats.unreplied > 0 ? 'text-rose-300' : 'text-emerald-300' },
                     { label: 'Pending Handover', value: latestConvoStats.pendingHandovers, color: latestConvoStats.pendingHandovers > 0 ? 'text-orange-300' : 'text-slate-400' },
-                ]" :key="card.label" class="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
-                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{{ card.label }}</p>
-                    <p class="mt-1.5 text-xl font-black" :class="card.color">{{ card.value ?? 0 }}</p>
+                ]" :key="`operator-summary-${card.label}`" class="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 backdrop-blur transition hover:bg-white/10">
+                    <p class="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">{{ card.label }}</p>
+                    <p class="mt-0.5 text-lg font-black leading-none" :class="card.color">{{ card.value ?? 0 }}</p>
                 </article>
             </div>
         </section>
 
         <!-- ░░ Main: Inbox + Thread ░░ -->
-        <section class="mt-6 grid gap-6 xl:grid-cols-[clamp(280px,28%,360px),minmax(0,1fr)]">
+        <section class="grid min-w-0 grid-cols-[minmax(150px,42%),minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(180px,36%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(280px,28%,360px),minmax(0,1fr)] xl:gap-6">
 
             <!-- Sidebar: Conversation List -->
-            <aside class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)]">
-                <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-5 py-4">
-                    <h2 class="font-black text-[var(--text-1)]">Inbox</h2>
+            <aside class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-4rem)] xl:sticky xl:top-4 xl:rounded-[2rem]">
+                <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-3 flex-shrink-0 sm:px-4 sm:py-4 xl:px-5">
+                    <h2 class="text-sm font-black text-[var(--text-1)] sm:text-base">Inbox</h2>
                     <div class="flex items-center gap-2">
                         <button @click="pullInbox().then(refreshInboxList)" :disabled="isLoading"
-                                class="rounded-xl border border-[var(--border)] px-2.5 py-1 text-[10px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-400 transition">
+                                class="rounded-xl border border-[var(--border)] px-2 py-1 text-[9px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-400 transition sm:px-2.5 sm:text-[10px]">
                             Pull
                         </button>
-                        <span class="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--text-2)]">{{ conversations.length }}</span>
+                        <span class="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-2)] sm:px-2.5 sm:text-[10px]">{{ conversations.length }}</span>
                     </div>
                 </div>
 
-                <p class="px-5 py-2 text-[10px] text-[var(--text-2)]">{{ inboxSyncText }}</p>
+                <p class="px-3 py-2 text-[9px] text-[var(--text-2)] flex-shrink-0 sm:px-4 sm:text-[10px] xl:px-5">{{ inboxSyncText }}</p>
 
-                <div class="max-h-[calc(100vh-18rem)] overflow-y-auto divide-y divide-[var(--border)]">
+                <div class="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
                     <button v-for="c in conversations" :key="c.conversationId"
                             @click="selectConversation(c.conversationId)"
-                            class="w-full px-4 py-3.5 text-left transition group"
+                            class="group w-full px-2.5 py-2.5 text-left transition sm:px-3 sm:py-3 xl:px-4 xl:py-3.5"
                             :class="activeConvoId === c.conversationId ? 'bg-sky-500/10 border-l-2 border-sky-400' : 'hover:bg-[var(--surface-2)] border-l-2 border-transparent'">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white"
+                        <div class="flex items-start gap-2 sm:gap-3">
+                            <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white sm:h-9 sm:w-9 sm:text-[11px] xl:h-10 xl:w-10 xl:text-xs"
                                  :class="avatarToneClassFor(c.conversationId || c.remoteNumber)">
-                                {{ initialsFromName(c.displayTitle || c.remoteName || c.remoteNumber) }}
+                                {{ initialsFromName(c.displayTitle) }}
                             </div>
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-bold text-[var(--text-1)] truncate">
-                                        <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle || c.remoteName || c.remoteNumber }}
+                                    <p class="truncate text-xs font-bold text-[var(--text-1)] sm:text-[13px] xl:text-sm">
+                                        <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle }}
                                     </p>
                                     <!-- Unread badge -->
-                                    <span v-if="c.unreadCount > 0" class="flex-shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black text-white">
+                                    <span v-if="c.unreadCount > 0" class="flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white sm:px-2 sm:text-[10px]">
                                         {{ c.unreadCount }}
                                     </span>
                                 </div>
 
-                                <p v-if="c.remoteName || c.isGroup" class="text-[10px] text-[var(--text-2)] mt-0.5 font-mono">{{ c.remoteNumber }}</p>
+                                <p class="mt-0.5 text-[9px] text-[var(--text-2)] font-mono sm:text-[10px]">{{ getCleanRemoteNumber(c.remoteNumber) }}</p>
 
-                                <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                <div class="mt-1.5 flex flex-wrap items-center gap-1">
+                                    <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
                                           :class="{
                                               'bg-emerald-500/15 text-emerald-600': c.status === 'open',
                                               'bg-amber-500/15 text-amber-600': c.status === 'pending',
@@ -1150,37 +1230,37 @@ onUnmounted(() => {
                                           }">
                                         {{ c.status }}
                                     </span>
-                                    <span v-if="c.customerMark" class="rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                                    <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
                                           :class="markToneClass(c.customerMark.tone)">
                                         {{ c.customerMark.label }}
                                     </span>
-                                    <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-2 py-0.5 text-[10px] font-bold text-sky-600">
+                                    <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 sm:px-2 sm:text-[10px]">
                                         aktif kamu
                                     </span>
-                                    <span v-else-if="c.ownership === 'locked'" class="rounded-full bg-rose-500/12 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                                    <span v-else-if="c.ownership === 'locked'" class="rounded-full bg-rose-500/12 px-1.5 py-0.5 text-[9px] font-bold text-rose-600 sm:px-2 sm:text-[10px]">
                                         terkunci
                                     </span>
-                                    <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-2 py-0.5 text-[10px] font-semibold text-blue-600">
+                                    <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600 sm:px-2 sm:text-[10px]">
                                         {{ c.owner.alias || c.owner.name }}
                                     </span>
-                                    <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-2 py-0.5 text-[10px] font-bold text-violet-600">
+                                    <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[9px] font-bold text-violet-600 sm:px-2 sm:text-[10px]">
                                         baru takeover
                                     </span>
-                                    <span v-if="c.ownerPresence === 'active'" class="rounded-full bg-emerald-500/12 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                                    <span v-if="c.ownerPresence === 'active'" class="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 sm:px-2 sm:text-[10px]">
                                         aktif sekarang
                                     </span>
-                                    <span v-else-if="c.ownerPresence === 'standby'" class="rounded-full bg-sky-500/12 px-2 py-0.5 text-[10px] font-bold text-sky-600">
+                                    <span v-else-if="c.ownerPresence === 'standby'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 sm:px-2 sm:text-[10px]">
                                         standby
                                     </span>
-                                    <span v-else-if="c.ownerPresence === 'idle'" class="rounded-full bg-slate-500/12 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                                    <span v-else-if="c.ownerPresence === 'idle'" class="rounded-full bg-slate-500/12 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 sm:px-2 sm:text-[10px]">
                                         idle
                                     </span>
-                                    <span v-if="c.pendingHandover" class="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-bold text-orange-600">
+                                    <span v-if="c.pendingHandover" class="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-600 sm:px-2 sm:text-[10px]">
                                         handover ⏳
                                     </span>
                                 </div>
 
-                                <p class="mt-1.5 text-[10px] text-[var(--text-2)]">
+                                <p class="mt-1 text-[9px] text-[var(--text-2)] sm:mt-1.5 sm:text-[10px]">
                                     {{ c.lastActivityAt || '—' }}
                                     <span v-if="c.claimedAt" class="ml-1 text-[var(--text-2)]/80">· diklaim {{ c.claimedAt }}</span>
                                 </p>
@@ -1193,37 +1273,41 @@ onUnmounted(() => {
                         <p class="mt-1 text-xs text-[var(--text-2)]">Pesan akan muncul saat runtime mengirim webhook atau pull inbox berhasil.</p>
                     </div>
                 </div>
+
             </aside>
 
             <!-- Main: Thread + Reply -->
-            <div class="flex flex-col gap-4">
+            <div class="min-w-0 flex flex-col gap-3 sm:gap-4">
 
                 <!-- Thread Header -->
-                <div class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-5 shadow-[var(--shadow)]">
+                <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex items-start gap-3">
-                            <div v-if="activeConvo" class="mt-0.5 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+                            <div v-if="activeConvo" class="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white sm:h-10 sm:w-10 xl:h-12 xl:w-12 xl:text-sm"
                                  :class="avatarToneClassFor(activeConvo.conversationId || activeConvo.remoteNumber)">
                                 {{ initialsFromName(activeConvo?.displayTitle || activeConvo?.remoteName || activeConvo?.remoteNumber) }}
                             </div>
 
-                            <div>
-                            <h2 class="text-xl font-black text-[var(--text-1)]">
-                                <span v-if="activeConvo?.isGroup" class="mr-1">👥</span>{{ activeConvo?.displayTitle || activeConvo?.remoteName || activeConvo?.remoteNumber || 'Pilih Percakapan' }}
+                            <div class="min-w-0">
+                            <h2 class="truncate text-base font-black text-[var(--text-1)] sm:text-lg xl:text-xl">
+                                <span v-if="activeConvo?.isGroup" class="mr-1">👥</span>{{ activeConvo?.displayTitle || 'Pilih Percakapan' }}
                             </h2>
-                            <p v-if="activeConvo?.remoteNumber && activeConvo?.remoteName" class="text-xs font-mono text-[var(--text-2)]">{{ activeConvo.remoteNumber }}</p>
-                            <p v-if="activeConvo?.isGroup && groupParticipantCount" class="mt-1 text-[11px] font-semibold text-violet-600">
+                            <p v-if="activeConvo?.remoteNumber" class="text-[10px] font-mono text-[var(--text-2)] sm:text-xs">
+                                {{ getCleanRemoteNumber(activeConvo.remoteNumber) }}
+                                <span v-if="isLidNumber(activeConvo.remoteNumber)" class="ml-1 text-[10px] text-amber-600 font-bold">(Legacy WhatsApp)</span>
+                            </p>
+                            <p v-if="activeConvo?.isGroup && groupParticipantCount" class="mt-1 text-[10px] font-semibold text-violet-600 sm:text-[11px]">
                                 {{ groupParticipantCount }} anggota terdeteksi di thread ini
                             </p>
-                            <div v-if="activeConvo" class="mt-2 flex flex-wrap items-center gap-2">
-                                <span v-if="activeConvo.isGroup" class="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                            <div v-if="activeConvo" class="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                <span v-if="activeConvo.isGroup" class="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 sm:px-2.5 sm:text-xs">
                                     Grup
                                 </span>
-                                <span v-if="activeCustomerMark" class="rounded-full border px-2.5 py-1 text-xs font-bold" :class="markToneClass(activeCustomerMark.tone)">
+                                <span v-if="activeCustomerMark" class="rounded-full border px-2 py-1 text-[10px] font-bold sm:px-2.5 sm:text-xs" :class="markToneClass(activeCustomerMark.tone)">
                                     {{ activeCustomerMark.label }}
                                 </span>
                                 <!-- Status -->
-                                <span class="rounded-full px-2.5 py-1 text-xs font-bold"
+                                <span class="rounded-full px-2 py-1 text-[10px] font-bold sm:px-2.5 sm:text-xs"
                                       :class="{
                                           'bg-emerald-100 text-emerald-700': activeConvo.status === 'open',
                                           'bg-amber-100 text-amber-700': activeConvo.status === 'pending',
@@ -1232,21 +1316,21 @@ onUnmounted(() => {
                                     {{ activeConvo.status }}
                                 </span>
                                 <!-- Owner -->
-                                <span v-if="activeConvo.owner" class="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                <span v-if="activeConvo.owner" class="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 sm:px-2.5 sm:text-xs">
                                     Ditangani: {{ activeConvo.owner.alias || activeConvo.owner.name }}
                                     <span v-if="iMineConvo" class="ml-1 text-blue-400">(kamu)</span>
                                 </span>
-                                <span v-else class="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-xs text-slate-500">Belum ada petugas</span>
-                                <span v-if="activeConvo.claimedAt" class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                                <span v-else class="rounded-full border border-dashed border-slate-300 px-2 py-1 text-[10px] text-slate-500 sm:px-2.5 sm:text-xs">Belum ada petugas</span>
+                                <span v-if="activeConvo.claimedAt" class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 sm:px-2.5 sm:text-xs">
                                     dikunci {{ activeConvo.claimedAt }}
                                 </span>
-                                <span v-if="activeConvo.justClaimed" class="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                                <span v-if="activeConvo.justClaimed" class="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 sm:px-2.5 sm:text-xs">
                                     takeover baru
                                 </span>
-                                <span v-if="ownerPresenceLabel" class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                                <span v-if="ownerPresenceLabel" class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 sm:px-2.5 sm:text-xs">
                                     {{ ownerPresenceLabel }}
                                 </span>
-                                <span class="rounded-full px-2.5 py-1 text-xs font-bold"
+                                <span class="rounded-full px-2 py-1 text-[10px] font-bold sm:px-2.5 sm:text-xs"
                                       :class="conversationLockState === 'mine'
                                           ? 'border border-sky-200 bg-sky-50 text-sky-700'
                                           : conversationLockState === 'locked'
@@ -1259,35 +1343,35 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Actions -->
-                        <div v-if="activeConvo" class="flex flex-wrap gap-2">
-                            <button @click="refreshConvoMessages()" class="text-xs text-[var(--text-2)] border border-[var(--border)] rounded-xl px-3 py-1.5 hover:border-sky-400/50 transition">↻ Muat ulang</button>
+                        <div v-if="activeConvo" class="flex flex-wrap gap-1.5 sm:gap-2">
+                            <button @click="refreshConvoMessages()" class="rounded-xl border border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--text-2)] hover:border-sky-400/50 transition sm:px-3 sm:text-xs">↻ Muat ulang</button>
 
                             <!-- Close (owner or admin) -->
                             <button v-if="(iMineConvo || isAdmin) && activeConvo.status !== 'closed'"
                                     @click="closeConvo"
-                                    class="text-xs border border-slate-200 rounded-xl px-3 py-1.5 text-slate-600 hover:bg-slate-100 transition">
+                                    class="rounded-xl border border-slate-200 px-2 py-1.5 text-[10px] text-slate-600 hover:bg-slate-100 transition sm:px-3 sm:text-xs">
                                 ✓ Selesaikan
                             </button>
 
                             <!-- Request Handover (others) -->
                             <button v-if="!iMineConvo && !isUnclaimedConvo && !iRequestedHandover"
                                     @click="showHandoverModal = true"
-                                    class="text-xs border border-orange-200 bg-orange-50 rounded-xl px-3 py-1.5 text-orange-700 hover:bg-orange-100 transition">
+                                    class="rounded-xl border border-orange-200 bg-orange-50 px-2 py-1.5 text-[10px] text-orange-700 hover:bg-orange-100 transition sm:px-3 sm:text-xs">
                                 ⇄ Minta Alih Chat
                             </button>
-                            <span v-if="iRequestedHandover" class="text-xs px-3 py-1.5 rounded-xl bg-orange-50 text-orange-600 border border-orange-200">
+                            <span v-if="iRequestedHandover" class="rounded-xl border border-orange-200 bg-orange-50 px-2 py-1.5 text-[10px] text-orange-600 sm:px-3 sm:text-xs">
                                 ⏳ Menunggu persetujuan...
                             </span>
 
                             <!-- Force takeover (admin) -->
                             <button v-if="isAdmin && !iMineConvo && activeConvo.owner"
                                     @click="forceHandover(activeConvo.conversationId)"
-                                    class="text-xs border border-rose-200 bg-rose-50 rounded-xl px-3 py-1.5 text-rose-700 hover:bg-rose-100 transition">
+                                    class="rounded-xl border border-rose-200 bg-rose-50 px-2 py-1.5 text-[10px] text-rose-700 hover:bg-rose-100 transition sm:px-3 sm:text-xs">
                                 ⚡ Ambil Alih (Admin)
                             </button>
 
                             <button @click="markEditorOpen = !markEditorOpen"
-                                    class="text-xs border border-violet-200 bg-violet-50 rounded-xl px-3 py-1.5 text-violet-700 hover:bg-violet-100 transition">
+                                    class="rounded-xl border border-violet-200 bg-violet-50 px-2 py-1.5 text-[10px] text-violet-700 hover:bg-violet-100 transition sm:px-3 sm:text-xs">
                                 🏷 Tandai Customer
                             </button>
                         </div>
@@ -1349,23 +1433,23 @@ onUnmounted(() => {
 
                 <!-- Thread Messages -->
                  <div ref="threadEl"
-                     class="flex-1 overflow-y-auto rounded-[2rem] border border-[var(--border)] bg-[var(--surface-2)] p-5 shadow-[var(--shadow)] scroll-smooth"
+                     class="flex-1 overflow-y-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--shadow)] scroll-smooth sm:p-4 xl:rounded-[2rem] xl:p-5"
                      :class="activeConvo && !customBackgroundStyle ? 'thread-surface' : ''"
                      :style="[threadViewportStyle, activeConvo && customBackgroundStyle ? customBackgroundStyle : {}]">
 
-                    <div class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2.5">
-                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)]">Tampilan Chat</p>
+                    <div class="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 sm:mb-4 sm:gap-3 sm:py-2.5">
+                        <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)] sm:text-[10px]">Tampilan Chat</p>
                         <div class="ml-auto flex items-center gap-2">
-                            <button @click="adjustThreadZoom(-5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-xs font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition">
+                            <button @click="adjustThreadZoom(-5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition sm:text-xs">
                                 A-
                             </button>
-                            <span class="w-[52px] text-center text-xs font-bold text-[var(--text-1)]">{{ threadZoom }}%</span>
-                            <button @click="adjustThreadZoom(5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-xs font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition">
+                            <span class="w-[44px] text-center text-[10px] font-bold text-[var(--text-1)] sm:w-[52px] sm:text-xs">{{ threadZoom }}%</span>
+                            <button @click="adjustThreadZoom(5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition sm:text-xs">
                                 A+
                             </button>
                         </div>
 
-                        <label class="flex items-center gap-2 text-xs text-[var(--text-2)]">
+                        <label class="flex items-center gap-2 text-[10px] text-[var(--text-2)] sm:text-xs">
                             <span>Target pesan terlihat:</span>
                             <input type="range"
                                    min="6"
@@ -1373,8 +1457,8 @@ onUnmounted(() => {
                                    step="1"
                                    :value="threadVisibleCount"
                                    @input="setThreadVisibleCount($event.target.value)"
-                                   class="w-28 accent-sky-500" />
-                            <span class="w-7 text-right font-bold text-[var(--text-1)]">{{ threadVisibleCount }}</span>
+                                   class="w-20 accent-sky-500 sm:w-28" />
+                            <span class="w-6 text-right font-bold text-[var(--text-1)] sm:w-7">{{ threadVisibleCount }}</span>
                         </label>
                     </div>
 
@@ -1402,7 +1486,7 @@ onUnmounted(() => {
                                 {{ msg.senderInitials }}
                             </div>
 
-                            <article class="max-w-[78%] rounded-2xl px-4 py-3 shadow-sm transition-all duration-200"
+                            <article class="max-w-[92%] rounded-2xl px-3 py-2.5 shadow-sm transition-all duration-200 sm:max-w-[86%] sm:px-4 sm:py-3 xl:max-w-[78%]"
                                      :class="bubbleCardClass(msg)">
 
                                 <div class="mb-1.5 flex items-center justify-between gap-4 text-[10px] font-semibold"
@@ -1417,11 +1501,20 @@ onUnmounted(() => {
                                     <span class="whitespace-nowrap">{{ msg.sentAt }}</span>
                                 </div>
 
-                                <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ msg.text || '[tanpa teks]' }}</p>
+                                <div v-if="msg.hasVisualMedia" class="space-y-2">
+                                    <img
+                                        :src="msg.mediaUrl"
+                                        :alt="msg.mediaKind === 'sticker' ? 'Sticker WhatsApp' : 'Media WhatsApp'"
+                                        class="max-h-80 w-auto rounded-xl border border-slate-200/80 object-cover shadow-sm"
+                                        :class="msg.mediaKind === 'sticker' ? 'h-28 w-28 object-contain border-0 bg-transparent shadow-none' : ''"
+                                    />
+                                    <p v-if="msg.mediaCaption" class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.mediaCaption }}</p>
+                                </div>
+                                <p v-else class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.text || (msg.mediaKind ? `[${msg.mediaKind}]` : '') || '[pesan kosong]' }}</p>
 
                                 <div class="mt-1.5 flex items-center justify-between gap-2 text-[10px]"
                                      :class="bubbleFooterClass(msg)">
-                                    <span>{{ msg.type }}</span>
+                                    <span>{{ messageTypeLabel(msg.type, msg) }}</span>
                                     <div class="flex items-center gap-2">
                                         <button v-if="isSuperAdmin && msg.id" @click="deleteMessageAction(msg.id)"
                                                 class="text-rose-500/80 hover:text-rose-500 transition" title="Hapus pesan (Superadmin)">
@@ -1442,25 +1535,25 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Reply Box -->
-                <div class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-5 shadow-[var(--shadow)]">
+                <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
                     <!-- Ownership warning -->
                     <div v-if="activeConvo && !canReply" class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                         <strong>{{ activeConvo.owner?.alias || activeConvo.owner?.name || 'Operator lain' }} sedang memegang chat ini.</strong>
                         {{ lockBannerText }}
                     </div>
 
-                    <div class="flex gap-3">
+                    <div class="flex flex-col gap-2 sm:gap-3 xl:flex-row">
                         <textarea v-model="replyText"
                                   rows="3"
                                   :disabled="!activeConvo || !canReply"
-                                  :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : `Balas ke ${activeConvo?.remoteNumber || ''}...`"
-                                  class="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : `Balas ke ${activeConvo?.displayTitle}...` "
+                                  class="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-sm"
                                   @keydown.ctrl.enter="replyToConversation" />
 
-                        <div class="flex flex-col gap-2">
+                        <div class="flex flex-col gap-2 xl:w-auto">
                             <button @click="replyToConversation"
                                     :disabled="replyState === 'sending' || !activeConvo || !canReply"
-                                    class="send-btn flex-1 min-w-[110px] rounded-2xl px-5 py-3 text-sm font-black text-white shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                    class="send-btn flex-1 min-w-[88px] rounded-2xl px-4 py-2.5 text-xs font-black text-white shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed sm:min-w-[110px] sm:px-5 sm:py-3 sm:text-sm"
                                     :class="replyState === 'sending' ? 'send-btn-sending' : ''">
                                 <span class="inline-flex items-center justify-center gap-1.5">
                                     <span v-if="replyState === 'sending'" class="send-dot-loader" aria-hidden="true"></span>
@@ -1473,6 +1566,8 @@ onUnmounted(() => {
                 </div>
             </div>
         </section>
+
+
 
         <!-- ░░ Tiket: Pengaduan & Konsultasi ░░ -->
         <section class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">

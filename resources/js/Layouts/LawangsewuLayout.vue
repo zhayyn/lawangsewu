@@ -2,6 +2,7 @@
 import NavItemIcon from '@/Components/lawangsewu/NavItemIcon.vue';
 import ThemeToggle from '@/Components/lawangsewu/ThemeToggle.vue';
 import LoginToast from '@/Components/lawangsewu/LoginToast.vue';
+import LawangsewuAtomCubeLogo from '@/Components/lawangsewu/LawangsewuAtomCubeLogo.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -27,7 +28,7 @@ const isSidebarCollapsed = ref(false);
 const isSidebarAnimating = ref(false);
 let sidebarAnimationTimer = null;
 
-const shellTheme = computed(() => (isDark.value ? 'theme-dark' : 'theme-light'));
+const shellTheme = computed(() => (isDark.value ? 'dark theme-dark' : 'theme-light'));
 const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?.user?.name || 'Operator PTIP');
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
@@ -116,6 +117,29 @@ function shouldShowNavBadge(item) {
     return Boolean(item.badge) && !isOperator.value;
 }
 
+function getBadgeText(badge) {
+    if (!badge) return '';
+    const upper = badge.toUpperCase();
+    if (upper === 'LIVE' || upper === 'READY') return 'Ready';
+    if (upper === 'TBD') return 'TBD';
+    return badge.charAt(0).toUpperCase() + badge.slice(1).toLowerCase();
+}
+
+function getBadgeStyle(badge) {
+    if (!badge) return '';
+    const upper = badge.toUpperCase();
+    if (upper === 'LIVE' || upper === 'READY') {
+        return 'border-emerald-500/50 text-emerald-600 dark:border-emerald-400/50 dark:text-emerald-400';
+    }
+    if (upper === 'ADMIN' || upper === 'SUPERADMIN') {
+        return 'border-indigo-500/60 text-indigo-700 dark:border-indigo-400/60 dark:text-indigo-400';
+    }
+    if (upper === 'TBD') {
+        return 'border-red-500/60 text-red-600 dark:border-red-400/60 dark:text-red-400';
+    }
+    return 'border-[var(--border)] text-[var(--text-3)]';
+}
+
 function toggleTheme() {
     isDark.value = !isDark.value;
 }
@@ -179,56 +203,45 @@ onMounted(() => {
                     <div class="flex items-center justify-between gap-3 px-6 py-8">
                         <div class="flex items-center gap-3">
                             <div class="relative group cursor-pointer flex-shrink-0 transition-transform duration-500 hover:scale-105 active:scale-95">
-                                <div class="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-700 group-hover:duration-200"></div>
-                                <div class="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 shadow-xl overflow-hidden">
-                                    <!-- 3D Geometric Isometric Logo representing 'L' and 'S' or layered doors -->
-                                    <svg class="w-7 h-7 text-white drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] group-hover:drop-shadow-[0_0_12px_rgba(99,102,241,0.8)] transition-all duration-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <g stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
-                                            <!-- Isometric Cube / Door Layers -->
-                                            <path d="M12 2L3 7.2l9 5.2l9-5.2L12 2z" fill="url(#topGradient)" fill-opacity="0.9" />
-                                            <path d="M3 7.2v10l9 5.2v-10l-9-5.2z" fill="url(#leftGradient)" fill-opacity="0.8" />
-                                            <path d="M21 7.2v10l-9 5.2v-10l9-5.2z" fill="url(#rightGradient)" fill-opacity="0.6" />
-                                            <!-- Decorative Inner Lines / Arches (Lawangsewu / Thousand doors theme) -->
-                                            <path d="M12 11.5v9M7.5 9v10M16.5 9v10" stroke="rgba(255,255,255,0.4)" stroke-width="0.75" />
-                                            <path d="M12 2v5.2" stroke="rgba(255,255,255,0.3)" stroke-width="0.75" />
-                                        </g>
-                                        <defs>
-                                            <linearGradient id="topGradient" x1="12" y1="2" x2="12" y2="12" gradientUnits="userSpaceOnUse">
-                                                <stop stop-color="#60A5FA" />
-                                                <stop offset="1" stop-color="#3B82F6" />
-                                            </linearGradient>
-                                            <linearGradient id="leftGradient" x1="3" y1="7.2" x2="12" y2="22.4" gradientUnits="userSpaceOnUse">
-                                                <stop stop-color="#2563EB" />
-                                                <stop offset="1" stop-color="#1E3A8A" />
-                                            </linearGradient>
-                                            <linearGradient id="rightGradient" x1="21" y1="7.2" x2="12" y2="22.4" gradientUnits="userSpaceOnUse">
-                                                <stop stop-color="#3B82F6" />
-                                                <stop offset="1" stop-color="#1E40AF" />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                    <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <div class="relative flex items-center justify-center overflow-visible">
+                                    <LawangsewuAtomCubeLogo :size="30" />
                                 </div>
                             </div>
                             <div
                                 class="leading-tight overflow-hidden origin-left transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
                                 :class="isSidebarCollapsed ? 'max-w-0 opacity-0 -translate-x-1' : 'max-w-[14rem] opacity-100 translate-x-0'"
                             >
-                                <p class="text-sm font-black text-[var(--text-1)] tracking-tight whitespace-nowrap bg-gradient-to-r from-[var(--text-1)] to-[var(--text-2)] bg-clip-text text-transparent">
-                                    {{ appMeta.name }}
-                                </p>
-                                <p class="text-[9px] text-[var(--text-3)] font-bold uppercase tracking-[0.1em] whitespace-nowrap">
-                                    {{ appMeta.tagline }}
-                                </p>
+                                <div class="flex items-center gap-1.5 mb-0.5">
+                                    <p class="inline-block origin-left text-[17.5px] font-black tracking-tighter whitespace-nowrap text-blue-700 dark:text-blue-500 drop-shadow-[0_2px_1px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_2px_1px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:drop-shadow-[0_0_12px_rgba(37,99,235,0.8)] dark:group-hover:drop-shadow-[0_0_15px_rgba(96,165,250,1)] transition-all duration-300">
+                                        LAWANGSEWU
+                                    </p>
+                                    <span class="px-1.5 py-[2px] text-[7px] font-black uppercase tracking-widest rounded border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-2)] shadow-sm transition-transform duration-300 group-hover:translate-x-4">
+                                        VERSI 2.1.0
+                                    </span>
+                                </div>
+                                <div class="overflow-hidden w-[160px] mt-0.5 relative">
+                                    <div class="flex animate-marquee-seamless whitespace-nowrap">
+                                        <p class="text-[7.5px] text-[var(--text-3)] font-bold uppercase tracking-[0.15em] px-1.5 flex-shrink-0">
+                                            ✦ Layanan Aplikasi Web Pengadilan Agama Semarang dan Workspace Utama
+                                        </p>
+                                        <p class="text-[7.5px] text-[var(--text-3)] font-bold uppercase tracking-[0.15em] px-1.5 flex-shrink-0">
+                                            ✦ Layanan Aplikasi Web Pengadilan Agama Semarang dan Workspace Utama
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+
                     </div>
+
+
 
                     <div class="flex-1 space-y-8 overflow-y-auto px-4 pb-6 scrollbar-none">
                         <section
-                            v-for="group in displayNavGroups"
+                            v-for="(group, groupIndex) in displayNavGroups"
                             :key="group.label"
-                            class="space-y-2"
+                            class="space-y-2 pb-2"
+                            :class="groupIndex > 0 ? 'border-t border-slate-200/50 dark:border-white/10 pt-2' : ''"
                         >
                             <p
                                 class="px-4 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-3)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
@@ -248,8 +261,8 @@ onMounted(() => {
                                         :class="[
                                             'nav-tilt group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-500 relative isolate overflow-hidden will-change-transform',
                                             item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600/5 text-blue-500 font-semibold shadow-[0_10px_30px_-24px_rgba(37,99,235,0.75)]'
-                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)] hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.5)]'
+                                                ? 'bg-blue-600/5 text-slate-950 dark:text-blue-400 font-semibold shadow-[0_10px_30px_-24px_rgba(37,99,235,0.75)]'
+                                                : 'text-slate-950 dark:text-[#ffffff] hover:bg-[var(--surface-2)] hover:text-slate-950 dark:hover:text-[#ffffff] hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.5)]'
                                         ]"
                                     >
                                         <div class="pointer-events-none absolute inset-0 rounded-xl bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.08),transparent)] opacity-0 translate-x-[-120%] transition-all duration-700 group-hover:translate-x-[120%] group-hover:opacity-100"></div>
@@ -268,31 +281,31 @@ onMounted(() => {
                                             class="min-w-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
                                             :class="isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-1 overflow-hidden' : 'flex-1 opacity-100 translate-x-0'"
                                         >
-                                            <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
+                                            <p class="text-[13px] tracking-tight truncate text-slate-950 dark:text-inherit">{{ item.label }}</p>
                                         </div>
 
                                         <span
                                             v-if="shouldShowNavBadge(item)"
                                             :class="[
-                                                'px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]',
+                                                'px-2 py-[2px] text-[10px] font-medium tracking-wide rounded-full border bg-transparent transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]',
                                                 isSidebarCollapsed ? 'max-w-0 scale-90 opacity-0 pointer-events-none overflow-hidden px-0 py-0 border-transparent' : 'max-w-20 scale-100 opacity-100',
-                                                item.badge === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-[var(--surface-3)] border-[var(--border)] text-[var(--text-3)]'
+                                                getBadgeStyle(item.badge)
                                             ]"
                                         >
-                                            {{ item.badge }}
+                                            {{ getBadgeText(item.badge) }}
                                         </span>
                                     </Link>
 
                                     <div
                                         v-else
-                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group transition-all"
+                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group transition-all text-slate-950 dark:text-[#ffffff]"
                                     >
                                         <NavItemIcon :route-key="item.routeKey" :dark="isDark" />
                                         <div
                                             class="min-w-0 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
                                             :class="isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-1 overflow-hidden' : 'flex-1 opacity-100 translate-x-0'"
                                         >
-                                            <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
+                                            <p class="text-[13px] tracking-tight truncate text-slate-950 dark:text-inherit">{{ item.label }}</p>
                                         </div>
                                     </div>
                                 </template>
@@ -300,29 +313,6 @@ onMounted(() => {
                         </section>
                     </div>
 
-                    <button
-                        type="button"
-                        class="group absolute -right-3 top-1/2 z-20 hidden h-11 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-2)] shadow-[0_12px_26px_-20px_rgba(15,23,42,0.65)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] hover:w-7 hover:border-[var(--accent-border)] hover:text-[var(--text-1)] lg:flex"
-                        :class="isSidebarAnimating ? 'scale-95' : 'scale-100'"
-                        :aria-label="isSidebarCollapsed ? 'Tampilkan menu samping' : 'Sembunyikan menu samping'"
-                        @click="toggleSidebarCollapsed"
-                    >
-                        <span class="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.2),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                        <svg
-                            class="h-4 w-4 transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
-                            :class="isSidebarCollapsed ? 'translate-x-[1px] rotate-0' : '-translate-x-[1px] rotate-0'"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2.2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                        >
-                            <path v-if="isSidebarCollapsed" d="m9 18 6-6-6-6" />
-                            <path v-else d="m15 18-6-6 6-6" />
-                        </svg>
-                    </button>
                 </aside>
 
                 <div class="flex min-w-0 flex-1 flex-col">
@@ -340,6 +330,17 @@ onMounted(() => {
                                     <span class="absolute left-0 top-[7px] h-0.5 w-4 rounded-full bg-current transition-all duration-300 group-hover:translate-x-0.5"></span>
                                     <span class="absolute left-0 top-[14px] h-0.5 w-4 rounded-full bg-current transition-all duration-300 group-hover:w-3 group-hover:translate-x-1"></span>
                                 </span>
+                            </button>
+
+                            <!-- Desktop Sidebar Toggle Button -->
+                            <button
+                                type="button"
+                                class="group hidden h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-3)] hover:border-[var(--accent-border)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)] lg:flex transition-all duration-300 shadow-sm shrink-0"
+                                :title="isSidebarCollapsed ? 'Tampilkan Sidebar' : 'Sembunyikan Sidebar'"
+                                @click="toggleSidebarCollapsed"
+                            >
+                                <svg v-if="!isSidebarCollapsed" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>
+                                <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>
                             </button>
 
                             <div v-if="!isViewer && !isOperator" class="hidden min-w-0 flex-1 md:block">
@@ -443,21 +444,20 @@ onMounted(() => {
                 >
                     <div class="mb-6 flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/10 shadow-lg shrink-0">
-                                <svg class="w-6 h-6 text-white drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <g stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
-                                        <path d="M12 2L3 7.2l9 5.2l9-5.2L12 2z" fill="url(#topGradient)" fill-opacity="0.9" />
-                                        <path d="M3 7.2v10l9 5.2v-10l-9-5.2z" fill="url(#leftGradient)" fill-opacity="0.8" />
-                                        <path d="M21 7.2v10l-9 5.2v-10l9-5.2z" fill="url(#rightGradient)" fill-opacity="0.6" />
-                                    </g>
-                                </svg>
+                            <div class="relative flex shrink-0 items-center justify-center overflow-visible">
+                                <LawangsewuAtomCubeLogo :size="30" />
                             </div>
                             <div class="leading-tight">
-                                <p class="text-sm font-black text-[var(--text-1)] tracking-tight bg-gradient-to-r from-[var(--text-1)] to-[var(--text-2)] bg-clip-text text-transparent">
-                                    {{ appMeta.name }}
-                                </p>
-                                <p class="text-[9px] text-[var(--text-3)] font-bold uppercase tracking-[0.1em]">
-                                    {{ appMeta.tagline }}
+                                <div class="flex items-center gap-1.5 mb-0.5">
+                                    <p class="text-[17px] font-black tracking-tighter text-blue-700 dark:text-blue-500 drop-shadow-[0_2px_1px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_2px_1px_rgba(0,0,0,0.4)]">
+                                        LAWANGSEWU
+                                    </p>
+                                    <span class="px-1.5 py-[2px] text-[7px] font-black uppercase tracking-widest rounded border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-2)] shadow-sm">
+                                        VERSI 2.1.0
+                                    </span>
+                                </div>
+                                <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--text-3)]">
+                                    Ekosistem Digital Internal PA Semarang
                                 </p>
                             </div>
                         </div>
@@ -495,9 +495,10 @@ onMounted(() => {
 
                     <div class="mt-5 flex-1 space-y-6 overflow-y-auto scrollbar-none pb-10">
                         <section
-                            v-for="group in displayNavGroups"
+                            v-for="(group, groupIndex) in displayNavGroups"
                             :key="group.label"
-                            class="space-y-3"
+                            class="space-y-3 pb-2"
+                            :class="groupIndex > 0 ? 'border-t border-slate-200/50 dark:border-white/10 pt-2' : ''"
                         >
                             <p class="px-3 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-3)] opacity-60">
                                 {{ group.label }}
@@ -514,8 +515,8 @@ onMounted(() => {
                                         :class="[
                                             'nav-tilt-mobile group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 relative isolate overflow-hidden',
                                             item.routeKey === props.currentRoute
-                                                ? 'bg-blue-600/5 text-blue-500 font-semibold shadow-[0_10px_24px_-22px_rgba(37,99,235,0.8)]'
-                                                : 'text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text-1)]'
+                                                ? 'bg-blue-600/5 text-slate-950 dark:text-blue-400 font-semibold shadow-[0_10px_24px_-22px_rgba(37,99,235,0.8)]'
+                                                : 'text-slate-950 dark:text-[#ffffff] hover:bg-[var(--surface-2)] hover:text-slate-950 dark:hover:text-[#ffffff]'
                                         ]"
                                         @click="isSidebarOpen = false"
                                     >
@@ -526,26 +527,26 @@ onMounted(() => {
                                             :dark="isDark"
                                         />
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
+                                            <p class="text-[13px] tracking-tight truncate text-slate-950 dark:text-inherit">{{ item.label }}</p>
                                         </div>
                                         <span
                                             v-if="shouldShowNavBadge(item)"
                                             :class="[
-                                                'px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border',
-                                                item.badge === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-[var(--surface-3)] border-[var(--border)] text-[var(--text-3)]'
+                                                'px-2 py-[2px] text-[10px] font-medium tracking-wide rounded-full border bg-transparent',
+                                                getBadgeStyle(item.badge)
                                             ]"
                                         >
-                                            {{ item.badge }}
+                                            {{ getBadgeText(item.badge) }}
                                         </span>
                                     </Link>
 
                                     <div
                                         v-else
-                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group"
+                                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 opacity-40 cursor-not-allowed group text-slate-950 dark:text-[#ffffff]"
                                     >
                                         <NavItemIcon :route-key="item.routeKey" :dark="isDark" />
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[13px] tracking-tight truncate">{{ item.label }}</p>
+                                            <p class="text-[13px] tracking-tight truncate text-slate-950 dark:text-inherit">{{ item.label }}</p>
                                         </div>
                                     </div>
                                 </template>
@@ -563,8 +564,18 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
+
 .nav-tilt {
     transform-style: preserve-3d;
+}
+
+@keyframes marqueeSeamless {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+}
+.animate-marquee-seamless {
+    animation: marqueeSeamless 15s linear infinite;
 }
 
 .nav-tilt:hover {

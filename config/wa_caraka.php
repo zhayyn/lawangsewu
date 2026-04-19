@@ -29,4 +29,7 @@ return [
 
     // Number of recent log entries to show on the dashboard
     'log_display_limit' => 50,
+
+    // Laravel queue name for outbound messages (must match queue:work --queue flag)
+    'queue' => env('WA_QUEUE', 'default'),
 ];

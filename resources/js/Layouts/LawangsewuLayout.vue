@@ -33,7 +33,7 @@ const userName = computed(() => page.props.auth?.user?.alias || page.props.auth?
 const isSuperAdmin = computed(() => Boolean(page.props.auth?.isSuperAdmin));
 const isViewer = computed(() => page.props.auth?.user?.role === 'viewer');
 const isOperator = computed(() => page.props.auth?.user?.role === 'operator');
-const viewerRouteKeys = ['dashboard', 'cctv', 'chat', 'guestbook'];
+// operatorRouteKeys kept for badge suppression; nav filtering is now backend-driven.
 const operatorRouteKeys = ['ptsp', 'wacaraka', 'chat'];
 const safeRoute = (name, fallback = '#') => {
     try {
@@ -44,24 +44,12 @@ const safeRoute = (name, fallback = '#') => {
 };
 
 const displayNavGroups = computed(() => {
+    // Backend (LawangsewuPortal) already filters items by role / FeaturePermission.
+    // Frontend only strips items without an href, then appends the Superadmin group.
     const accessibleGroups = props.navGroups
         .map(group => ({
             ...group,
-            items: group.items.filter((item) => {
-                if (!item.href) {
-                    return false;
-                }
-
-                if (isViewer.value) {
-                    return viewerRouteKeys.includes(item.routeKey);
-                }
-
-                if (isOperator.value) {
-                    return operatorRouteKeys.includes(item.routeKey);
-                }
-
-                return true;
-            }),
+            items: group.items.filter(item => Boolean(item.href)),
         }))
         .filter(group => group.items.length > 0);
 

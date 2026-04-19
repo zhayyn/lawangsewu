@@ -19,6 +19,10 @@ class RoleMiddleware
 
         $user = $request->user();
 
+        if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return $next($request);
+        }
+
         if (! $user || ! in_array($user->role, $roles, true)) {
             if ($request->expectsJson()) {
                 return response()->json([

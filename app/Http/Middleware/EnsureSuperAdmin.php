@@ -18,14 +18,7 @@ class EnsureSuperAdmin
             abort(403, 'Akses khusus superadmin.');
         }
 
-        // Check new is_superadmin flag first
-        if ($user->is_superadmin) {
-            return $next($request);
-        }
-
-        // Fallback to email check for backward compatibility
-        $superAdminEmail = strtolower((string) config('auth.super_admin_email', 'dbprakom@gmail.com'));
-        if (strtolower((string) $user->email) !== $superAdminEmail) {
+        if (! method_exists($user, 'isSuperAdmin') || ! $user->isSuperAdmin()) {
             abort(403, 'Akses khusus superadmin.');
         }
 

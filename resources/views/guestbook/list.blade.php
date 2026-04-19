@@ -5,18 +5,32 @@
 @push('styles')
 <style>
     .guest-list-shell {
+        position: relative;
         min-height: calc(100dvh - 52px);
         padding: clamp(1rem, 2vw, 1.5rem) 0 1.8rem;
         background: linear-gradient(120deg, rgba(255, 246, 228, 0.54), rgba(238, 247, 255, 0.54)), url('{{ asset('guestbook/foto-bg.png') }}') center center / cover no-repeat, #f6f9ff;
         overflow-x: clip;
     }
 
+    .guest-list-shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06));
+        pointer-events: none;
+    }
+
+    .guest-list-shell > .container {
+        position: relative;
+        z-index: 1;
+    }
+
     .guest-list-panel {
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 1.3rem;
+        background: rgba(255, 255, 255, 0.78);
+        border-radius: 1.4rem;
         box-shadow: 0 18px 38px rgba(16, 24, 40, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.52);
+        backdrop-filter: blur(14px);
     }
 
     .btn-glass {
@@ -35,14 +49,227 @@
     .history-photo {
         width: 72px;
         height: 72px;
-        border-radius: 0.75rem;
+        border-radius: 0.9rem;
         object-fit: cover;
         border: 2px solid #edf2ff;
         background: #eef3fa;
+        box-shadow: 0 10px 24px rgba(18, 38, 63, 0.12);
+    }
+
+    .guest-history-table {
+        --bs-table-bg: transparent;
+        --bs-table-striped-bg: rgba(247, 251, 255, 0.74);
+        --bs-table-hover-bg: rgba(238, 246, 255, 0.92);
+        margin-bottom: 0;
+    }
+
+    .guest-history-table thead th {
+        background: linear-gradient(135deg, rgba(15, 39, 71, 0.94), rgba(28, 90, 138, 0.9));
+        color: #f4f8ff;
+        border: 0;
+        font-size: 0.77rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .guest-history-table tbody td {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        border-color: rgba(18, 51, 79, 0.08);
+        vertical-align: middle;
     }
 
     .history-row:hover {
         background: #f8fbff;
+    }
+
+    .history-primary {
+        display: block;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #173754;
+    }
+
+    .history-secondary {
+        display: block;
+        margin-top: 0.2rem;
+        color: #5f7489;
+        font-size: 0.92rem;
+    }
+
+    .history-purpose {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 0.55rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(18, 51, 79, 0.06);
+        color: #365874;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
+    .guest-table-actions {
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.45rem;
+    }
+
+    .guest-pagination-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.9rem;
+        margin-top: 1rem;
+        padding: 1rem 1.1rem;
+    }
+
+    .guest-pagination-meta {
+        color: #49627d;
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
+
+    .guest-pagination {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+    }
+
+    .guest-page-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 40px;
+        height: 40px;
+        padding: 0 0.8rem;
+        border-radius: 999px;
+        border: 1px solid rgba(18, 51, 79, 0.12);
+        background: rgba(255, 255, 255, 0.86);
+        color: #12334f;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 8px 18px rgba(18, 38, 63, 0.08);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .guest-page-link:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 22px rgba(18, 38, 63, 0.12);
+        background: #ffffff;
+        color: #12334f;
+    }
+
+    .guest-page-link.is-active {
+        background: linear-gradient(145deg, rgba(72, 142, 255, 0.96), rgba(34, 116, 236, 0.96));
+        border-color: rgba(72, 142, 255, 1);
+        color: #fff;
+        box-shadow: 0 12px 24px rgba(34, 116, 236, 0.22);
+    }
+
+    .guest-page-link.is-disabled {
+        opacity: 0.45;
+        pointer-events: none;
+        box-shadow: none;
+    }
+
+    .guest-page-link.is-nav {
+        padding-left: 0.95rem;
+        padding-right: 0.95rem;
+    }
+
+    .guest-page-ellipsis {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 40px;
+        color: #6b8095;
+        font-weight: 700;
+    }
+
+    @media (max-width: 991.98px) {
+        .guest-history-table thead th:nth-child(2),
+        .guest-history-table tbody td:nth-child(2),
+        .guest-history-table thead th:nth-child(5),
+        .guest-history-table tbody td:nth-child(5) {
+            white-space: nowrap;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .guest-list-shell {
+            padding-bottom: 1.1rem;
+        }
+
+        .guest-pagination-wrap {
+            justify-content: center;
+            text-align: center;
+            padding: 0.9rem;
+        }
+
+        .guest-pagination-meta {
+            width: 100%;
+            font-size: 0.85rem;
+        }
+
+        .guest-pagination {
+            justify-content: center;
+            gap: 0.28rem;
+        }
+
+        .guest-page-link {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 0.58rem;
+            font-size: 0.82rem;
+        }
+
+        .guest-page-link.is-nav {
+            font-size: 0.78rem;
+            padding-left: 0.72rem;
+            padding-right: 0.72rem;
+        }
+
+        .guest-page-ellipsis {
+            min-width: 18px;
+            height: 34px;
+        }
+
+        .history-photo {
+            width: 58px;
+            height: 58px;
+        }
+
+        .guest-table-actions {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .guest-table-actions .btn {
+            width: 100%;
+        }
+
+        .history-primary {
+            font-size: 0.94rem;
+        }
+
+        .history-secondary {
+            font-size: 0.84rem;
+        }
+
+        .history-purpose {
+            font-size: 0.76rem;
+            line-height: 1.35;
+        }
     }
 </style>
 @endpush
@@ -145,8 +372,8 @@
     </div>
 
     <div class="table-responsive guest-list-panel p-3">
-        <table class="table table-striped table-hover align-middle">
-            <thead class="table-dark">
+        <table class="table guest-history-table align-middle">
+            <thead>
                 <tr>
                     <th width="5%">No</th>
                     <th width="14%" class="text-center">Tanggal</th>
@@ -171,15 +398,17 @@
                             @endif
                         </td>
                         <td>
-                            <strong>{{ $entry->name }}</strong><br>
-                            <small class="text-muted">{{ $entry->position }} - {{ $entry->institution }}</small><br>
-                            <small class="text-secondary">Keperluan: {{ $entry->purpose ?: '-' }}</small>
+                            <span class="history-primary">{{ $entry->name }}</span>
+                            <span class="history-secondary">{{ $entry->position }} - {{ $entry->institution }}</span>
+                            <span class="history-purpose">Keperluan: {{ $entry->purpose ?: '-' }}</span>
                         </td>
                         <td class="text-end">{{ \Illuminate\Support\Carbon::parse($entry->checkin)->format('d/m/Y H:i') }}</td>
                         <td class="text-center">
                             @if ($canInspectGuestbook)
-                                <a href="{{ route('lawangsewu.guestbook.detail', $entry->id) }}" class="btn btn-sm btn-glass mb-1"><i class="bi bi-person-vcard"></i> Detail</a>
-                                <a href="{{ route('lawangsewu.guestbook.cetak', ['id' => $entry->id, 'row' => ($entries->currentPage() - 1) * $entries->perPage() + $loop->iteration]) }}" target="_blank" class="btn btn-sm btn-glass"><i class="bi bi-printer"></i> Card</a>
+                                <div class="guest-table-actions">
+                                    <a href="{{ route('lawangsewu.guestbook.detail', $entry->id) }}" class="btn btn-sm btn-glass"><i class="bi bi-person-vcard"></i> Detail</a>
+                                    <a href="{{ route('lawangsewu.guestbook.cetak', ['id' => $entry->id, 'row' => ($entries->currentPage() - 1) * $entries->perPage() + $loop->iteration]) }}" target="_blank" class="btn btn-sm btn-glass"><i class="bi bi-printer"></i> Card</a>
+                                </div>
                             @else
                                 <span class="text-muted small">Lihat data ringkas</span>
                             @endif
@@ -192,9 +421,48 @@
         </table>
     </div>
 
-    <div class="d-flex justify-content-center mt-3">
-        {{ $entries->links() }}
-    </div>
+    @if ($entries->hasPages())
+        @php
+            $startPage = max(1, $entries->currentPage() - 1);
+            $endPage = min($entries->lastPage(), $entries->currentPage() + 1);
+
+            if ($entries->currentPage() <= 2) {
+                $endPage = min($entries->lastPage(), 3);
+            }
+
+            if ($entries->currentPage() >= $entries->lastPage() - 1) {
+                $startPage = max(1, $entries->lastPage() - 2);
+            }
+        @endphp
+        <div class="guest-list-panel guest-pagination-wrap">
+            <div class="guest-pagination-meta">
+                Menampilkan {{ $entries->firstItem() ?? 0 }}-{{ $entries->lastItem() ?? 0 }} dari {{ $entries->total() }} tamu
+            </div>
+            <nav class="guest-pagination" aria-label="Navigasi halaman daftar tamu">
+                <a href="{{ $entries->onFirstPage() ? '#' : $entries->previousPageUrl() }}" class="guest-page-link is-nav {{ $entries->onFirstPage() ? 'is-disabled' : '' }}" aria-label="Halaman sebelumnya">Sblm</a>
+
+                @if ($startPage > 1)
+                    <a href="{{ $entries->url(1) }}" class="guest-page-link">1</a>
+                    @if ($startPage > 2)
+                        <span class="guest-page-ellipsis">...</span>
+                    @endif
+                @endif
+
+                @foreach ($entries->getUrlRange($startPage, $endPage) as $page => $url)
+                    <a href="{{ $url }}" class="guest-page-link {{ $page === $entries->currentPage() ? 'is-active' : '' }}" aria-current="{{ $page === $entries->currentPage() ? 'page' : 'false' }}">{{ $page }}</a>
+                @endforeach
+
+                @if ($endPage < $entries->lastPage())
+                    @if ($endPage < $entries->lastPage() - 1)
+                        <span class="guest-page-ellipsis">...</span>
+                    @endif
+                    <a href="{{ $entries->url($entries->lastPage()) }}" class="guest-page-link">{{ $entries->lastPage() }}</a>
+                @endif
+
+                <a href="{{ $entries->hasMorePages() ? $entries->nextPageUrl() : '#' }}" class="guest-page-link is-nav {{ $entries->hasMorePages() ? '' : 'is-disabled' }}" aria-label="Halaman berikutnya">Brkt</a>
+            </nav>
+        </div>
+    @endif
 </div>
 </div>
 

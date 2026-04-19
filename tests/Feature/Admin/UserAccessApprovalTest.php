@@ -17,6 +17,7 @@ class UserAccessApprovalTest extends TestCase
     {
         $superadmin = User::factory()->create([
             'email' => Config::string('auth.super_admin_email'),
+            'is_superadmin' => true,
             'is_active' => true,
             'role' => 'admin',
             'email_verified_at' => now(),
@@ -131,6 +132,7 @@ class UserAccessApprovalTest extends TestCase
     {
         $superadmin = User::factory()->create([
             'email' => Config::string('auth.super_admin_email'),
+            'is_superadmin' => true,
             'is_active' => true,
             'role' => 'admin',
             'email_verified_at' => now(),
@@ -176,6 +178,7 @@ class UserAccessApprovalTest extends TestCase
 
         $superadmin = User::factory()->create([
             'email' => 'founder-roleperm@example.test',
+            'is_superadmin' => true,
             'is_active' => true,
             'role' => 'admin',
             'email_verified_at' => now(),
@@ -212,6 +215,7 @@ class UserAccessApprovalTest extends TestCase
 
         $superadmin = User::factory()->create([
             'email' => 'founder-userperm@example.test',
+            'is_superadmin' => true,
             'is_active' => true,
             'role' => 'admin',
             'email_verified_at' => now(),
@@ -253,5 +257,103 @@ class UserAccessApprovalTest extends TestCase
         ]);
 
         $this->assertFalse(FeaturePermission::hasAccess($target->fresh(), 'admin.cctv'));
+    }
+
+    public function test_superadmin_can_open_user_access_page_and_manage_allowlist_and_permissions(): void
+    {
+        Config::set('auth.super_admin_email', 'founder-full-access@example.test');
+
+        $superadmin = User::factory()->create([
+            'email' => 'founder-full-access@example.test',
+            'is_superadmin' => true,
+            'is_active' => true,
+            'role' => 'admin',
+            'email_verified_at' => now(),
+        ]);
+
+        $target = User::factory()->create([
+            'email' => 'target-full-access@example.test',
+            'role' => 'viewer',
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($superadmin)
+            ->get(route('admin.users.index'))
+            ->assertOk();
+
+        $this->actingAs($superadmin)
+            ->post(route('admin.users.allowlist.store'), [
+                'email' => 'allowed-full-access@example.test',
+                'note' => 'Full access audit',
+                'auto_activate' => true,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($superadmin)
+            ->patch(route('admin.permissions.role.update'), [
+                'role' => 'operator',
+                'feature_key' => 'admin.users',
+                'enabled' => true,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($superadmin)
+            ->patch(route('admin.permissions.user.update'), [
+                'user_id' => $target->id,
+                'feature_key' => 'admin.cctv',
+                'enabled' => true,
+            ])
+            ->assertRedirect();
+    }
+
+    public function test_configured_superadmin_email_without_flag_can_still_manage_user_access_end_to_end(): void
+    {
+        Config::set('auth.super_admin_email', 'founder-email-only@example.test');
+
+        $superadmin = User::factory()->create([
+            'email' => 'founder-email-only@example.test',
+            'is_superadmin' => false,
+            'is_active' => true,
+            'role' => 'admin',
+            'email_verified_at' => now(),
+        ]);
+
+        $target = User::factory()->create([
+            'email' => 'target-email-only@example.test',
+            'role' => 'viewer',
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        $this->assertTrue($superadmin->fresh()->isSuperAdmin());
+
+        $this->actingAs($superadmin)
+            ->get(route('admin.users.index'))
+            ->assertOk();
+
+        $this->actingAs($superadmin)
+            ->post(route('admin.users.allowlist.store'), [
+                'email' => 'allowed-email-only@example.test',
+                'note' => 'Email fallback audit',
+                'auto_activate' => true,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($superadmin)
+            ->patch(route('admin.permissions.role.update'), [
+                'role' => 'operator',
+                'feature_key' => 'admin.users',
+                'enabled' => false,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($superadmin)
+            ->patch(route('admin.permissions.user.update'), [
+                'user_id' => $target->id,
+                'feature_key' => 'admin.cctv',
+                'enabled' => true,
+            ])
+            ->assertRedirect();
     }
 }

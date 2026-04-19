@@ -34,6 +34,26 @@ class DashboardFlowTest extends TestCase
 
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Lawangsewu/Dashboard')
+            ->where('navGroups', function ($groups): bool {
+                $labels = collect($groups)->flatMap(fn (array $group) => $group['items'] ?? [])->pluck('label')->values()->all();
+
+                 // Operator sees: Dashboard Utama + Chat Internal (Dashboard category)
+                 //               + Antrian PTSP + WA Live PTSP (Pelayanan category)
+                 sort($labels);
+                 $expected = ['Antrian PTSP', 'Chat Internal', 'Dashboard Utama', 'WA Live PTSP'];
+                 sort($expected);
+                 return $labels === $expected;
+            })
+            ->where('quickActions', function ($items): bool {
+                $labels = collect($items)->pluck('label')->values()->all();
+
+                return $labels === ['Buka Chat', 'Buka Antrian PTSP', 'WA Live PTSP'];
+            })
+            ->where('modules', function ($items): bool {
+                $labels = collect($items)->pluck('title')->values()->all();
+
+                return $labels === ['Antrian PTSP', 'Chat Internal', 'WA Live PTSP'];
+            })
             ->has('metrics')
             ->has('cameras')
             ->has('messages')

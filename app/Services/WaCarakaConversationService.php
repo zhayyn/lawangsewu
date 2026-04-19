@@ -8,6 +8,7 @@ use App\Models\WaCarakaHandover;
 use App\Models\WaCarakaMessage;
 use App\Events\WaCarakaConversationUpdated;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * WaCarakaConversationService
@@ -63,50 +64,13 @@ class WaCarakaConversationService
     /**
      * Check if a user can reply to a specific conversation.
      * Returns ['allowed' => bool, 'reason' => string].
+     *
+     * Ownership tracking is retained for display purposes, but every
+     * authenticated user may reply to any conversation.
      */
     public function canReply(WaCarakaConversation $convo, User $user): array
     {
-        // Superadmin/admin can always reply (they become the new owner if unclaimed)
-        if ($user->isSuperAdmin() || $user->role === 'admin') {
-            return ['allowed' => true, 'reason' => null];
-        }
-
-        // Unclaimed conversation — any operator can claim by replying
-        if ($convo->isUnclaimed()) {
-            return ['allowed' => true, 'reason' => null];
-        }
-
-        // Claimed by this user — always allowed
-        if ($convo->isClaimedBy($user->id)) {
-            return ['allowed' => true, 'reason' => null];
-        }
-
-        // Claimed by someone else
-        $owner = $convo->owner;
-        $ownerName = $owner ? ($owner->alias ?: $owner->name) : 'petugas lain';
-
-        // Check if user has a pending or approved handover
-        $handover = WaCarakaHandover::where('conversation_id', $convo->id)
-            ->where('requested_by', $user->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->latest()
-            ->first();
-
-        if ($handover?->status === 'approved') {
-            return ['allowed' => true, 'reason' => null];
-        }
-
-        if ($handover?->status === 'pending') {
-            return [
-                'allowed' => false,
-                'reason'  => "Permintaan pengambilalihan menunggu persetujuan {$ownerName}.",
-            ];
-        }
-
-        return [
-            'allowed' => false,
-            'reason'  => "Percakapan ini sedang ditangani oleh {$ownerName}. Ajukan pengambilalihan terlebih dahulu.",
-        ];
+        return ['allowed' => true, 'reason' => null];
     }
 
     /**
@@ -120,7 +84,7 @@ class WaCarakaConversationService
         }
 
         $convo->claimFor($user);
-        WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
     }
 
     /**
@@ -140,7 +104,7 @@ class WaCarakaConversationService
             }
 
             $fresh = $locked->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']);
-            WaCarakaConversationUpdated::dispatch($fresh);
+            $this->safeDispatchUpdate($fresh);
 
             return $fresh;
         });
@@ -153,7 +117,7 @@ class WaCarakaConversationService
     {
         $convo = $this->findOrCreate($message->remote_number, $message->conversation_id);
         $convo->recordInbound();
-        WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
         return $convo;
     }
 
@@ -167,7 +131,7 @@ class WaCarakaConversationService
         if ($convo->claimed_by !== $sender->id) {
             $convo->update(['claimed_by' => $sender->id, 'claimed_at' => now()]);
         }
-        WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
     }
 
     // ──────────────────────────────────────────────
@@ -227,7 +191,7 @@ class WaCarakaConversationService
             $handover->approve(); // updates conversation.claimed_by inside
         });
 
-        WaCarakaConversationUpdated::dispatch($handover->conversation->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($handover->conversation->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
 
         return ['ok' => true];
     }
@@ -249,7 +213,7 @@ class WaCarakaConversationService
         }
 
         $handover->reject();
-        WaCarakaConversationUpdated::dispatch($handover->conversation->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($handover->conversation->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
 
         return ['ok' => true];
     }
@@ -274,7 +238,7 @@ class WaCarakaConversationService
         ]);
 
         $convo->transferTo($admin);
-        WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
 
         return ['ok' => true];
     }
@@ -292,7 +256,7 @@ class WaCarakaConversationService
         }
 
         $convo->update(['status' => 'closed']);
-        WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+        $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
         return ['ok' => true];
     }
 
@@ -303,7 +267,7 @@ class WaCarakaConversationService
     {
         if ($convo->status === 'closed') {
             $convo->update(['status' => $convo->claimed_by ? 'open' : 'pending']);
-            WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
+            $this->safeDispatchUpdate($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
         }
     }
 
@@ -320,5 +284,21 @@ class WaCarakaConversationService
             'closed'        => WaCarakaConversation::closed()->count(),
             'pendingHandovers' => WaCarakaHandover::where('status', 'pending')->count(),
         ];
+    }
+
+    // ──────────────────────────────────────────────
+    // Internal Helpers
+    // ──────────────────────────────────────────────
+
+    private function safeDispatchUpdate(WaCarakaConversation $convo): void
+    {
+        try {
+            WaCarakaConversationUpdated::dispatch($convo);
+        } catch (\Throwable $e) {
+            Log::warning('[WaCaraka] ConversationUpdated broadcast failed (non-critical)', [
+                'conversation_id' => $convo->conversation_id ?? null,
+                'error'           => class_basename($e) . ': ' . substr($e->getMessage(), 0, 120),
+            ]);
+        }
     }
 }

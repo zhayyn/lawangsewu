@@ -15,6 +15,69 @@ use Illuminate\Support\Facades\Schema;
 
 class LawangsewuPortal
 {
+    protected static function currentUser()
+    {
+        return auth()->user();
+    }
+
+    protected static function isSuperAdmin(): bool
+    {
+        return (bool) self::currentUser()?->isSuperAdmin();
+    }
+
+    protected static function isOperatorOnlyView(): bool
+    {
+        $user = self::currentUser();
+
+        return $user
+            && ! $user->isSuperAdmin()
+            && $user->role === 'operator';
+    }
+
+    /**
+     * Check if the current user may see a given nav item identified by routeKey.
+     * Superadmin always has access. For others, FeaturePermission is consulted
+     * so that the superadmin can toggle individual menu items per role from the
+     * Kelola Akses User interface.
+     */
+    protected static function canSeeNavItem(string $routeKey): bool
+    {
+        $user = self::currentUser();
+        if (! $user) {
+            return false;
+        }
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return \App\Models\FeaturePermission::hasAccess($user, 'nav.' . $routeKey);
+    }
+
+    protected static function filterNavItems(array $items): array
+    {
+        return array_values(array_filter($items, function (array $item): bool {
+            return self::canSeeNavItem((string) ($item['routeKey'] ?? ''));
+        }));
+    }
+
+    protected static function filterLaunchersForCurrentUser(array $items): array
+    {
+        return array_values(array_filter($items, function (array $item): bool {
+            $routeKey = (string) ($item['routeKey'] ?? '');
+            if ($routeKey !== '') {
+                return self::canSeeNavItem($routeKey);
+            }
+
+            // Fallback for items without routeKey: always show to non-operator or superadmin
+            $user = self::currentUser();
+            if (! $user || $user->isSuperAdmin()) {
+                return true;
+            }
+
+            return ! ($user->role === 'operator');
+        }));
+    }
+
     protected static function routeOrNull(string $name): ?string
     {
         return Route::has($name) ? route($name) : null;
@@ -32,7 +95,7 @@ class LawangsewuPortal
 
     public static function navGroups(): array
     {
-        return [
+        $groups = [
             [
                 'label' => 'Dashboard',
                 'items' => [
@@ -43,26 +106,31 @@ class LawangsewuPortal
                         'href' => route('lawangsewu.dashboard'),
                         'badge' => 'Ready',
                     ],
+                    [
+                        'label' => 'Chat Internal',
+                        'short' => 'CH',
+                        'routeKey' => 'chat',
+                        'href' => route('lawangsewu.chat'),
+                        'badge' => 'Ready',
+                    ],
                 ],
             ],
             [
                 'label' => 'Pelayanan',
                 'items' => [
                     ['label' => 'Buku Tamu', 'short' => 'BT', 'routeKey' => 'guestbook', 'href' => route('lawangsewu.guestbook.form'), 'badge' => 'Ready'],
-                    ['label' => 'Pendopo', 'short' => 'PD', 'routeKey' => 'satellite.pendopo', 'href' => route('lawangsewu.satellite.pendopo'), 'badge' => 'Ready'],
                     ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Ready'],
                     ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Ready'],
                     ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Ready'],
+                    ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
                 ],
             ],
             [
                 'label' => 'SIPP Hub & Data',
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
-                    ['label' => 'Chat Internal', 'short' => 'CH', 'routeKey' => 'chat', 'href' => route('lawangsewu.chat'), 'badge' => 'Ready'],
                     ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Ready'],
-                    ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
-                    ...(auth()->user()?->isSuperAdmin()
+                    ...(self::isSuperAdmin()
                         ? [['label' => 'WA Caraka Admin', 'short' => 'WA⚙', 'routeKey' => 'wacaraka.admin', 'href' => self::routeOrNull('admin.wacaraka.index'), 'badge' => 'Admin']]
                         : []),
                 ],
@@ -84,20 +152,26 @@ class LawangsewuPortal
                 ],
             ],
         ];
+
+        return array_values(array_filter(array_map(function (array $group): array {
+            $group['items'] = self::filterNavItems($group['items'] ?? []);
+
+            return $group;
+        }, $groups), fn (array $group): bool => ! empty($group['items'])));
     }
 
     public static function quickActions(): array
     {
-        return [
-            ['label' => 'Buka CCTV', 'href' => route('lawangsewu.cctv'), 'tone' => 'accent'],
-            ['label' => 'Buka Chat', 'href' => route('lawangsewu.chat'), 'tone' => 'neutral'],
-            ['label' => 'Buka Buku Tamu', 'href' => route('lawangsewu.guestbook.form'), 'tone' => 'neutral'],
-            ['label' => 'Buka Antrian PTSP', 'href' => route('lawangsewu.ptsp.index'), 'tone' => 'neutral'],
-            ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral'],
-            ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral'],
-            ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent'],
-            ['label' => 'WA Live PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent'],
-        ];
+        return self::filterLaunchersForCurrentUser([
+            ['label' => 'Buka CCTV', 'href' => route('lawangsewu.cctv'), 'tone' => 'accent', 'routeKey' => 'cctv'],
+            ['label' => 'Buka Chat', 'href' => route('lawangsewu.chat'), 'tone' => 'neutral', 'routeKey' => 'chat'],
+            ['label' => 'Buka Buku Tamu', 'href' => route('lawangsewu.guestbook.form'), 'tone' => 'neutral', 'routeKey' => 'guestbook'],
+            ['label' => 'Buka Antrian PTSP', 'href' => route('lawangsewu.ptsp.index'), 'tone' => 'neutral', 'routeKey' => 'ptsp'],
+            ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral', 'routeKey' => 'sidang'],
+            ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral', 'routeKey' => 'pilar'],
+            ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent', 'routeKey' => 'sipp'],
+            ['label' => 'WA Live PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent', 'routeKey' => 'wacaraka'],
+        ]);
     }
 
     public static function metrics(): array
@@ -127,18 +201,19 @@ class LawangsewuPortal
 
     public static function modules(): array
     {
-        return [
-            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.guestbook.form')],
-            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => route('lawangsewu.ptsp.index')],
-            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Ready', 'href' => route('lawangsewu.sidang.index')],
-            ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.pilar.index')],
-            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Ready', 'href' => route('lawangsewu.sipp.index')],
-            ['title' => 'WA Live PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index')],
+        return self::filterLaunchersForCurrentUser([
+            ['title' => 'Buku Tamu', 'description' => 'Registrasi tamu dan kehadiran harian.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.guestbook.form'), 'routeKey' => 'guestbook'],
+            ['title' => 'Antrian PTSP', 'description' => 'Manajemen loket dan nomor antre.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => route('lawangsewu.ptsp.index'), 'routeKey' => 'ptsp'],
+            ['title' => 'Chat Internal', 'description' => 'Kanal komunikasi internal operator dan koordinasi harian.', 'owner' => 'Internal', 'badge' => 'Ready', 'href' => route('lawangsewu.chat'), 'routeKey' => 'chat'],
+            ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Ready', 'href' => route('lawangsewu.sidang.index'), 'routeKey' => 'sidang'],
+            ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.pilar.index'), 'routeKey' => 'pilar'],
+            ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Ready', 'href' => route('lawangsewu.sipp.index'), 'routeKey' => 'sipp'],
+            ['title' => 'WA Live PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'routeKey' => 'wacaraka'],
             ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Ready', 'href' => null],
             ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Pandanaran AI', 'description' => 'Asisten internal untuk tanya jawab cepat.', 'owner' => 'AI', 'badge' => 'Beta', 'href' => null],
-        ];
+        ]);
     }
 
     public static function hearings(): array

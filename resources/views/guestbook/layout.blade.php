@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Buku Tamu Digital')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -72,6 +76,65 @@
             white-space: nowrap;
         }
 
+        .site-header-marquee {
+            position: relative;
+            flex: 1 1 auto;
+            min-width: 180px;
+            height: 2rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.05));
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .site-header-marquee::before,
+        .site-header-marquee::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 42px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .site-header-marquee::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(11, 33, 55, 0.92), rgba(11, 33, 55, 0));
+        }
+
+        .site-header-marquee::after {
+            right: 0;
+            background: linear-gradient(270deg, rgba(11, 33, 55, 0.92), rgba(11, 33, 55, 0));
+        }
+
+        .site-header-marquee-track {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 2.5rem;
+            min-width: max-content;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            white-space: nowrap;
+            color: rgba(244, 249, 255, 0.9);
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            animation: pendopo-marquee 28s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes pendopo-marquee {
+            0% { transform: translate(0, -50%); }
+            100% { transform: translate(-50%, -50%); }
+        }
+
         .site-header-badge .badge-icon {
             width: 28px;
             height: 28px;
@@ -89,6 +152,7 @@
             display: flex;
             align-items: center;
             gap: 0.55rem;
+            flex-shrink: 0;
         }
 
         .site-pill {
@@ -187,6 +251,23 @@
                 font-size: 0.88rem;
             }
 
+            .site-header-marquee {
+                min-width: 120px;
+                height: 1.65rem;
+            }
+
+            .site-header-marquee::before,
+            .site-header-marquee::after {
+                width: 22px;
+            }
+
+            .site-header-marquee-track {
+                font-size: 0.63rem;
+                gap: 1.1rem;
+                letter-spacing: 0.05em;
+                animation-duration: 22s;
+            }
+
             .site-pill {
                 font-size: 0.7rem;
                 padding: 0.28rem 0.6rem;
@@ -197,7 +278,9 @@
     @stack('styles')
 </head>
 <body>
-@php $isEmbedded = request()->boolean('embedded'); @endphp
+@php
+    $isEmbedded = request()->boolean('embedded');
+@endphp
 @if(!$isEmbedded)
 <header class="site-header" role="banner">
     <div class="site-header-inner">
@@ -206,8 +289,14 @@
             PENDOPO
         </div>
 
+        <div class="site-header-marquee" aria-label="Keterangan operasional Pendopo">
+            <div class="site-header-marquee-track">
+                <span>Pusat Entri Data &amp; Operasional Pengunjung.</span>
+                <span>Pusat Entri Data &amp; Operasional Pengunjung.</span>
+            </div>
+        </div>
+
         <div class="site-header-right">
-            <a class="site-pill" href="{{ route('lawangsewu.dashboard') }}" target="_top"><i class="bi bi-speedometer2"></i> Dashboard</a>
             <a class="site-pill" href="{{ route('lawangsewu.guestbook.form') }}" target="_top"><i class="bi bi-book-half"></i> Form Tamu</a>
             <a class="site-pill" href="{{ route('lawangsewu.guestbook.list', ['period' => 'all']) }}" target="_top"><i class="bi bi-clock-history"></i> Riwayat</a>
         </div>

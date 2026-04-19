@@ -78,6 +78,71 @@ return [
             'category' => 'Reporting',
             'default_roles' => ['viewer', 'operator', 'useradmin', 'admin'],
         ],
+
+        // ── Navigasi (dikelola superadmin per-role) ──────────────────────────
+        [
+            'key' => 'nav.dashboard',
+            'name' => 'Menu: Dashboard Utama',
+            'description' => 'Tampilkan menu Dashboard Utama di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['viewer', 'operator', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.chat',
+            'name' => 'Menu: Chat Internal',
+            'description' => 'Tampilkan menu Chat Internal di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['viewer', 'operator', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.guestbook',
+            'name' => 'Menu: Buku Tamu',
+            'description' => 'Tampilkan menu Buku Tamu di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['viewer', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.ptsp',
+            'name' => 'Menu: Antrian PTSP',
+            'description' => 'Tampilkan menu Antrian PTSP di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['operator', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.sidang',
+            'name' => 'Menu: Antrian Sidang',
+            'description' => 'Tampilkan menu Antrian Sidang di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['viewer', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.pilar',
+            'name' => 'Menu: Pilar PASMG',
+            'description' => 'Tampilkan menu Pilar Antrian PASMG di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.wacaraka',
+            'name' => 'Menu: WA Live PTSP',
+            'description' => 'Tampilkan menu WA Live PTSP di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['operator', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.cctv',
+            'name' => 'Menu: Monitoring CCTV',
+            'description' => 'Tampilkan menu Monitoring CCTV di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['viewer', 'useradmin', 'admin'],
+        ],
+        [
+            'key' => 'nav.sipp',
+            'name' => 'Menu: SIPP Hub',
+            'description' => 'Tampilkan menu SIPP Hub di navigasi',
+            'category' => 'Navigasi',
+            'default_roles' => ['useradmin', 'admin'],
+        ],
     ],
 
     'categories' => [
@@ -87,5 +152,6 @@ return [
         'Monitoring' => 'Pemantauan sistem',
         'Dashboard' => 'Dashboard dan portal',
         'Reporting' => 'Laporan dan analitik',
+        'Navigasi' => 'Visibilitas menu navigasi per role',
     ],
 ];

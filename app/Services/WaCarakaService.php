@@ -155,6 +155,67 @@ class WaCarakaService
         return $this->post('/history/clear');
     }
 
+    public function getLidMappings(): array
+    {
+        return $this->get('/lid-mappings');
+    }
+
+    public function syncContacts(): array
+    {
+        $response = $this->post('/contacts/sync');
+
+        // Some runtimes do not implement /contacts/sync yet.
+        // Fallback to current lid mappings so UI action stays useful.
+        if (($response['status'] ?? 0) === 404 || ($response['ok'] ?? false) === false) {
+            $mappings = $this->getLidMappings();
+            $pairs = $mappings['data']['pairs'] ?? [];
+
+            return [
+                'ok' => true,
+                'status' => 200,
+                'data' => [
+                    'ok' => true,
+                    'scanned' => null,
+                    'learned' => 0,
+                    'lidMappings' => is_array($pairs) ? count($pairs) : 0,
+                    'fallback' => true,
+                ],
+            ];
+        }
+
+        return $response;
+    }
+
+    public function resolveContactsMeta(array $jids): array
+    {
+        $normalized = collect($jids)
+            ->filter(fn ($jid) => is_string($jid) && trim($jid) !== '')
+            ->map(fn ($jid) => trim((string) $jid))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($normalized)) {
+            return [
+                'ok' => true,
+                'status' => 200,
+                'data' => ['ok' => true, 'items' => []],
+            ];
+        }
+
+        $response = $this->post('/contacts/resolve', ['jids' => $normalized]);
+
+        if (($response['status'] ?? 0) === 404) {
+            return [
+                'ok' => true,
+                'status' => 200,
+                'data' => ['ok' => true, 'items' => [], 'fallback' => true],
+            ];
+        }
+
+        return $response;
+    }
+
     // ══════════════════════════════════════════════
     // Outbound Messaging
     // ══════════════════════════════════════════════
@@ -175,7 +236,7 @@ class WaCarakaService
             return $this->sendRuntimeText($to, $text, $sender, $userId);
         }
 
-        WaCarakaMessageSynced::dispatch($queuedMessage->fresh('user:id,name,alias'));
+        $this->dispatchMessageSynced($queuedMessage->fresh('user:id,name,alias'));
 
         $job = new SendWaCarakaOutboundMessage($queuedMessage->id, $sender);
 
@@ -264,7 +325,7 @@ class WaCarakaService
 
         $storedMessage = $message->fresh('user:id,name,alias');
         if ($storedMessage) {
-            WaCarakaMessageSynced::dispatch($storedMessage);
+            $this->dispatchMessageSynced($storedMessage);
         }
 
         $this->logLegacy([
@@ -358,7 +419,7 @@ class WaCarakaService
         ]);
 
         if ($outboundMsg) {
-            WaCarakaMessageSynced::dispatch($outboundMsg);
+            $this->dispatchMessageSynced($outboundMsg);
         }
 
         $this->logLegacy([
@@ -383,10 +444,45 @@ class WaCarakaService
      */
     public function handleInbound(array $payload): WaCarakaMessage
     {
-        $chatAddress = (string) ($payload['chatId'] ?? $payload['remoteJid'] ?? $payload['remote'] ?? $payload['from'] ?? '');
-        $senderAddress = (string) ($payload['from'] ?? $payload['participant'] ?? $payload['author'] ?? $chatAddress);
-        $isGroup = str_ends_with($chatAddress, '@g.us') || (bool) ($payload['isGroup'] ?? false);
+        $raw = is_array($payload['raw'] ?? null) ? $payload['raw'] : [];
+
+        $chatAddress = (string) (
+            $payload['chatId']
+            ?? $payload['remoteJid']
+            ?? $payload['remote']
+            ?? ($raw['chatId'] ?? null)
+            ?? ($raw['remoteJid'] ?? null)
+            ?? $payload['from']
+            ?? ''
+        );
+        $senderAddress = (string) (
+            $payload['fromPn']
+            ?? $payload['resolvedFromJid']
+            ?? $payload['from']
+            ?? $payload['participant']
+            ?? $payload['author']
+            ?? ($raw['participant'] ?? null)
+            ?? ($raw['author'] ?? null)
+            ?? ($raw['fromRaw'] ?? null)
+            ?? $chatAddress
+        );
+
+        $isGroup = str_ends_with($chatAddress, '@g.us')
+            || (bool) ($payload['isGroup'] ?? false)
+            || (bool) ($raw['isGroup'] ?? false)
+            || str_ends_with((string) ($raw['chatId'] ?? ''), '@g.us');
+
+        if ($isGroup && !str_ends_with($chatAddress, '@g.us')) {
+            $chatAddress = (string) ($raw['chatId'] ?? $chatAddress);
+        }
+
         $remoteNumber = $isGroup ? $chatAddress : $senderAddress;
+
+        // Guard: keep canonical chat JID for groups so group/personal never merge.
+        if ($isGroup && str_ends_with((string) ($raw['chatId'] ?? ''), '@g.us')) {
+            $remoteNumber = (string) $raw['chatId'];
+        }
+
         $conversationId = WaCarakaMessage::conversationIdFor($remoteNumber);
 
         $attributes = [
@@ -417,7 +513,14 @@ class WaCarakaService
         $this->syncConversation($message);
 
         if ($message->wasRecentlyCreated) {
-            WaCarakaMessageReceived::dispatch($message);
+            try {
+                WaCarakaMessageReceived::dispatch($message);
+            } catch (\Throwable $e) {
+                Log::warning('[WaCaraka] Failed to dispatch message received event', [
+                    'message_id' => $message->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
 
             // Chatbot auto-reply for text messages
             if (($message->message_type ?? 'text') === 'text' && !empty($message->message_text)) {
@@ -651,11 +754,63 @@ class WaCarakaService
             ];
         }
 
+        // Pending reply is counted from conversations shown in inbox:
+        // chat terakhir bukan dari WA Caraka (direction terakhir !== outbound).
+        // Use effective runtime timestamp when available; pull-inbox can import
+        // older messages with newer DB ids.
+        $inboxConversationIds = WaCarakaConversation::query()
+            ->whereIn('conversation_id', function ($query) {
+                $query->from('wa_caraka_messages')
+                    ->select('conversation_id')
+                    ->whereNotNull('conversation_id')
+                    ->groupBy('conversation_id');
+            })
+            ->pluck('conversation_id')
+            ->filter()
+            ->values();
+
+        $latestByConversation = [];
+
+        WaCarakaMessage::query()
+            ->select(['conversation_id', 'direction', 'created_at', 'metadata'])
+            ->whereIn('conversation_id', $inboxConversationIds)
+            ->orderBy('id')
+            ->chunk(500, function ($rows) use (&$latestByConversation) {
+                foreach ($rows as $row) {
+                    $metadata = is_array($row->metadata) ? $row->metadata : [];
+                    $rawTs = $metadata['timestamp'] ?? ($metadata['raw']['timestamp'] ?? null);
+
+                    $effectiveAt = $row->created_at;
+                    if (is_string($rawTs) && trim($rawTs) !== '') {
+                        try {
+                            $parsed = \Illuminate\Support\Carbon::parse($rawTs);
+                            if ($parsed) {
+                                $effectiveAt = $parsed;
+                            }
+                        } catch (\Throwable $e) {
+                            // Ignore malformed runtime timestamp, fallback to created_at.
+                        }
+                    }
+
+                    $cid = (string) $row->conversation_id;
+                    if (!isset($latestByConversation[$cid]) || $effectiveAt->gte($latestByConversation[$cid]['at'])) {
+                        $latestByConversation[$cid] = [
+                            'at' => $effectiveAt,
+                            'direction' => $row->direction,
+                        ];
+                    }
+                }
+            });
+
+        $unrepliedConversations = collect($latestByConversation)
+            ->filter(fn ($item) => ($item['direction'] ?? null) !== 'outbound')
+            ->count();
+
         return [
             'totalMessages'  => WaCarakaMessage::count(),
             'inbound'        => WaCarakaMessage::inbound()->count(),
             'outbound'       => WaCarakaMessage::outbound()->count(),
-            'unreplied'      => WaCarakaMessage::unreplied()->count(),
+            'unreplied'      => $unrepliedConversations,
             'todayInbound'   => WaCarakaMessage::inbound()->today()->count(),
             'todayOutbound'  => WaCarakaMessage::outbound()->today()->count(),
             'conversations'  => WaCarakaMessage::distinct('conversation_id')->count('conversation_id'),
@@ -762,6 +917,19 @@ class WaCarakaService
         return $message?->fresh('user:id,name,alias');
     }
 
+    private function dispatchMessageSynced(?WaCarakaMessage $message): void
+    {
+        if (!$message) {
+            return;
+        }
+
+        try {
+            WaCarakaMessageSynced::dispatch($message);
+        } catch (\Throwable $e) {
+            Log::warning('[WaCaraka] Broadcast dispatch failed (non-critical)', ['error' => $e->getMessage()]);
+        }
+    }
+
     private function shouldDispatchOutboundAsync(): bool
     {
         if (!config('wa_caraka.async_dispatch', true)) {
@@ -784,14 +952,28 @@ class WaCarakaService
         }
 
         try {
-            $convo = WaCarakaConversation::firstOrCreate(
-                ['conversation_id' => $message->conversation_id],
-                [
+            $activityAt = $this->resolveMessageActivityAt($message);
+
+            $convo = WaCarakaConversation::query()
+                ->where('conversation_id', $message->conversation_id)
+                ->first();
+
+            if (!$convo) {
+                // Prevent duplicate threads for same WA chat when legacy/new conversation keys differ.
+                $convo = WaCarakaConversation::query()
+                    ->where('remote_number', $message->remote_number)
+                    ->orderByDesc('last_activity_at')
+                    ->first();
+            }
+
+            if (!$convo) {
+                $convo = WaCarakaConversation::create([
+                    'conversation_id'  => $message->conversation_id,
                     'remote_number'    => $message->remote_number,
                     'status'           => 'pending',
-                    'last_activity_at' => now(),
-                ],
-            );
+                    'last_activity_at' => $activityAt,
+                ]);
+            }
 
             $metadata = is_array($message->metadata) ? $message->metadata : [];
             $resolvedName = $metadata['groupName']
@@ -799,25 +981,49 @@ class WaCarakaService
                 ?? $metadata['senderName']
                 ?? $metadata['participantName']
                 ?? $metadata['pushName']
+                ?? ($metadata['raw']['meta']['notifyName'] ?? null)
+                ?? ($metadata['raw']['notifyName'] ?? null)
                 ?? null;
 
-            if ($resolvedName && !$convo->remote_name) {
-                $convo->remote_name = $resolvedName;
-            }
-
-            if ($message->direction === 'inbound') {
-                // Increment unread only for newly created messages
-                if ($message->wasRecentlyCreated) {
-                    $convo->increment('unread_count');
+                // Prioritize name sources: groupName/groupSubject > senderName/participantName/pushName > notifyName
+                // Always update name if we found a new one and it's better than what we have
+                // OR if the current name is empty (never set)
+                $shouldUpdateName = false;
+                if ($resolvedName) {
+                    if (!$convo->remote_name) {
+                        // First time setting a name
+                        $shouldUpdateName = true;
+                        $convo->remote_name = $resolvedName;
+                    } elseif ($convo->remote_name !== $resolvedName) {
+                        // Name changed - update if the new one is not generic/fallback
+                        // (e.g., prefer actual names over JID numbers)
+                        if (!is_numeric($resolvedName) || !is_numeric($convo->remote_name)) {
+                            $shouldUpdateName = true;
+                            $convo->remote_name = $resolvedName;
+                        }
+                    }
                 }
-                $convo->update(['last_activity_at' => now(), 'remote_name' => $convo->remote_name]);
-            } else {
-                // Outbound: update activity timestamp, keep status as open
-                $convo->update([
-                    'last_activity_at' => now(),
-                    'status'           => $convo->status === 'pending' ? 'open' : $convo->status,
-                    'remote_name'      => $convo->remote_name,
-                ]);
+
+                $lastActivityAt = $convo->last_activity_at;
+                if (!$lastActivityAt || $activityAt->greaterThan($lastActivityAt)) {
+                    $lastActivityAt = $activityAt;
+                }
+
+                $updateData = ['last_activity_at' => $lastActivityAt];
+                if ($shouldUpdateName) {
+                    $updateData['remote_name'] = $convo->remote_name;
+                }
+
+                if ($message->direction === 'inbound') {
+                    // Increment unread only for newly created messages
+                    if ($message->wasRecentlyCreated) {
+                        $convo->increment('unread_count');
+                    }
+                    $convo->update($updateData);
+                } else {
+                    // Outbound: update activity timestamp, keep status as open
+                    $updateData['status'] = $convo->status === 'pending' ? 'open' : $convo->status;
+                    $convo->update($updateData);
             }
 
             WaCarakaConversationUpdated::dispatch($convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']));
@@ -827,5 +1033,34 @@ class WaCarakaService
                 'error'           => $e->getMessage(),
             ]);
         }
+    }
+
+    private function resolveMessageActivityAt(WaCarakaMessage $message): \Illuminate\Support\Carbon
+    {
+        $metadata = is_array($message->metadata) ? $message->metadata : [];
+        $rawTimestamp = $metadata['timestamp'] ?? ($metadata['raw']['timestamp'] ?? null);
+
+        if (is_numeric($rawTimestamp)) {
+            $value = (int) $rawTimestamp;
+            // Heuristic: runtime can send ms timestamp.
+            if ($value > 9999999999) {
+                $value = (int) floor($value / 1000);
+            }
+            try {
+                return \Illuminate\Support\Carbon::createFromTimestamp($value);
+            } catch (\Throwable $e) {
+                // fallback below
+            }
+        }
+
+        if (is_string($rawTimestamp) && trim($rawTimestamp) !== '') {
+            try {
+                return \Illuminate\Support\Carbon::parse($rawTimestamp);
+            } catch (\Throwable $e) {
+                // fallback below
+            }
+        }
+
+        return $message->created_at ?? now();
     }
 }

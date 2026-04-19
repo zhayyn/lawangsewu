@@ -81,8 +81,9 @@ const submitAllowlist = () => {
             allowlistForm.reset();
             inlineError.value = '';
         },
-        onError: () => {
-            inlineError.value = 'Gagal menyimpan allowlist. Pastikan akun Anda superadmin.';
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal menyimpan allowlist. Pastikan akun Anda superadmin.';
         },
     });
 };
@@ -93,8 +94,9 @@ const toggleAllowlist = (entry) => {
     }, {
         preserveScroll: true,
         preserveState: true,
-        onError: () => {
-            inlineError.value = 'Gagal update allowlist. Hanya superadmin yang dapat mengubah allowlist.';
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal update allowlist. Hanya superadmin yang dapat mengubah allowlist.';
         },
     });
 };
@@ -103,8 +105,9 @@ const removeAllowlist = (entryId) => {
     router.delete(route('admin.users.allowlist.destroy', entryId), {
         preserveScroll: true,
         preserveState: true,
-        onError: () => {
-            inlineError.value = 'Gagal menghapus allowlist. Hanya superadmin yang dapat menghapus allowlist.';
+        onError: (errors) => {
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal menghapus allowlist. Hanya superadmin yang dapat menghapus allowlist.';
         },
     });
 };
@@ -147,7 +150,7 @@ const filteredUsers = computed(() => {
 });
 
 const roleOrder = ['admin', 'useradmin', 'operator', 'viewer'];
-const manageablePermissionUsers = computed(() => props.users.filter((user) => user.role !== 'admin' && !user.is_superadmin));
+const manageablePermissionUsers = computed(() => props.users.filter((user) => Boolean(user.can_manage)));
 
 watch(
     manageablePermissionUsers,

@@ -31,6 +31,11 @@ $y = (int)date('Y');
         .card:hover { transform: translateY(-2px); box-shadow: 0 10px 16px rgba(15, 23, 42, .07); }
         .card .label { font-size: 12px; color: var(--muted); }
         .card .value { font-size: 24px; font-weight: 800; color: var(--primary); margin-top: 4px; }
+        .kpi-strip { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+        .kpi { background: linear-gradient(180deg, #ffffff, #f7fbf8); border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; }
+        .kpi .k { font-size: 11px; color: #5f6b7a; text-transform: uppercase; letter-spacing: .35px; }
+        .kpi .v { font-size: 20px; margin-top: 6px; color: #0f5132; font-weight: 800; }
+        .kpi.warn { border-color: #f8d6b3; background: linear-gradient(180deg, #fffaf3, #fff); }
         .panel { margin-top: 14px; background: var(--panel); border-radius: 14px; border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow); }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid #edf0f4; flex-wrap: wrap; }
         .tools { display: flex; gap: 8px; align-items: center; }
@@ -56,11 +61,13 @@ $y = (int)date('Y');
         td.center { text-align: center; }
         tr.total { background: #f7faf8; font-weight: 800; }
         .footnote { text-align: center; margin: 14px 0 20px; color: var(--muted); font-size: 13px; }
+        .meta { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; color: #4b5563; font-size: 12px; }
+        .badge { background: #f3f6f4; border: 1px solid #dde5df; color: #274a36; border-radius: 999px; padding: 2px 8px; font-weight: 700; }
         .error { background: #fff3f2; color: #b42318; border: 1px solid #fecdca; padding: 10px; border-radius: 8px; margin: 12px; display: none; }
         .tv-mode .tv-slide { display: none; }
         .tv-mode .tv-slide.active { display: block; }
         .tv-mode .table-wrap.active { max-height: 72vh; }
-        @media (max-width: 980px) { .cards { grid-template-columns: repeat(2, 1fr);} .grid { grid-template-columns: 1fr; } .input{min-width:180px;} }
+        @media (max-width: 980px) { .cards, .kpi-strip { grid-template-columns: repeat(2, 1fr);} .grid { grid-template-columns: 1fr; } .input{min-width:180px;} }
         @media (max-width: 640px) { .container { padding: 0 10px; } .card .value { font-size: 20px; } .tools{ width:100%; } .input{ min-width: 0; flex:1; } }
     </style>
 </head>
@@ -78,10 +85,17 @@ $y = (int)date('Y');
         <div class="card"><div class="label"><?php echo $y-1; ?></div><div class="value" id="sum1">0</div></div>
         <div class="card"><div class="label"><?php echo $y; ?></div><div class="value" id="sum0">0</div></div>
     </div>
+    <div class="kpi-strip" id="kpiStrip">
+        <div class="kpi"><div class="k">Sisa Tahun Lalu</div><div class="v" id="kpiSisaLalu">0</div></div>
+        <div class="kpi"><div class="k">Masuk Tahun Ini</div><div class="v" id="kpiMasuk">0</div></div>
+        <div class="kpi"><div class="k">Diputus Tahun Ini</div><div class="v" id="kpiPutus">0</div></div>
+        <div class="kpi"><div class="k">Belum Putus</div><div class="v" id="kpiBelumPutus">0</div></div>
+        <div class="kpi warn"><div class="k">Clearance Rate</div><div class="v" id="kpiCR">0%</div></div>
+    </div>
 
     <div class="panel">
         <div class="toolbar">
-            <div class="status" id="statusText">Memuat data...</div>
+            <div class="status" id="statusText">Memuat data... <span class="meta" id="dataMeta"></span></div>
             <div class="tools">
                 <input class="input" id="searchJenis" type="text" placeholder="Cari jenis perkara...">
                 <button class="btn" id="btnRefresh" type="button">Refresh</button>
@@ -133,15 +147,23 @@ $y = (int)date('Y');
 const rowsBody = document.getElementById('rowsBody');
 const statusText = document.getElementById('statusText');
 const errorBox = document.getElementById('errorBox');
+const dataMeta = document.getElementById('dataMeta');
 const btnRefresh = document.getElementById('btnRefresh');
 const searchJenis = document.getElementById('searchJenis');
 const btnTvMode = document.getElementById('btnTvMode');
 const tvDuration = document.getElementById('tvDuration');
-const API_CANDIDATES = ['statistik-data', '/statistik-data', '/lawangsewu/statistik-data'];
+const API_CANDIDATES = [
+    '/api/statistik-data',
+    '/lawangsewu/api/statistik-data',
+    '/lawangsewu/statistik-data',
+    'statistik-data',
+    '/statistik-data'
+];
 let trendChart = null;
 let typeChart = null;
 let cachedRows = [];
 let cachedTotals = { th4:0, th3:0, th2:0, th1:0, th0:0 };
+let cachedRingkasan = { sisa_lalu: 0, masuk: 0, putus: 0, belum_putus: 0 };
 let tvMode = false;
 let tvTimer = null;
 let tvIndex = 0;
@@ -200,6 +222,49 @@ function setSums(t) {
     document.getElementById('sum2').textContent = fmt(t.th2);
     document.getElementById('sum1').textContent = fmt(t.th1);
     document.getElementById('sum0').textContent = fmt(t.th0);
+}
+
+function setKpi(ringkasan) {
+    document.getElementById('kpiSisaLalu').textContent = fmt(ringkasan.sisa_lalu);
+    document.getElementById('kpiMasuk').textContent = fmt(ringkasan.masuk);
+    document.getElementById('kpiPutus').textContent = fmt(ringkasan.putus);
+    document.getElementById('kpiBelumPutus').textContent = fmt(ringkasan.belum_putus);
+    const masuk = Number(ringkasan.masuk || 0);
+    const putus = Number(ringkasan.putus || 0);
+    const cr = masuk > 0 ? (putus / masuk) * 100 : 0;
+    document.getElementById('kpiCR').textContent = `${cr.toFixed(1).replace('.', ',')}%`;
+}
+
+function totalsFromRows(rows) {
+    return rows.reduce((acc, row) => {
+        acc.th4 += Number(row.th4 || 0);
+        acc.th3 += Number(row.th3 || 0);
+        acc.th2 += Number(row.th2 || 0);
+        acc.th1 += Number(row.th1 || 0);
+        acc.th0 += Number(row.th0 || 0);
+        return acc;
+    }, { th4: 0, th3: 0, th2: 0, th1: 0, th0: 0 });
+}
+
+function normalizeRows(rows) {
+    return rows.map((row) => ({
+        jenis: String(row.jenis || '-'),
+        th4: Number(row.th4 || 0),
+        th3: Number(row.th3 || 0),
+        th2: Number(row.th2 || 0),
+        th1: Number(row.th1 || 0),
+        th0: Number(row.th0 || 0)
+    }));
+}
+
+function applyDataMeta(source, totalsTrusted) {
+    const now = new Date();
+    const stamp = now.toLocaleString('id-ID', { hour12: false });
+    const sourceBadge = `<span class="badge">${source}</span>`;
+    const trustBadge = totalsTrusted
+        ? '<span class="badge">totals: sinkron</span>'
+        : '<span class="badge">totals: rekalkulasi</span>';
+    dataMeta.innerHTML = `${sourceBadge}${trustBadge}<span>update ${stamp}</span>`;
 }
 
 function renderColorLegend(targetId, labels, colors) {
@@ -347,6 +412,7 @@ async function fetchStatistikPerkara(year) {
             }
             const json = await res.json();
             if (json && json.ok) {
+                json._source = base;
                 return json;
             }
             lastError = (json && json.message) ? json.message : `Respons tidak valid dari ${base}`;
@@ -359,6 +425,7 @@ async function fetchStatistikPerkara(year) {
 
 async function loadData() {
     statusText.textContent = 'Mengambil data statistik dari Server 10...';
+    dataMeta.innerHTML = '';
     errorBox.style.display = 'none';
     rowsBody.innerHTML = '';
 
@@ -366,11 +433,28 @@ async function loadData() {
         const year = new Date().getFullYear();
         const json = await fetchStatistikPerkara(year);
 
-        cachedRows = Array.isArray(json.rows) ? json.rows : [];
-        cachedTotals = json.totals || cachedTotals;
+        cachedRows = normalizeRows(Array.isArray(json.rows) ? json.rows : []);
+        const apiTotals = {
+            th4: Number(json?.totals?.th4 || 0),
+            th3: Number(json?.totals?.th3 || 0),
+            th2: Number(json?.totals?.th2 || 0),
+            th1: Number(json?.totals?.th1 || 0),
+            th0: Number(json?.totals?.th0 || 0),
+        };
+        const calcTotals = totalsFromRows(cachedRows);
+        const totalsTrusted = JSON.stringify(apiTotals) === JSON.stringify(calcTotals);
+        cachedTotals = totalsTrusted ? apiTotals : calcTotals;
+        cachedRingkasan = {
+            sisa_lalu: Number(json?.ringkasan?.sisa_lalu || 0),
+            masuk: Number(json?.ringkasan?.masuk || 0),
+            putus: Number(json?.ringkasan?.putus || 0),
+            belum_putus: Number(json?.ringkasan?.belum_putus || 0),
+        };
         setSums(cachedTotals);
+        setKpi(cachedRingkasan);
         renderRows();
         renderCharts(year, cachedTotals, cachedRows);
+        applyDataMeta(json._source || 'unknown', totalsTrusted);
         statusText.textContent = 'Data berhasil dimuat.';
     } catch (err) {
         errorBox.textContent = err.message;
@@ -397,11 +481,28 @@ function startDataAutoRefresh() {
         const year = new Date().getFullYear();
         fetchStatistikPerkara(year).then(json => {
             if(json && json.ok) {
-                cachedRows = Array.isArray(json.rows) ? json.rows : [];
-                cachedTotals = json.totals || cachedTotals;
+                cachedRows = normalizeRows(Array.isArray(json.rows) ? json.rows : []);
+                const apiTotals = {
+                    th4: Number(json?.totals?.th4 || 0),
+                    th3: Number(json?.totals?.th3 || 0),
+                    th2: Number(json?.totals?.th2 || 0),
+                    th1: Number(json?.totals?.th1 || 0),
+                    th0: Number(json?.totals?.th0 || 0),
+                };
+                const calcTotals = totalsFromRows(cachedRows);
+                const totalsTrusted = JSON.stringify(apiTotals) === JSON.stringify(calcTotals);
+                cachedTotals = totalsTrusted ? apiTotals : calcTotals;
+                cachedRingkasan = {
+                    sisa_lalu: Number(json?.ringkasan?.sisa_lalu || 0),
+                    masuk: Number(json?.ringkasan?.masuk || 0),
+                    putus: Number(json?.ringkasan?.putus || 0),
+                    belum_putus: Number(json?.ringkasan?.belum_putus || 0),
+                };
                 setSums(cachedTotals);
+                setKpi(cachedRingkasan);
                 renderRows();
                 renderCharts(year, cachedTotals, cachedRows);
+                applyDataMeta(json._source || 'unknown', totalsTrusted);
             }
         }).catch(err => console.error("Auto-refresh gagal:", err));
     }, 120000); // 120,000 ms = 2 menit

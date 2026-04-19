@@ -72,12 +72,17 @@ Route::get('/info-persidangan', [WidgetCompatController::class, 'phpPublic'])->d
 Route::get('/info-persidangan-hijautua', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan-hijautua');
 Route::get('/info-persidangan-stabilo', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan-stabilo');
 
+// Backward-compatible root endpoint used by some legacy embeds.
+Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik']);
+
 Route::prefix('lawangsewu')->group(function () {
     Route::get('/pengumuman-peradilan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan');
     Route::get('/pengumuman-peradilan-embed', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan-embed');
     Route::get('/pengumuman-rss-widget', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-rss-widget');
     Route::get('/dashboard-perkara', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'dashboard-perkara');
     Route::get('/monitor-persidangan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'monitor-persidangan');
+    // Backward-compatible direct endpoint used by legacy/public widgets.
+    Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik']);
 
     Route::prefix('api')->group(function () {
         Route::get('/pengumuman-rss', [WidgetCompatController::class, 'apiPengumuman']);
@@ -153,6 +158,11 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
         ->name('lawangsewu.wacaraka.api');
 });
 
+Route::middleware(['auth', 'verified', 'active'])->group(function () {
+    Route::get('/wa-caraka/reports', [WaCarakaController::class, 'reports'])->name('lawangsewu.wacaraka.reports');
+    Route::get('/wa-caraka/reports/data', [WaCarakaController::class, 'reportsData'])->name('lawangsewu.wacaraka.reports.data');
+});
+
 Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(function () {
     Route::post('/antrian-ptsp', [PtspQueueController::class, 'store'])->name('lawangsewu.ptsp.store');
     Route::post('/antrian-ptsp/{ticket}/call', [PtspQueueController::class, 'call'])->name('lawangsewu.ptsp.call');
@@ -174,17 +184,11 @@ Route::middleware(['auth', 'active', 'role:viewer,operator,useradmin,admin'])->g
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware(['auth', 'verified', 'active', 'role:admin,useradmin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'active'])->prefix('admin')->name('admin.')->group(function () {
     Route::middleware('permission:admin.users')->group(function () {
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
         Route::post('/users', [UserAccessController::class, 'store'])->name('users.store');
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->name('users.update');
-    });
-
-    Route::middleware('permission:admin.users.allowlist')->group(function () {
-        Route::post('/users/allowlist', [UserAccessController::class, 'storeAllowlist'])->name('users.allowlist.store');
-        Route::patch('/users/allowlist/{entry}', [UserAccessController::class, 'updateAllowlist'])->name('users.allowlist.update');
-        Route::delete('/users/allowlist/{entry}', [UserAccessController::class, 'destroyAllowlist'])->name('users.allowlist.destroy');
     });
 });
 
@@ -197,6 +201,10 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function 
 });
 
 Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::post('/users/allowlist', [UserAccessController::class, 'storeAllowlist'])->name('users.allowlist.store');
+    Route::patch('/users/allowlist/{entry}', [UserAccessController::class, 'updateAllowlist'])->name('users.allowlist.update');
+    Route::delete('/users/allowlist/{entry}', [UserAccessController::class, 'destroyAllowlist'])->name('users.allowlist.destroy');
+
     Route::patch('/permissions/role', [UserAccessController::class, 'updateRoleFeaturePermission'])->name('permissions.role.update');
     Route::patch('/permissions/user', [UserAccessController::class, 'updateUserFeaturePermission'])->name('permissions.user.update');
     Route::delete('/permissions/user', [UserAccessController::class, 'clearUserFeaturePermission'])->name('permissions.user.clear');

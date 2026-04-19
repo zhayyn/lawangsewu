@@ -64,3 +64,29 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Production Operations (Lawangsewu)
+
+For this deployment, runtime refresh and full deploy helpers are available:
+
+- `ops/scripts/refresh_web_runtime.sh`
+- `ops/scripts/deploy_full_refresh.sh`
+
+Quick usage:
+
+```bash
+cd /var/www/lawangsewu
+sudo bash ops/scripts/refresh_web_runtime.sh
+```
+
+Full deploy usage:
+
+```bash
+cd /var/www/lawangsewu
+sudo bash ops/scripts/deploy_full_refresh.sh
+```
+
+Operational runbook:
+
+- `docs/21_2026-04-18_runbook-refresh-runtime-deploy.md`
+- `docs/22_2026-04-18_laporan-insiden-404-route-runtime-opcache.md`

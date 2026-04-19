@@ -106,7 +106,13 @@
 const namaBulan=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const colors=['#0d6efd','#198754','#dc3545','#ffc107','#6f42c1','#20c997','#fd7e14','#6610f2','#0dcaf0','#adb5bd'];
 let cBulanan,cAlur,cJenis;
-const API_CANDIDATES = ['statistik-data', '/statistik-data', '/lawangsewu/statistik-data'];
+const API_CANDIDATES = [
+    '/api/statistik-data',
+    '/lawangsewu/api/statistik-data',
+    '/lawangsewu/statistik-data',
+    'statistik-data',
+    '/statistik-data'
+];
 const btnTvMode = document.getElementById('btnTvMode');
 const tvDuration = document.getElementById('tvDuration');
 let tvMode = false;

@@ -97,19 +97,19 @@ const waStatus = computed(() => props.systemHealth.find((item) => item.label ===
                 </Link>
 
                 <Link
-                    :href="route('lawangsewu.satellite.pendopo')"
+                    :href="route('lawangsewu.guestbook.form')"
                     class="group relative overflow-hidden rounded-[2rem] border border-amber-500/20 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.16),transparent_28%),linear-gradient(145deg,rgba(69,26,3,0.92),rgba(24,24,27,0.98))] p-6 text-white transition duration-300 hover:-translate-y-1 hover:border-amber-400/40 lg:col-span-2"
                 >
                     <div class="space-y-4">
                         <div class="inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
-                            Pendopo
+                            Buku Tamu
                         </div>
                         <h2 class="text-2xl font-black tracking-tight">Pusat Entri Data & Operasional Pengunjung</h2>
                         <p class="max-w-2xl text-sm leading-7 text-slate-200/85">
-                            Buka pusat entri data dan operasional pengunjung di Pengadilan Agama Semarang melalui modul Pendopo yang disiapkan khusus untuk alur viewer.
+                            Buka pusat entri data dan operasional pengunjung di Pengadilan Agama Semarang melalui modul Buku Tamu yang disiapkan khusus untuk alur viewer.
                         </p>
                         <span class="inline-flex items-center gap-2 text-sm font-bold text-amber-200">
-                            Buka Pendopo
+                            Buka Buku Tamu
                             <span aria-hidden="true">→</span>
                         </span>
                     </div>

@@ -89,7 +89,7 @@ const tintClass = computed(() => ({
 }[iconType.value] || 'text-sky-600'));
 
 const wrapperClasses = computed(() => {
-    const sizeClass = props.compact ? 'h-6 w-6 rounded-md' : 'h-6 w-6 rounded-[0.75rem]';
+    const sizeClass = props.compact ? 'h-5 w-5 rounded-md' : 'h-5 w-5 rounded-md';
 
     if (props.dark) {
         return [

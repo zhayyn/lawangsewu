@@ -5,6 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
+if (!function_exists('sd_load_env')) {
 function sd_load_env(string $path): void
 {
     if (!is_readable($path)) {
@@ -38,6 +39,17 @@ function sd_env(string $key, string $default = ''): string
     return trim($v);
 }
 
+function sd_env_first(array $keys, string $default = ''): string
+{
+    foreach ($keys as $key) {
+        $value = sd_env($key, '');
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return $default;
+}
+
 function sd_log(string $msg): void
 {
     $root = dirname(__DIR__, 4);
@@ -56,13 +68,14 @@ function sd_db(): PDO
     sd_load_env($root . '/.env');
     sd_load_env(dirname(__DIR__, 2) . '/config/.env');
 
-    $host = sd_env('LW_STAT_DB_HOST', 'localhost');
-    $user = sd_env('LW_STAT_DB_USER', 'admin');
-    $pass = sd_env('LW_STAT_DB_PASS', '');
-    $name = sd_env('LW_STAT_DB_NAME', 'sipp');
+    $host = sd_env_first(['LW_STAT_DB_HOST', 'SIPP_DB_HOST', 'DB_HOST'], 'localhost');
+    $port = sd_env_first(['LW_STAT_DB_PORT', 'SIPP_DB_PORT', 'DB_PORT'], '3306');
+    $user = sd_env_first(['LW_STAT_DB_USER', 'SIPP_DB_USERNAME', 'DB_USERNAME'], 'admin');
+    $pass = sd_env_first(['LW_STAT_DB_PASS', 'SIPP_DB_PASSWORD', 'DB_PASSWORD'], '');
+    $name = sd_env_first(['LW_STAT_DB_NAME', 'SIPP_DB_DATABASE', 'DB_DATABASE'], 'sipp');
 
     $pdo = new PDO(
-        'mysql:host=' . $host . ';dbname=' . $name . ';charset=utf8mb4',
+        'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $name . ';charset=utf8mb4',
         $user,
         $pass,
         [
@@ -327,6 +340,7 @@ function sd_hakim(PDO $db, int $year): array
         'summary_hakim' => $summaryHakim,
         'penyelesaian_by_alur' => $alurPenyelesaian,
     ];
+}
 }
 
 $hal = strtolower(trim((string)($_GET['hal'] ?? 'perkara')));

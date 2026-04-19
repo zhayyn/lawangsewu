@@ -103,7 +103,13 @@
 
 <script>
 function bil(n){return Number(n||0).toLocaleString('id-ID');}
-const API_CANDIDATES = ['statistik-data', '/statistik-data', '/lawangsewu/statistik-data'];
+const API_CANDIDATES = [
+    '/api/statistik-data',
+    '/lawangsewu/api/statistik-data',
+    '/lawangsewu/statistik-data',
+    'statistik-data',
+    '/statistik-data'
+];
 const qHakim = document.getElementById('qHakim');
 const btnTvMode = document.getElementById('btnTvMode');
 const tvDuration = document.getElementById('tvDuration');

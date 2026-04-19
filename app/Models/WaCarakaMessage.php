@@ -95,13 +95,28 @@ class WaCarakaMessage extends Model
     }
 
     /**
-     * Generate a conversation ID from a remote number.
-     * Groups all messages with the same remote party.
+     * Generate a stable conversation ID from a remote identifier.
+     * Keep chat type (group/personal/lid) in the key to avoid collisions.
      */
     public static function conversationIdFor(string $remoteNumber): string
     {
-        // Normalize: strip non-digits and prefix
-        $cleaned = preg_replace('/\D/', '', $remoteNumber);
-        return 'wa_' . $cleaned;
+        $normalized = strtolower(trim($remoteNumber));
+
+        if ($normalized === '') {
+            return 'wa_unknown';
+        }
+
+        $kind = 'personal';
+        if (str_ends_with($normalized, '@g.us')) {
+            $kind = 'group';
+        } elseif (str_ends_with($normalized, '@lid')) {
+            $kind = 'lid';
+        }
+
+        // Keep only compact digits for readability, plus hash for uniqueness.
+        $digits = preg_replace('/\D/', '', $normalized) ?: '0';
+        $hash = substr(sha1($normalized), 0, 10);
+
+        return sprintf('wa_%s_%s_%s', $kind, $digits, $hash);
     }
 }

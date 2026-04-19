@@ -24,6 +24,7 @@ const pollRef       = ref(null);
 const runtimeHealth     = ref({});
 const qrDataUrl         = ref('');
 const historyItems      = ref([]);
+const lidMappings       = ref({}); // lid baseUser → pn baseUser (e.g. '229583802597421' → '6285123456789')
 const connectedInfo     = ref(null);   // info device yang terkoneksi
 const qrPollingRef      = ref(null);   // interval polling QR
 const qrLoading         = ref(false);  // sedang memuat QR
@@ -44,6 +45,7 @@ const threadZoom            = ref(100);
 const threadVisibleCount    = ref(12);
 const markEditorOpen        = ref(false);
 const markState             = ref('idle');
+const markDraftDirty        = ref(false);
 const markForm              = ref({
     label: '',
     tone: 'amber',
@@ -64,6 +66,8 @@ const sendCooldownRef = ref(null);
 const handoverReason  = ref('');
 const handoverLoading = ref(false);
 const showHandoverModal = ref(false);
+const handoverEnabled = ref(true);
+const handoverToggling = ref(false);
 
 // Status
 const statusText = ref('Memeriksa koneksi...');
@@ -86,21 +90,16 @@ const isConnected  = computed(() => Boolean(runtimeHealth.value?.connected || ru
 const hasRealtime = computed(() => typeof window !== 'undefined' && Boolean(window.Echo));
 const myId = computed(() => props.authUser?.id);
 
-// Ownership
+// Ownership (display-only — everyone can reply)
 const iMineConvo = computed(() => activeConvo.value?.owner?.id === myId.value);
 const isUnclaimedConvo = computed(() => !activeConvo.value?.owner);
-// Allow reply if: my conversation, unclaimed, admin, OR explicitly not locked (ownership !== 'locked')
-const canReply = computed(() => {
-    if (iMineConvo.value || isUnclaimedConvo.value || isAdmin.value) return true;
-    // Allow reply unless explicitly locked by someone else
-    return activeConvo.value?.ownership !== 'locked';
-});
+// Every authenticated user may reply to any conversation.
+const canReply = computed(() => Boolean(activeConvo.value));
 const hasPendingHandover = computed(() => Boolean(activeConvo.value?.pendingHandover));
 const iRequestedHandover = computed(() =>
     activeConvo.value?.pendingHandover?.requestor?.id === myId.value
 );
 const conversationLockState = computed(() => activeConvo.value?.ownership || 'unclaimed');
-const lockBannerText = computed(() => activeConvo.value?.lockReason || 'Percakapan ini sedang ditangani operator lain.');
 const activeCustomerMark = computed(() => activeConvo.value?.customerMark || null);
 const ownerPresenceLabel = computed(() => ({
     active: 'operator aktif sekarang',
@@ -167,6 +166,36 @@ const markToneClass = (tone) => ({
     slate: 'bg-slate-100 text-slate-700 border-slate-200',
 }[tone || 'amber'] || 'bg-amber-100 text-amber-700 border-amber-200');
 
+const markToneOptions = [
+    { value: 'amber', label: 'Amber' },
+    { value: 'emerald', label: 'Emerald' },
+    { value: 'rose', label: 'Rose' },
+    { value: 'sky', label: 'Sky' },
+    { value: 'violet', label: 'Violet' },
+    { value: 'slate', label: 'Slate' },
+];
+
+const markTonePickerClass = (tone) => ({
+    amber: markForm.value.tone === 'amber'
+        ? 'border-amber-400 bg-gradient-to-r from-amber-200 to-orange-300 text-amber-900 shadow-[0_8px_20px_rgba(251,191,36,0.35)]'
+        : 'border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50',
+    emerald: markForm.value.tone === 'emerald'
+        ? 'border-emerald-400 bg-gradient-to-r from-emerald-200 to-teal-300 text-emerald-900 shadow-[0_8px_20px_rgba(16,185,129,0.28)]'
+        : 'border-emerald-200 bg-white text-emerald-800 hover:border-emerald-300 hover:bg-emerald-50',
+    rose: markForm.value.tone === 'rose'
+        ? 'border-rose-400 bg-gradient-to-r from-rose-200 to-pink-300 text-rose-900 shadow-[0_8px_20px_rgba(244,63,94,0.30)]'
+        : 'border-rose-200 bg-white text-rose-800 hover:border-rose-300 hover:bg-rose-50',
+    sky: markForm.value.tone === 'sky'
+        ? 'border-sky-400 bg-gradient-to-r from-sky-200 to-cyan-300 text-sky-900 shadow-[0_8px_20px_rgba(14,165,233,0.28)]'
+        : 'border-sky-200 bg-white text-sky-800 hover:border-sky-300 hover:bg-sky-50',
+    violet: markForm.value.tone === 'violet'
+        ? 'border-violet-400 bg-gradient-to-r from-violet-200 to-fuchsia-300 text-violet-900 shadow-[0_8px_20px_rgba(139,92,246,0.32)]'
+        : 'border-violet-200 bg-white text-violet-800 hover:border-violet-300 hover:bg-violet-50',
+    slate: markForm.value.tone === 'slate'
+        ? 'border-slate-400 bg-gradient-to-r from-slate-200 to-gray-300 text-slate-900 shadow-[0_8px_20px_rgba(100,116,139,0.28)]'
+        : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50',
+}[tone || 'amber']);
+
 const hashText = (text) => {
     const value = String(text || 'x');
     let hash = 0;
@@ -194,6 +223,16 @@ const initialsFromName = (name) => {
 
     const parts = text.split(/\s+/).slice(0, 2);
     return parts.map((part) => part[0]?.toUpperCase() || '').join('') || text[0].toUpperCase();
+};
+
+const onProfileImageError = (conversationId) => {
+    const idx = conversations.value.findIndex((item) => item.conversationId === conversationId);
+    if (idx === -1) return;
+
+    conversations.value[idx] = {
+        ...conversations.value[idx],
+        profilePhotoUrl: null,
+    };
 };
 
 const outgoingTickIcon = (status) => ({
@@ -261,20 +300,15 @@ const scheduleSendStateReset = (delay = 1200) => {
     }, delay);
 };
 
-const conversationSortWeight = (item) => {
-    const pinned = item?.customerMark?.isPinned ? 1 : 0;
-    const unread = Number(item?.unreadCount || 0) > 0 ? 1 : 0;
-    return (pinned * 10) + unread;
-};
-
 const sortConversations = (list) => {
     return [...list].sort((a, b) => {
-        const weightDiff = conversationSortWeight(b) - conversationSortWeight(a);
-        if (weightDiff !== 0) return weightDiff;
-
-        const activityA = Date.parse(a?.lastActivityAt || '') || 0;
-        const activityB = Date.parse(b?.lastActivityAt || '') || 0;
+        const activityA = Number(a?.lastActivityTs || 0);
+        const activityB = Number(b?.lastActivityTs || 0);
         if (activityA !== activityB) return activityB - activityA;
+
+        const unreadA = Number(a?.unreadCount || 0);
+        const unreadB = Number(b?.unreadCount || 0);
+        if (unreadA !== unreadB) return unreadB - unreadA;
 
         return String(a?.displayTitle || a?.remoteNumber || '').localeCompare(
             String(b?.displayTitle || b?.remoteNumber || ''),
@@ -398,13 +432,60 @@ const isLidNumber = (value) => {
     return String(normalized || '').endsWith('@lid');
 };
 
+const formatWaPhoneNumber = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) return '';
+
+    if (digits.startsWith('62')) return digits;
+    if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+    if (digits.startsWith('8')) return `62${digits}`;
+
+    return digits;
+};
+
 const getCleanRemoteNumber = (value) => {
     const normalized = normalizeRemoteIdentifier(value);
     if (!normalized) return '-';
+
+    if (normalized.endsWith('@g.us')) {
+        return normalized.replace(/@g\.us$/i, '');
+    }
+
     // Return only the number part without any suffix
     const clean = normalized.replace(/@(g\.us|s\.whatsapp\.net|lid)$/i, '');
-    // LID: tampilkan nomor saja tanpa label "(LID)" agar tidak membingungkan operator
-    return clean;
+
+    // Jika ini adalah LID dan ada mapping ke nomor HP, gunakan nomor HP tersebut
+    if (normalized.endsWith('@lid') && lidMappings.value[clean]) {
+        const pn = lidMappings.value[clean];
+        return formatWaPhoneNumber(pn) || pn;
+    }
+
+    // Pastikan nomor tampil konsisten sebagai 62xx... saat memungkinkan.
+    const formatted = formatWaPhoneNumber(clean);
+    return formatted || clean;
+};
+
+const getLidBaseNumber = (value) => {
+    const normalized = normalizeRemoteIdentifier(value);
+    if (!normalized || !normalized.endsWith('@lid')) return '';
+    return normalized.replace(/@lid$/i, '');
+};
+
+const getMappedWaNumber = (value) => {
+    const lidBase = getLidBaseNumber(value);
+    if (!lidBase) return '';
+    const mapped = lidMappings.value[lidBase];
+    if (!mapped) return '';
+    return formatWaPhoneNumber(mapped) || String(mapped);
+};
+
+const primaryContactNumber = (value) => {
+    const normalized = normalizeRemoteIdentifier(value);
+    if (!normalized) return '-';
+    if (!isLidNumber(normalized)) return getCleanRemoteNumber(normalized);
+
+    const mappedWa = getMappedWaNumber(normalized);
+    return mappedWa || `LID: ${getLidBaseNumber(normalized)}`;
 };
 
 const formatRemoteLabel = (value) => {
@@ -439,10 +520,12 @@ const normalizeConversation = (raw = {}) => {
     const remoteNumber = normalizeRemoteIdentifier(raw.remoteNumber || '');
     const isGroup = Boolean(raw.isGroup) || isGroupByRemote(remoteNumber);
     const groupName = raw.groupName || (isGroup ? raw.remoteName : null);
-    // Always use clean number for non-group displayTitle (without @lid/@wa suffix)
+    const aliasLabel = String(raw.customerMark?.label || '').trim();
+    const waName = String(raw.remoteName || '').trim(); // notifyName from WhatsApp
+    // Non-group title priority: alias > WA display name > normalized number
     const displayTitle = isGroup 
         ? (raw.displayTitle || groupName || 'Grup WhatsApp') 
-        : getCleanRemoteNumber(remoteNumber);
+        : (aliasLabel || waName || getCleanRemoteNumber(remoteNumber));
 
     return {
         ...raw,
@@ -548,6 +631,10 @@ const messageTypeLabel = (type, msg = null) => {
 };
 
 const syncMarkFormFromActive = () => {
+    if (markEditorOpen.value && markDraftDirty.value && markState.value !== 'saving') {
+        return;
+    }
+
     const mark = activeConvo.value?.customerMark;
     markForm.value = {
         label: mark?.label || '',
@@ -555,6 +642,16 @@ const syncMarkFormFromActive = () => {
         note: mark?.note || '',
         isPinned: Boolean(mark?.isPinned),
     };
+    markDraftDirty.value = false;
+};
+
+const toggleMarkEditor = () => {
+    markEditorOpen.value = !markEditorOpen.value;
+    if (markEditorOpen.value) {
+        syncMarkFormFromActive();
+        return;
+    }
+    markDraftDirty.value = false;
 };
 
 const saveCustomerMark = async () => {
@@ -590,6 +687,8 @@ const saveCustomerMark = async () => {
             },
         });
 
+        markDraftDirty.value = false;
+
         markState.value = 'saved';
         appendLog('Tanda customer diperbarui', { conversation: activeConvoId.value, label });
         setTimeout(() => { markState.value = 'idle'; }, 1200);
@@ -616,6 +715,7 @@ const clearCustomerMark = async () => {
         });
 
         syncMarkFormFromActive();
+        markDraftDirty.value = false;
         markState.value = 'saved';
         appendLog('Tanda customer dihapus', { conversation: activeConvoId.value });
         setTimeout(() => { markState.value = 'idle'; }, 1200);
@@ -745,6 +845,22 @@ const refreshHistory = async () => {
     } catch { /* silent */ }
 };
 
+const refreshLidMappings = async () => {
+    try {
+        const data = await callApi('lid-mappings');
+        if (data?.pairs && Array.isArray(data.pairs)) {
+            const map = {};
+            data.pairs.forEach(({ lid, pn }) => {
+                // strip suffix: '229583802597421@lid' → '229583802597421'
+                const lidBase = String(lid || '').replace(/@lid$/i, '');
+                const pnBase  = String(pn  || '').replace(/@(s\.whatsapp\.net|pn)$/i, '');
+                if (lidBase && pnBase) map[lidBase] = pnBase;
+            });
+            lidMappings.value = map;
+        }
+    } catch { /* silent */ }
+};
+
 const refreshInboxList = async (preserveActive = true) => {
     try {
         const data = await callApi('inbox');
@@ -788,11 +904,13 @@ const refreshAll = async () => {
     if (isLoading.value) return;
     isLoading.value = true;
     try {
-        await Promise.all([refreshHealth(), refreshStats(), refreshHistory()]);
+        await Promise.all([refreshHealth(), refreshStats(), refreshHistory(), refreshLidMappings()]);
         
         // Only attempt heavier calls if connected or at least has health response
         if (runtimeHealth.value?.status) {
-            await Promise.all([refreshInboxList(), refreshQr(), refreshConvoMessages(), pullInbox()]);
+            // Pull first, then refresh list so ordering reflects newest incoming chat immediately.
+            await pullInbox();
+            await Promise.all([refreshInboxList(), refreshQr(), refreshConvoMessages()]);
         } else {
             // Unset data to indicate downtime
             activeConvoId.value = '';
@@ -831,6 +949,68 @@ const runAction = async (action, title) => {
     }
 };
 
+const softResetStateAction = async () => {
+    if (isBusy.value) return;
+    if (!window.confirm('Reset state inbox?\n\nSemua percakapan "pending" akan ditandai selesai dan status dikembalikan ke "open". Data pesan tidak dihapus.')) return;
+    isBusy.value = true;
+    try {
+        const d = await callApi('reset-state', { method: 'post' });
+        appendLog('Reset state berhasil', d);
+        await refreshAll();
+    } catch (err) {
+        appendLog('Reset state gagal', { error: err?.error });
+    } finally {
+        isBusy.value = false;
+    }
+};
+
+const syncContactsAction = async () => {
+    if (isBusy.value) return;
+    isBusy.value = true;
+    try {
+        const d = await callApi('sync-contacts', { method: 'post' });
+        appendLog(`Sync kontak selesai: ${d?.learned ?? 0} LID dipelajari, ${d?.lidMappings ?? 0} total mapping`, d);
+        // Refresh LID map then inbox so names update
+        await refreshLidMappings();
+        await refreshInboxList();
+    } catch (err) {
+        appendLog('Sync kontak gagal', { error: err?.error });
+    } finally {
+        isBusy.value = false;
+    }
+};
+
+const clearConversationAction = async () => {
+    if (isBusy.value || !activeConvoId.value) return;
+    if (!window.confirm('Hapus sesi percakapan ini dari inbox lokal?\n\nPesan, mark, dan handover untuk percakapan ini akan dihapus permanen.')) return;
+
+    isBusy.value = true;
+    try {
+        const d = await callApi('clear-conversation', {
+            method: 'post',
+            data: { conversation_id: activeConvoId.value },
+        });
+        appendLog('Sesi percakapan dihapus', d);
+        activeConvoId.value = '';
+        conversationMessages.value = [];
+        await refreshAll();
+    } catch (err) {
+        appendLog('Gagal menghapus sesi percakapan', { error: err?.error });
+    } finally {
+        isBusy.value = false;
+    }
+};
+
+const openReportsPage = () => {
+    const fallback = '/wa-caraka/reports';
+    try {
+        const url = typeof route === 'function' ? route('lawangsewu.wacaraka.reports') : fallback;
+        window.location.assign(url || fallback);
+    } catch {
+        window.location.assign(fallback);
+    }
+};
+
 const selectConversation = async (convoId) => {
     activeConvoId.value = convoId;
     markEditorOpen.value = false;
@@ -863,6 +1043,7 @@ const replyToConversation = async () => {
                 remoteNumber: activeConvo.value?.remoteNumber,
                 remoteName: activeConvo.value?.remoteName,
                 lastActivityAt: 'baru saja',
+                lastActivityTs: Math.floor(Date.now() / 1000),
                 pendingHandover: null,
             });
         }
@@ -1118,12 +1299,42 @@ watch([threadZoom, threadVisibleCount], ([zoom, count]) => {
     localStorage.setItem('wacaraka.thread.visibleCount', String(count));
 });
 
+const fetchHandoverStatus = async () => {
+    try {
+        const res = await callApi('get-handover-enabled');
+        handoverEnabled.value = res.handoverEnabled ?? true;
+    } catch (e) {
+        console.warn('[WaCaraka] Failed to fetch handover status:', e);
+    }
+};
+
+const toggleHandoverEnabled = async () => {
+    if (!isSuperAdmin.value || handoverToggling.value) return;
+    
+    handoverToggling.value = true;
+    try {
+        const newState = !handoverEnabled.value;
+        await callApi('toggle-handover-enabled', {
+            method: 'post',
+            data: { enabled: newState },
+        });
+        handoverEnabled.value = newState;
+        appendLog('Fitur Alih Chat', { enabled: newState });
+    } catch (e) {
+        console.error('[WaCaraka] Failed to toggle handover:', e);
+        appendLog('❌ Toggle Alih Chat', { error: e.error || e.message });
+    } finally {
+        handoverToggling.value = false;
+    }
+};
+
 onMounted(async () => {
     if (typeof window !== 'undefined') {
         setThreadZoom(localStorage.getItem('wacaraka.thread.zoom') ?? threadZoom.value);
         setThreadVisibleCount(localStorage.getItem('wacaraka.thread.visibleCount') ?? threadVisibleCount.value);
     }
 
+    await fetchHandoverStatus();
     await refreshAll();
     await loadTickets();
     setAutoRefresh(true);
@@ -1157,6 +1368,12 @@ onUnmounted(() => {
                         <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
                         {{ statusText }}
                     </span>
+                    <button v-if="isSuperAdmin" @click="toggleHandoverEnabled" :disabled="handoverToggling" class="rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="handoverEnabled ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : 'border-rose-400/40 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20'" :title="handoverEnabled ? 'Fitur alih chat sedang aktif' : 'Fitur alih chat sedang dinonaktifkan'">
+                        {{ handoverToggling ? '⏳' : (handoverEnabled ? '✓' : '✕') }} Alih Chat
+                    </button>
+                    <button v-if="isAdmin" @click="openReportsPage" class="rounded-full border border-violet-300/40 bg-violet-300/10 px-3 py-1 text-[11px] font-bold text-violet-100 hover:bg-violet-300/20 transition">
+                        📊 Laporan
+                    </button>
                     <button @click="refreshAll" :disabled="isLoading" class="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1 text-[11px] font-bold text-sky-200 hover:bg-sky-400/20 transition disabled:opacity-40">
                         {{ isLoading ? 'Memuat...' : '↻ Refresh' }}
                     </button>
@@ -1203,9 +1420,19 @@ onUnmounted(() => {
                             class="group w-full px-2.5 py-2.5 text-left transition sm:px-3 sm:py-3 xl:px-4 xl:py-3.5"
                             :class="activeConvoId === c.conversationId ? 'bg-sky-500/10 border-l-2 border-sky-400' : 'hover:bg-[var(--surface-2)] border-l-2 border-transparent'">
                         <div class="flex items-start gap-2 sm:gap-3">
-                            <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white sm:h-9 sm:w-9 sm:text-[11px] xl:h-10 xl:w-10 xl:text-xs"
-                                 :class="avatarToneClassFor(c.conversationId || c.remoteNumber)">
-                                {{ initialsFromName(c.displayTitle) }}
+                            <div class="mt-0.5 h-8 w-8 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-9 sm:w-9 xl:h-10 xl:w-10">
+                                <img
+                                    v-if="c.profilePhotoUrl"
+                                    :src="c.profilePhotoUrl"
+                                    alt="Foto profil WA"
+                                    class="h-full w-full object-cover"
+                                    referrerpolicy="no-referrer"
+                                    @error="onProfileImageError(c.conversationId)"
+                                />
+                                <div v-else class="flex h-full w-full items-center justify-center text-[10px] font-black text-white sm:text-[11px] xl:text-xs"
+                                     :class="avatarToneClassFor(c.conversationId || c.remoteNumber)">
+                                    {{ initialsFromName(c.displayTitle) }}
+                                </div>
                             </div>
 
                             <div class="min-w-0 flex-1">
@@ -1219,7 +1446,13 @@ onUnmounted(() => {
                                     </span>
                                 </div>
 
-                                <p class="mt-0.5 text-[9px] text-[var(--text-2)] font-mono sm:text-[10px]">{{ getCleanRemoteNumber(c.remoteNumber) }}</p>
+                                <p class="mt-0.5 text-[9px] text-[var(--text-2)] font-mono sm:text-[10px]">{{ primaryContactNumber(c.remoteNumber) }}</p>
+                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 text-[9px] text-[var(--text-2)] sm:text-[10px]">
+                                    Nama Group: <span class="font-semibold">{{ c.groupName }}</span>
+                                </p>
+                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 text-[9px] text-[var(--text-2)] sm:text-[10px]">
+                                    Nama WA: <span class="font-semibold">{{ c.remoteName }}</span>
+                                </p>
 
                                 <div class="mt-1.5 flex flex-wrap items-center gap-1">
                                     <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
@@ -1228,7 +1461,7 @@ onUnmounted(() => {
                                               'bg-amber-500/15 text-amber-600': c.status === 'pending',
                                               'bg-slate-500/15 text-slate-500': c.status === 'closed',
                                           }">
-                                        {{ c.status }}
+                                        {{ c.status === 'pending' ? 'belum dibaca' : c.status }}
                                     </span>
                                     <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
                                           :class="markToneClass(c.customerMark.tone)">
@@ -1236,9 +1469,6 @@ onUnmounted(() => {
                                     </span>
                                     <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 sm:px-2 sm:text-[10px]">
                                         aktif kamu
-                                    </span>
-                                    <span v-else-if="c.ownership === 'locked'" class="rounded-full bg-rose-500/12 px-1.5 py-0.5 text-[9px] font-bold text-rose-600 sm:px-2 sm:text-[10px]">
-                                        terkunci
                                     </span>
                                     <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600 sm:px-2 sm:text-[10px]">
                                         {{ c.owner.alias || c.owner.name }}
@@ -1283,9 +1513,19 @@ onUnmounted(() => {
                 <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex items-start gap-3">
-                            <div v-if="activeConvo" class="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-black text-white sm:h-10 sm:w-10 xl:h-12 xl:w-12 xl:text-sm"
-                                 :class="avatarToneClassFor(activeConvo.conversationId || activeConvo.remoteNumber)">
-                                {{ initialsFromName(activeConvo?.displayTitle || activeConvo?.remoteName || activeConvo?.remoteNumber) }}
+                            <div v-if="activeConvo" class="mt-0.5 h-9 w-9 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
+                                <img
+                                    v-if="activeConvo.profilePhotoUrl"
+                                    :src="activeConvo.profilePhotoUrl"
+                                    alt="Foto profil WA"
+                                    class="h-full w-full object-cover"
+                                    referrerpolicy="no-referrer"
+                                    @error="onProfileImageError(activeConvo.conversationId)"
+                                />
+                                <div v-else class="flex h-full w-full items-center justify-center text-xs font-black text-white xl:text-sm"
+                                     :class="avatarToneClassFor(activeConvo.conversationId || activeConvo.remoteNumber)">
+                                    {{ initialsFromName(activeConvo?.displayTitle || activeConvo?.remoteName || activeConvo?.remoteNumber) }}
+                                </div>
                             </div>
 
                             <div class="min-w-0">
@@ -1293,8 +1533,14 @@ onUnmounted(() => {
                                 <span v-if="activeConvo?.isGroup" class="mr-1">👥</span>{{ activeConvo?.displayTitle || 'Pilih Percakapan' }}
                             </h2>
                             <p v-if="activeConvo?.remoteNumber" class="text-[10px] font-mono text-[var(--text-2)] sm:text-xs">
-                                {{ getCleanRemoteNumber(activeConvo.remoteNumber) }}
-                                <span v-if="isLidNumber(activeConvo.remoteNumber)" class="ml-1 text-[10px] text-amber-600 font-bold">(Legacy WhatsApp)</span>
+                                {{ primaryContactNumber(activeConvo.remoteNumber) }}
+                                <span v-if="isLidNumber(activeConvo.remoteNumber) && !getMappedWaNumber(activeConvo.remoteNumber)" class="ml-1 text-[10px] text-amber-600 font-bold">(Legacy WhatsApp)</span>
+                            </p>
+                            <p v-if="activeConvo?.groupName && activeConvo?.isGroup" class="text-[10px] text-[var(--text-2)] sm:text-xs">
+                                Nama Group: <span class="font-semibold text-[var(--text-1)]">{{ activeConvo.groupName }}</span>
+                            </p>
+                            <p v-if="activeConvo?.remoteName && !activeConvo?.isGroup" class="text-[10px] text-[var(--text-2)] sm:text-xs">
+                                Nama WA: <span class="font-semibold text-[var(--text-1)]">{{ activeConvo.remoteName }}</span>
                             </p>
                             <p v-if="activeConvo?.isGroup && groupParticipantCount" class="mt-1 text-[10px] font-semibold text-violet-600 sm:text-[11px]">
                                 {{ groupParticipantCount }} anggota terdeteksi di thread ini
@@ -1336,7 +1582,7 @@ onUnmounted(() => {
                                           : conversationLockState === 'locked'
                                               ? 'border border-rose-200 bg-rose-50 text-rose-700'
                                               : 'border border-emerald-200 bg-emerald-50 text-emerald-700'">
-                                    {{ conversationLockState === 'mine' ? 'mode operator aktif' : conversationLockState === 'locked' ? 'locked oleh operator lain' : 'siap diambil' }}
+                                    {{ conversationLockState === 'mine' ? 'mode operator aktif' : conversationLockState === 'locked' ? 'aktif operator lain' : 'belum dibalas' }}
                                 </span>
                             </div>
                             </div>
@@ -1353,15 +1599,7 @@ onUnmounted(() => {
                                 ✓ Selesaikan
                             </button>
 
-                            <!-- Request Handover (others) -->
-                            <button v-if="!iMineConvo && !isUnclaimedConvo && !iRequestedHandover"
-                                    @click="showHandoverModal = true"
-                                    class="rounded-xl border border-orange-200 bg-orange-50 px-2 py-1.5 text-[10px] text-orange-700 hover:bg-orange-100 transition sm:px-3 sm:text-xs">
-                                ⇄ Minta Alih Chat
-                            </button>
-                            <span v-if="iRequestedHandover" class="rounded-xl border border-orange-200 bg-orange-50 px-2 py-1.5 text-[10px] text-orange-600 sm:px-3 sm:text-xs">
-                                ⏳ Menunggu persetujuan...
-                            </span>
+
 
                             <!-- Force takeover (admin) -->
                             <button v-if="isAdmin && !iMineConvo && activeConvo.owner"
@@ -1370,42 +1608,47 @@ onUnmounted(() => {
                                 ⚡ Ambil Alih (Admin)
                             </button>
 
-                            <button @click="markEditorOpen = !markEditorOpen"
+                            <button @click="toggleMarkEditor"
                                     class="rounded-xl border border-violet-200 bg-violet-50 px-2 py-1.5 text-[10px] text-violet-700 hover:bg-violet-100 transition sm:px-3 sm:text-xs">
-                                🏷 Tandai Customer
+                                🏷 Atur Alias
+                            </button>
+
+                            <button v-if="isSuperAdmin" @click="clearConversationAction"
+                                    class="rounded-xl border border-rose-300 bg-rose-50 px-2 py-1.5 text-[10px] text-rose-700 hover:bg-rose-100 transition sm:px-3 sm:text-xs">
+                                🗑 Hapus Sesi
                             </button>
                         </div>
                     </div>
 
                     <div v-if="activeConvo && markEditorOpen" class="mt-4 rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-violet-700">Tanda Customer (Personal per Operator)</p>
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-violet-700">Alias Customer (Personal per Operator)</p>
                         <div class="mt-3 grid gap-3 md:grid-cols-2">
-                            <input v-model="markForm.label" type="text" maxlength="40" placeholder="Contoh: prioritas tinggi"
+                            <input v-model="markForm.label" @input="markDraftDirty = true" type="text" maxlength="40" placeholder="Contoh: Pak Budi PTSP"
                                    class="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400" />
-                            <select v-model="markForm.tone" class="rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400">
-                                <option value="amber">Amber</option>
-                                <option value="emerald">Emerald</option>
-                                <option value="rose">Rose</option>
-                                <option value="sky">Sky</option>
-                                <option value="violet">Violet</option>
-                                <option value="slate">Slate</option>
-                            </select>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button v-for="tone in markToneOptions" :key="tone.value" type="button"
+                                        @click="markForm.tone = tone.value; markDraftDirty = true"
+                                        class="rounded-xl border px-2 py-2 text-[11px] font-black tracking-wide transition"
+                                        :class="markTonePickerClass(tone.value)">
+                                    {{ tone.label }}
+                                </button>
+                            </div>
                         </div>
-                        <textarea v-model="markForm.note" rows="2" maxlength="255" placeholder="Catatan internal singkat..."
+                        <textarea v-model="markForm.note" @input="markDraftDirty = true" rows="2" maxlength="255" placeholder="Catatan internal singkat..."
                                   class="mt-3 w-full resize-none rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400" />
                         <label class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-violet-700">
-                            <input v-model="markForm.isPinned" type="checkbox" class="rounded border-violet-300 text-violet-600" />
+                            <input v-model="markForm.isPinned" @change="markDraftDirty = true" type="checkbox" class="rounded border-violet-300 text-violet-600" />
                             Pin conversation ini di daftar inbox saya
                         </label>
 
                         <div class="mt-3 flex flex-wrap gap-2">
                             <button @click="saveCustomerMark" :disabled="markState === 'saving'"
                                     class="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white hover:bg-violet-700 transition disabled:opacity-40">
-                                {{ markState === 'saving' ? 'Menyimpan...' : 'Simpan Tanda' }}
+                                {{ markState === 'saving' ? 'Menyimpan...' : 'Simpan Alias' }}
                             </button>
                             <button @click="clearCustomerMark" :disabled="markState === 'saving' || !activeCustomerMark"
                                     class="rounded-xl border border-rose-200 bg-white px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition disabled:opacity-40">
-                                Hapus Tanda
+                                Hapus Alias
                             </button>
                             <span v-if="markState === 'saved'" class="inline-flex items-center rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">✓ Tersimpan</span>
                             <span v-if="markState === 'error'" class="inline-flex items-center rounded-xl bg-rose-100 px-3 py-2 text-xs font-bold text-rose-700">✕ Cek input</span>
@@ -1516,8 +1759,8 @@ onUnmounted(() => {
                                      :class="bubbleFooterClass(msg)">
                                     <span>{{ messageTypeLabel(msg.type, msg) }}</span>
                                     <div class="flex items-center gap-2">
-                                        <button v-if="isSuperAdmin && msg.id" @click="deleteMessageAction(msg.id)"
-                                                class="text-rose-500/80 hover:text-rose-500 transition" title="Hapus pesan (Superadmin)">
+                                        <button v-if="isAdmin && msg.id" @click="deleteMessageAction(msg.id)"
+                                            class="text-rose-500/80 hover:text-rose-500 transition" title="Hapus pesan (Admin/Superadmin)">
                                             ✕
                                         </button>
                                         <span :class="outgoingStatusClass(msg)">
@@ -1536,12 +1779,6 @@ onUnmounted(() => {
 
                 <!-- Reply Box -->
                 <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
-                    <!-- Ownership warning -->
-                    <div v-if="activeConvo && !canReply" class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                        <strong>{{ activeConvo.owner?.alias || activeConvo.owner?.name || 'Operator lain' }} sedang memegang chat ini.</strong>
-                        {{ lockBannerText }}
-                    </div>
-
                     <div class="flex flex-col gap-2 sm:gap-3 xl:flex-row">
                         <textarea v-model="replyText"
                                   rows="3"
@@ -1748,6 +1985,10 @@ onUnmounted(() => {
                                 class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-40">Reconnect</button>
                         <button v-if="isAdmin" @click="runAction('disconnect', 'Disconnect')" :disabled="isBusy"
                                 class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition disabled:opacity-40">Disconnect</button>
+                        <button v-if="isAdmin" @click="softResetStateAction" :disabled="isBusy"
+                                class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-40" title="Tandai semua chat belum dibalas menjadi sudah, reset status inbox ke open">Reset State</button>
+                        <button v-if="isAdmin" @click="syncContactsAction" :disabled="isBusy"
+                                class="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 transition disabled:opacity-40" title="Scan kontak WA untuk memperbarui mapping LID ke nomor HP">Sync Kontak</button>
                     </div>
                 </div>
 

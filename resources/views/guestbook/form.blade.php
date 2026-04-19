@@ -435,6 +435,7 @@ var retakeButton = document.getElementById('retake');
 var saveButton = document.getElementById('simpandata');
 var submitTextButton = document.getElementById('submitTextBtn');
 var fotoBase64 = '';
+var capturedPhotoBlob = null;
 var currentVideoStream = null;
 var standbyTimer = null;
 var heatInterval = null;
@@ -467,7 +468,7 @@ function sembunyikanHint() {
 }
 
 function tampilkanFallbackUpload() {
-    uploadFallback.style.display = 'none';
+    uploadFallback.style.display = 'block';
     tampilkanHint('Kamera tidak aktif. Gunakan tombol bypas foto bila ingin upload manual.', 'warning');
 }
 
@@ -628,6 +629,54 @@ function sinkronkanKontrolKamera() {
     }
 }
 
+function generateGuestEntryId() {
+    var now = new Date();
+    var parts = [
+        now.getFullYear().toString(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+        String(now.getHours()).padStart(2, '0'),
+        String(now.getMinutes()).padStart(2, '0'),
+        String(now.getSeconds()).padStart(2, '0')
+    ];
+
+    return parts.join('') + String(Math.floor(Math.random() * 900) + 100);
+}
+
+function resetGuestbookForm() {
+    stopCameraStream();
+    resetError();
+    sembunyikanHint();
+
+    document.getElementById('form-tamu').reset();
+    document.getElementById('id_tamu').value = generateGuestEntryId();
+    instansiHidden.value = '';
+    instansiSelect.innerHTML = '<option value="">Pilih detail instansi/satuan</option>';
+    instansiSelect.disabled = true;
+    instansiCustom.style.display = 'none';
+    instansiCustom.value = '';
+
+    fotoFileInput.value = '';
+    fotoBase64 = '';
+    capturedPhotoBlob = null;
+
+    canvas.style.display = 'none';
+    video.style.display = 'none';
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    retakeButton.style.display = 'none';
+    snapButton.style.display = 'none';
+    snapButton.disabled = true;
+    saveButton.style.display = 'none';
+    submitTextButton.style.display = 'none';
+    uploadFallback.style.display = 'none';
+
+    muatPilihanDetailInstansi();
+    sinkronkanInstansi();
+    sinkronkanKontrolKamera();
+    perbaruiStatusKamera(false, 'Kamera standby');
+    powerCameraButton.focus();
+}
+
 function stopCameraStream() {
     if (standbyTimer) {
         window.clearTimeout(standbyTimer);
@@ -710,6 +759,7 @@ snapButton.addEventListener('click', function() {
     saveButton.style.display = 'inline-block';
     submitTextButton.style.display = 'inline-block';
     fotoBase64 = canvas.toDataURL('image/jpeg');
+    capturedPhotoBlob = dataURLToBlob(fotoBase64);
     shutDownCameraHardware();
     perbaruiStatusKamera(false, 'Kamera berhenti setelah foto diambil');
     resetError();
@@ -721,6 +771,7 @@ retakeButton.addEventListener('click', function() {
     saveButton.style.display = 'none';
     submitTextButton.style.display = 'none';
     fotoBase64 = '';
+    capturedPhotoBlob = null;
     if (bidangWajibTerisi()) {
         mulaicam();
     } else {
@@ -761,8 +812,23 @@ fotoFileInput.addEventListener('change', function (event) {
             saveButton.style.display = 'inline-block';
             submitTextButton.style.display = 'inline-block';
             resetError();
+            capturedPhotoBlob = file;
             perbaruiStatusKamera(false, 'Foto dipilih dari perangkat');
             tampilkanHint('Foto berhasil dipilih. Anda bisa langsung submit data.', 'success');
+        };
+        img.onerror = function () {
+            // Keep raw file for server-side upload even when browser cannot render preview.
+            fotoBase64 = '';
+            canvas.style.display = 'none';
+            video.style.display = 'none';
+            retakeButton.style.display = 'none';
+            snapButton.style.display = 'none';
+            saveButton.style.display = 'inline-block';
+            submitTextButton.style.display = 'inline-block';
+            resetError();
+            capturedPhotoBlob = file;
+            perbaruiStatusKamera(false, 'File foto dipilih dari perangkat');
+            tampilkanHint('File gambar dipilih. Preview tidak tersedia, tetapi Anda bisa langsung submit.', 'warning');
         };
         img.src = e.target.result;
     };
@@ -770,15 +836,26 @@ fotoFileInput.addEventListener('change', function (event) {
 });
 
 function kirimDataTamu() {
-    if (!fotoBase64) {
+    var selectedFile = (fotoFileInput.files && fotoFileInput.files[0]) ? fotoFileInput.files[0] : null;
+    var photoPayload = capturedPhotoBlob || selectedFile;
+    if (!photoPayload) {
         tampilkanError('Ambil foto atau upload foto terlebih dahulu sebelum menyimpan data.');
         return;
     }
 
     resetError();
+    sinkronkanInstansi();
     $('#simpandata, #submitTextBtn').prop('disabled', true);
-    var formData = new FormData($('#form-tamu')[0]);
-    formData.append('foto', fotoBase64);
+    var formData = new FormData();
+    formData.append('_token', document.querySelector('#form-tamu input[name="_token"]').value);
+    formData.append('id', document.getElementById('id_tamu').value || '');
+    formData.append('nama', document.getElementById('nama').value || '');
+    formData.append('jabatan', document.getElementById('jabatan').value || '');
+    formData.append('kategori_instansi', document.getElementById('kategori_instansi').value || '');
+    formData.append('instansi', document.getElementById('instansi').value || '');
+    formData.append('keperluan', document.getElementById('keperluan').value || '');
+    formData.append('payload_mode', 'file-only-v3');
+    formData.append('foto_file', photoPayload, 'foto-' + Date.now() + '.jpg');
 
     $.ajax({
         url: '{{ route('lawangsewu.guestbook.store') }}',
@@ -793,7 +870,8 @@ function kirimDataTamu() {
                 $('#tamuKe').text(response.jumlah);
                 successModal.show();
                 setTimeout(function(){
-                    window.location.reload();
+                    successModal.hide();
+                    resetGuestbookForm();
                 }, 1500);
             } else {
                 tampilkanError(response.message || 'Terjadi kesalahan saat menyimpan data.');
@@ -871,5 +949,47 @@ perbaruiIndikatorPanas();
 window.addEventListener('beforeunload', function () {
     shutDownCameraHardware();
 });
+
+function dataURLToFile(dataUrl, filename) {
+    try {
+        var parts = dataUrl.split(',');
+        if (parts.length !== 2) {
+            return null;
+        }
+        var mimeMatch = parts[0].match(/data:(.*?);base64/);
+        var mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        var binary = atob(parts[1]);
+        var len = binary.length;
+        var bytes = new Uint8Array(len);
+        for (var i = 0; i < len; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new File([bytes], filename, { type: mime });
+    } catch (err) {
+        console.error('Gagal membuat file dari data URL:', err);
+        return null;
+    }
+}
+
+function dataURLToBlob(dataUrl) {
+    try {
+        var parts = dataUrl.split(',');
+        if (parts.length !== 2) {
+            return null;
+        }
+        var mimeMatch = parts[0].match(/data:(.*?);base64/);
+        var mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        var binary = atob(parts[1]);
+        var len = binary.length;
+        var bytes = new Uint8Array(len);
+        for (var i = 0; i < len; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: mime });
+    } catch (err) {
+        console.error('Gagal membuat blob dari data URL:', err);
+        return null;
+    }
+}
 </script>
 @endpush

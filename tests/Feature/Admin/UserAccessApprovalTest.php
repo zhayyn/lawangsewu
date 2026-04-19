@@ -229,7 +229,7 @@ class UserAccessApprovalTest extends TestCase
 
         $setResponse = $this->actingAs($superadmin)->patch(route('admin.permissions.user.update'), [
             'user_id' => $target->id,
-            'feature_key' => 'admin.cctv',
+            'feature_key' => 'nav.chat',
             'enabled' => true,
         ]);
 
@@ -238,25 +238,25 @@ class UserAccessApprovalTest extends TestCase
         $this->assertDatabaseHas('feature_permissions', [
             'user_id' => $target->id,
             'role_id' => null,
-            'feature_key' => 'admin.cctv',
+            'feature_key' => 'nav.chat',
             'enabled' => true,
         ]);
 
-        $this->assertTrue(FeaturePermission::hasAccess($target->fresh(), 'admin.cctv'));
+        $this->assertTrue(FeaturePermission::hasAccess($target->fresh(), 'nav.chat'));
 
         $clearResponse = $this->actingAs($superadmin)->delete(route('admin.permissions.user.clear'), [
             'user_id' => $target->id,
-            'feature_key' => 'admin.cctv',
+            'feature_key' => 'nav.chat',
         ]);
 
         $clearResponse->assertRedirect();
 
         $this->assertDatabaseMissing('feature_permissions', [
             'user_id' => $target->id,
-            'feature_key' => 'admin.cctv',
+            'feature_key' => 'nav.chat',
         ]);
 
-        $this->assertFalse(FeaturePermission::hasAccess($target->fresh(), 'admin.cctv'));
+        $this->assertTrue(FeaturePermission::hasAccess($target->fresh(), 'nav.chat'));
     }
 
     public function test_superadmin_can_open_user_access_page_and_manage_allowlist_and_permissions(): void

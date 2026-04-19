@@ -89,7 +89,8 @@ const submitAllowlist = () => {
 };
 
 const toggleAllowlist = (entry) => {
-    router.patch(route('admin.users.allowlist.update', entry.id), {
+    router.post(route('admin.users.allowlist.update', entry.id), {
+        _method: 'patch',
         auto_activate: !entry.auto_activate,
     }, {
         preserveScroll: true,
@@ -102,7 +103,9 @@ const toggleAllowlist = (entry) => {
 };
 
 const removeAllowlist = (entryId) => {
-    router.delete(route('admin.users.allowlist.destroy', entryId), {
+    router.post(route('admin.users.allowlist.destroy', entryId), {
+        _method: 'delete',
+    }, {
         preserveScroll: true,
         preserveState: true,
         onError: (errors) => {
@@ -152,6 +155,13 @@ const filteredUsers = computed(() => {
 const roleOrder = ['admin', 'useradmin', 'operator', 'viewer'];
 const manageablePermissionUsers = computed(() => props.users.filter((user) => Boolean(user.can_manage)));
 
+const roleLabel = (role) => ({
+    admin: 'Superadmin',
+    useradmin: 'Admin',
+    operator: 'Operator',
+    viewer: 'Viewer',
+}[role] || role);
+
 watch(
     manageablePermissionUsers,
     (users) => {
@@ -188,7 +198,8 @@ const rolePermissionEnabled = (featureKey, role) =>
 const updateRolePermission = (role, featureKey, enabled) => {
     inlineError.value = '';
 
-    router.patch(route('admin.permissions.role.update'), {
+    router.post(route('admin.permissions.role.update'), {
+        _method: 'patch',
         role,
         feature_key: featureKey,
         enabled,
@@ -209,10 +220,23 @@ const userOverrideValue = (userId, featureKey) => {
         : null;
 };
 
+const effectiveUserFeatureEnabled = (user, featureKey) => {
+    if (!user) return false;
+
+    const roleEnabled = rolePermissionEnabled(featureKey, user.role);
+    if (!roleEnabled) {
+        return false;
+    }
+
+    const override = userOverrideValue(user.id, featureKey);
+    return override === null ? true : Boolean(override);
+};
+
 const setUserOverride = (userId, featureKey, enabled) => {
     inlineError.value = '';
 
-    router.patch(route('admin.permissions.user.update'), {
+    router.post(route('admin.permissions.user.update'), {
+        _method: 'patch',
         user_id: userId,
         feature_key: featureKey,
         enabled,
@@ -229,11 +253,11 @@ const setUserOverride = (userId, featureKey, enabled) => {
 const resetUserOverride = (userId, featureKey) => {
     inlineError.value = '';
 
-    router.delete(route('admin.permissions.user.clear'), {
-        data: {
-            user_id: userId,
-            feature_key: featureKey,
-        },
+    router.post(route('admin.permissions.user.clear'), {
+        _method: 'delete',
+        user_id: userId,
+        feature_key: featureKey,
+    }, {
         preserveScroll: true,
         preserveState: true,
         onError: (errors) => {
@@ -267,9 +291,9 @@ const saveUser = (userId) => {
     }
 
     const { role, is_active, name, alias } = formState[userId];
-    const payload = { role, is_active, name: name || null, alias: alias || null };
+    const payload = { _method: 'patch', role, is_active, name: name || null, alias: alias || null };
 
-    router.patch(route('admin.users.update', userId), payload, {
+    router.post(route('admin.users.update', userId), payload, {
         preserveScroll: true,
         preserveState: true,
         onError: (errors) => {
@@ -368,7 +392,7 @@ const permissionStateClass = (value) => {
                             <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Role Akses</label>
                             <div class="flex gap-2">
                                 <select v-model="newUserForm.role" class="input-surface flex-1">
-                                    <option v-for="role in roles" :key="role" :value="role">{{ role }}</option>
+                                    <option v-for="role in roles" :key="role" :value="role">{{ roleLabel(role) }}</option>
                                 </select>
                                 <button type="submit" class="github-button !bg-emerald-600 hover:!bg-emerald-700" :disabled="newUserForm.processing">
                                     Daftarkan
@@ -475,7 +499,7 @@ const permissionStateClass = (value) => {
                             Permission Fitur (Role & User)
                         </h3>
                         <p class="mt-2 text-xs text-[var(--text-3)] font-semibold">
-                            Role menentukan default akses modul. Override user akan mengalahkan default role.
+                            Role menentukan batas maksimal akses fitur. Tiap user hanya bisa dibatasi lebih lanjut di bawah role tersebut.
                         </p>
                     </div>
 
@@ -489,7 +513,7 @@ const permissionStateClass = (value) => {
                                         :key="`head-${role}`"
                                         class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]"
                                     >
-                                        {{ role }}
+                                        {{ roleLabel(role) }}
                                     </th>
                                 </tr>
                             </thead>
@@ -525,12 +549,12 @@ const permissionStateClass = (value) => {
                                 <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Pilih User Override</label>
                                 <select v-model="selectedPermissionUserId" class="input-surface w-full">
                                     <option v-for="user in manageablePermissionUsers" :key="user.id" :value="user.id">
-                                        {{ user.name || user.email }} ({{ user.role }})
+                                        {{ user.name || user.email }} ({{ roleLabel(user.role) }})
                                     </option>
                                 </select>
                             </div>
                             <p v-if="selectedPermissionUser" class="text-xs text-[var(--text-3)] font-semibold">
-                                Override aktif untuk: <span class="font-black text-[var(--text-1)]">{{ selectedPermissionUser.email }}</span>
+                                Batas role untuk user ini: <span class="font-black text-[var(--text-1)]">{{ roleLabel(selectedPermissionUser.role) }}</span>
                             </p>
                         </div>
 
@@ -548,29 +572,33 @@ const permissionStateClass = (value) => {
 
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--text-3)]">
-                                            Role default: {{ rolePermissionEnabled(feature.key, selectedPermissionUser.role) ? 'ON' : 'OFF' }}
+                                            Role: {{ rolePermissionEnabled(feature.key, selectedPermissionUser.role) ? 'ON' : 'OFF' }}
                                         </span>
                                         <button
                                             type="button"
-                                            class="github-button !py-2 !px-3 !text-[10px] !bg-emerald-600 hover:!bg-emerald-700"
-                                            @click="setUserOverride(selectedPermissionUser.id, feature.key, true)"
-                                        >Allow</button>
+                                            class="github-button !py-2 !px-3 !text-[10px]"
+                                            :class="effectiveUserFeatureEnabled(selectedPermissionUser, feature.key) ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-slate-600 hover:!bg-slate-700'"
+                                            :disabled="!rolePermissionEnabled(feature.key, selectedPermissionUser.role)"
+                                            @click="setUserOverride(selectedPermissionUser.id, feature.key, !effectiveUserFeatureEnabled(selectedPermissionUser, feature.key))"
+                                        >{{ effectiveUserFeatureEnabled(selectedPermissionUser, feature.key) ? 'ON' : 'OFF' }}</button>
+                                        <span
+                                            class="text-[10px] font-black uppercase tracking-widest"
+                                            :class="rolePermissionEnabled(feature.key, selectedPermissionUser.role)
+                                                ? (userOverrideValue(selectedPermissionUser.id, feature.key) === null ? 'text-slate-500' : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'text-emerald-600' : 'text-rose-600'))
+                                                : 'text-rose-600'"
+                                        >
+                                            {{ !rolePermissionEnabled(feature.key, selectedPermissionUser.role)
+                                                ? 'DIBLOK ROLE'
+                                                : (userOverrideValue(selectedPermissionUser.id, feature.key) === null
+                                                    ? 'MENGIKUTI ROLE'
+                                                    : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'IZINKAN USER' : 'BATASI USER')) }}
+                                        </span>
                                         <button
-                                            type="button"
-                                            class="github-button !py-2 !px-3 !text-[10px] !bg-rose-600 hover:!bg-rose-700"
-                                            @click="setUserOverride(selectedPermissionUser.id, feature.key, false)"
-                                        >Deny</button>
-                                        <button
+                                            v-if="rolePermissionEnabled(feature.key, selectedPermissionUser.role) && userOverrideValue(selectedPermissionUser.id, feature.key) !== null"
                                             type="button"
                                             class="github-button !py-2 !px-3 !text-[10px] !bg-slate-600 hover:!bg-slate-700"
                                             @click="resetUserOverride(selectedPermissionUser.id, feature.key)"
                                         >Reset</button>
-                                        <span
-                                            class="text-[10px] font-black uppercase tracking-widest"
-                                            :class="userOverrideValue(selectedPermissionUser.id, feature.key) === null ? 'text-slate-500' : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'text-emerald-600' : 'text-rose-600')"
-                                        >
-                                            {{ userOverrideValue(selectedPermissionUser.id, feature.key) === null ? 'DEFAULT' : (userOverrideValue(selectedPermissionUser.id, feature.key) ? 'OVERRIDE: ALLOW' : 'OVERRIDE: DENY') }}
-                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -645,7 +673,7 @@ const permissionStateClass = (value) => {
                                         :disabled="!user.can_manage"
                                     >
                                         <option v-for="role in roles" :key="role" :value="role">
-                                            {{ role.toUpperCase() }}
+                                            {{ roleLabel(role) }}
                                         </option>
                                     </select>
                                 </td>

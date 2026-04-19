@@ -131,4 +131,49 @@ class FeaturePermissionUiAndAuditTest extends TestCase
 
         $this->assertFalse(FeaturePermission::hasAccess($target->fresh(), 'admin.cctv'));
     }
+
+    public function test_user_override_cannot_exceed_role_permission_boundary(): void
+    {
+        Config::set('auth.super_admin_email', 'founder-boundary@example.test');
+
+        $superadmin = User::factory()->create([
+            'email' => 'founder-boundary@example.test',
+            'is_active' => true,
+            'role' => 'admin',
+            'email_verified_at' => now(),
+        ]);
+
+        $target = User::factory()->create([
+            'email' => 'operator-boundary@example.test',
+            'is_active' => true,
+            'role' => 'operator',
+            'email_verified_at' => now(),
+        ]);
+
+        $this->assertFalse(FeaturePermission::hasAccess($target, 'admin.users'));
+
+        $this->actingAs($superadmin)->patch(route('admin.permissions.user.update'), [
+            'user_id' => $target->id,
+            'feature_key' => 'admin.users',
+            'enabled' => true,
+        ])->assertRedirect();
+
+        $this->assertFalse(FeaturePermission::hasAccess($target->fresh(), 'admin.users'));
+
+        $this->actingAs($superadmin)->patch(route('admin.permissions.role.update'), [
+            'role' => 'operator',
+            'feature_key' => 'nav.chat',
+            'enabled' => true,
+        ])->assertRedirect();
+
+        $this->assertTrue(FeaturePermission::hasAccess($target->fresh(), 'nav.chat'));
+
+        $this->actingAs($superadmin)->patch(route('admin.permissions.user.update'), [
+            'user_id' => $target->id,
+            'feature_key' => 'nav.chat',
+            'enabled' => false,
+        ])->assertRedirect();
+
+        $this->assertFalse(FeaturePermission::hasAccess($target->fresh(), 'nav.chat'));
+    }
 }

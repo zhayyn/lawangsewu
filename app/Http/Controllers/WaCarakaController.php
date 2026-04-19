@@ -274,7 +274,7 @@ class WaCarakaController extends Controller
             ->keyBy('jid');
 
         $conversations = $conversationRows
-            ->map(function ($c) use ($user, $latestMessageByConversation, $latestInboundMessageByConversation, $runtimeMetaByRemoteNumber) {
+            ->map(function ($c) use ($user, $marksByConversation, $latestMessageByConversation, $latestInboundMessageByConversation, $runtimeMetaByRemoteNumber) {
                 $permission = $this->conversationService->canReply($c, $user);
                 $isGroup = str_ends_with((string) $c->remote_number, '@g.us');
                 $latestAny = $latestMessageByConversation->get($c->conversation_id);

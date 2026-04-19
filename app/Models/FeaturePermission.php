@@ -27,13 +27,15 @@ class FeaturePermission extends Model
 
     /**
      * Check if a user has access to a feature.
-     * User-level overrides take precedence over role defaults.
+     *
+     * Role access is the maximum boundary. User-level overrides may only
+     * restrict access within the role allowance and cannot expand beyond it.
      */
     public static function hasAccess(User|int $user, string $featureKey): bool
     {
         $resolvedUser = $user instanceof User ? $user : User::find($user);
 
-        if (!$resolvedUser) {
+        if (! $resolvedUser) {
             return false;
         }
 
@@ -42,25 +44,36 @@ class FeaturePermission extends Model
             return true;
         }
 
+        $roleAllowed = self::resolveRoleAccess($resolvedUser, $featureKey);
+
+        // Role is the hard upper bound.
+        if (! $roleAllowed) {
+            return false;
+        }
+
         $userId = $resolvedUser->id;
-        
-        // Check user-level permission first (overrides role)
+
+        // User override may only further restrict an already-allowed role feature.
         $userPermission = self::where('user_id', $userId)
             ->where('feature_key', $featureKey)
             ->first();
 
         if ($userPermission) {
-            return $userPermission->enabled;
+            return (bool) $userPermission->enabled;
         }
 
-        // Check role-level permission
-        if (!$resolvedUser->role) {
+        return true;
+    }
+
+    private static function resolveRoleAccess(User $user, string $featureKey): bool
+    {
+        if (! $user->role) {
             return false;
         }
 
-        $roleId = self::ROLE_MAP[$resolvedUser->role] ?? null;
+        $roleId = self::ROLE_MAP[$user->role] ?? null;
 
-        if (!$roleId) {
+        if (! $roleId) {
             return false;
         }
 
@@ -69,13 +82,13 @@ class FeaturePermission extends Model
             ->first();
 
         // If no explicit permission set, check config defaults
-        if (!$rolePermission) {
+        if (! $rolePermission) {
             $features = config('features.features', []);
             $feature = collect($features)->firstWhere('key', $featureKey);
-            return $feature && in_array($resolvedUser->role, $feature['default_roles'] ?? []);
+            return $feature && in_array($user->role, $feature['default_roles'] ?? [], true);
         }
 
-        return $rolePermission->enabled;
+        return (bool) $rolePermission->enabled;
     }
 
     public static function roleIdFor(string $role): ?int

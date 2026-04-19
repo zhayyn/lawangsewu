@@ -30,7 +30,7 @@ const MAX_BACKOFF_MS = 20000;
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const messages = ref([...props.initialMessages]);
-const showContacts = ref(true);
+const showContacts = ref(false);
 const scrollContainer = ref(null);
 const draftContent = ref('');
 const attachmentFile = ref(null);
@@ -469,7 +469,7 @@ watch(() => props.initialMessages, (newMessages) => {
         :nav-groups="navGroups"
         :app-meta="appMeta"
     >
-        <div class="space-y-6 h-[calc(100vh-140px)] flex flex-col">
+        <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col sm:space-y-6">
             <!-- Header Section -->
             <section class="card-surface p-5 py-4 shrink-0">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -497,7 +497,7 @@ watch(() => props.initialMessages, (newMessages) => {
                 </div>
             </section>
 
-            <div class="flex-1 flex gap-6 min-h-0">
+            <div class="flex-1 flex flex-col gap-4 min-h-0 xl:flex-row xl:gap-6">
                 <!-- Chat Main Area -->
                 <section class="flex-1 flex flex-col card-surface overflow-hidden !p-0">
                     <!-- Global Channel Header -->
@@ -685,7 +685,7 @@ watch(() => props.initialMessages, (newMessages) => {
                 </section>
 
                 <!-- Sidebar Right (Anggota) -->
-                <aside v-if="showContacts" class="w-80 flex flex-col gap-6 shrink-0">
+                <aside v-if="showContacts" class="w-full xl:w-80 flex flex-col gap-6 xl:shrink-0">
                     <!-- Current User Profile Card -->
                     <section class="card-surface p-5 border-blue-500/20 bg-blue-500/[0.02]">
                         <p class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 mb-4">Profil Interkom</p>

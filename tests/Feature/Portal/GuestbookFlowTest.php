@@ -63,7 +63,7 @@ class GuestbookFlowTest extends TestCase
             'institution' => 'Pemerintah Kota Semarang',
         ]);
 
-        Storage::disk('public')->assertExists('guestbook/photos/20260406010101999.jpg');
+        Storage::disk('public')->assertExists('guestbook/photos/20260406010101999.png');
     }
 
     public function test_guestbook_list_detail_and_report_pages_are_accessible(): void

@@ -245,4 +245,57 @@ class ChatFlowTest extends TestCase
             'id' => $message->id,
         ]);
     }
+
+    public function test_superadmin_can_clear_all_internal_chat_messages(): void
+    {
+        $superadmin = User::factory()->create([
+            'is_active' => true,
+            'role' => 'admin',
+            'is_superadmin' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        $sender = User::factory()->create([
+            'is_active' => true,
+            'role' => 'operator',
+            'email_verified_at' => now(),
+        ]);
+
+        ChatMessage::query()->create([
+            'user_id' => $sender->id,
+            'type' => 'global',
+            'content' => 'Pesan 1.',
+        ]);
+
+        ChatMessage::query()->create([
+            'user_id' => $sender->id,
+            'type' => 'global',
+            'content' => 'Pesan 2.',
+        ]);
+
+        $response = $this->actingAs($superadmin)->post(route('lawangsewu.chat.clear'));
+
+        $response->assertOk();
+        $this->assertSame(0, ChatMessage::query()->where('type', 'global')->count());
+    }
+
+    public function test_non_superadmin_cannot_clear_all_internal_chat_messages(): void
+    {
+        $operator = User::factory()->create([
+            'is_active' => true,
+            'role' => 'operator',
+            'email_verified_at' => now(),
+        ]);
+
+        ChatMessage::query()->create([
+            'user_id' => $operator->id,
+            'type' => 'global',
+            'content' => 'Pesan tetap ada.',
+        ]);
+
+        $response = $this->actingAs($operator)->post(route('lawangsewu.chat.clear'));
+
+        $response->assertForbidden();
+        $this->assertSame(1, ChatMessage::query()->where('type', 'global')->count());
+    }
 }

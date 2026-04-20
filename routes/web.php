@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::prefix('api')->group(function () {
+Route::prefix('api')->middleware('throttle:60,1')->group(function () {
     Route::get('/pengumuman-rss', [WidgetCompatController::class, 'apiPengumuman']);
     Route::get('/pengumuman-rss/{source}', [WidgetCompatController::class, 'apiPengumuman']);
     Route::get('/pengumuman', [WidgetCompatController::class, 'apiPengumumanAlias']);
@@ -73,7 +73,8 @@ Route::get('/info-persidangan-hijautua', [WidgetCompatController::class, 'phpPub
 Route::get('/info-persidangan-stabilo', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan-stabilo');
 
 // Backward-compatible root endpoint used by some legacy embeds.
-Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik']);
+Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik'])
+    ->middleware('throttle:60,1');
 
 Route::prefix('lawangsewu')->group(function () {
     Route::get('/pengumuman-peradilan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan');
@@ -82,9 +83,10 @@ Route::prefix('lawangsewu')->group(function () {
     Route::get('/dashboard-perkara', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'dashboard-perkara');
     Route::get('/monitor-persidangan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'monitor-persidangan');
     // Backward-compatible direct endpoint used by legacy/public widgets.
-    Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik']);
+    Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik'])
+        ->middleware('throttle:60,1');
 
-    Route::prefix('api')->group(function () {
+    Route::prefix('api')->middleware('throttle:60,1')->group(function () {
         Route::get('/pengumuman-rss', [WidgetCompatController::class, 'apiPengumuman']);
         Route::get('/pengumuman-rss/{source}', [WidgetCompatController::class, 'apiPengumuman']);
         Route::get('/pengumuman', [WidgetCompatController::class, 'apiPengumumanAlias']);
@@ -116,6 +118,8 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
     Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('lawangsewu.chat');
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
     Route::delete('/chat/{message}', [\App\Http\Controllers\ChatController::class, 'destroy'])->name('lawangsewu.chat.destroy');
+    Route::post('/chat/{message}/delete', [\App\Http\Controllers\ChatController::class, 'destroy'])->name('lawangsewu.chat.destroy.post');
+    Route::post('/chat/clear', [\App\Http\Controllers\ChatController::class, 'destroyAll'])->name('lawangsewu.chat.clear');
     Route::get('/chat/media/{message}', [\App\Http\Controllers\ChatController::class, 'media'])->name('lawangsewu.chat.media');
 
     // Backward-compatibility redirect: Pendopo is consolidated into Buku Tamu.

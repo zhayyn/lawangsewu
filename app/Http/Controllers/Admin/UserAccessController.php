@@ -34,12 +34,11 @@ class UserAccessController extends Controller
             $canManage = $actorIsSuperAdmin
                 || (! $user->isSuperAdmin() && $user->role !== 'admin');
 
-            return [
+            $entry = [
                 'id' => $user->id,
                 'name' => $user->name,
                 'alias' => $user->alias,
                 'email' => $user->email,
-                'google_id' => $user->google_id,
                 'role' => $user->role,
                 'is_active' => (bool) $user->is_active,
                 'is_superadmin' => (bool) $user->isSuperAdmin(),
@@ -47,6 +46,12 @@ class UserAccessController extends Controller
                 'created_at' => $user->created_at,
                 'can_manage' => $canManage,
             ];
+
+            if ($actorIsSuperAdmin) {
+                $entry['google_id'] = $user->google_id;
+            }
+
+            return $entry;
         })->values();
 
         return Inertia::render('Admin/Users', [

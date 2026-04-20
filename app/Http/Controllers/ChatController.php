@@ -157,4 +157,45 @@ class ChatController extends Controller
             'message' => 'Pesan chat internal berhasil dihapus.',
         ]);
     }
+
+    public function destroyAll(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->isSuperAdmin(), 403);
+
+        $messages = ChatMessage::query()
+            ->where(function ($query) {
+                $query->where('type', 'global')
+                    ->orWhereNull('type')
+                    ->orWhere('type', '');
+            })
+            ->select(['id', 'metadata'])
+            ->get();
+
+        foreach ($messages as $message) {
+            $attachment = $message->metadata['attachment'] ?? null;
+            if (!is_array($attachment) || empty($attachment['path'])) {
+                continue;
+            }
+
+            $disk = $attachment['disk'] ?? 'public';
+            if (Storage::disk($disk)->exists($attachment['path'])) {
+                Storage::disk($disk)->delete($attachment['path']);
+            }
+        }
+
+        $deletedCount = ChatMessage::query()
+            ->where(function ($query) {
+                $query->where('type', 'global')
+                    ->orWhereNull('type')
+                    ->orWhere('type', '');
+            })
+            ->delete();
+
+        return response()->json([
+            'ok' => true,
+            'deleted' => $deletedCount,
+            'message' => 'Semua pesan chat internal berhasil dihapus.',
+        ]);
+    }
 }

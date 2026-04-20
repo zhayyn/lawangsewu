@@ -43,6 +43,7 @@ const showEmojiPicker = ref(false);
 const mediaError = ref('');
 const isPreparingAttachment = ref(false);
 const isSubmitting = ref(false);
+const isDeletingChat = ref(false);
 const uploadProgress = ref(null);
 const attachmentSummary = ref(null);
 const attachmentPreviewUrl = ref('');
@@ -53,8 +54,56 @@ const emojiList = ['😀', '😁', '😂', '🤣', '😊', '😍', '🤩', '😎
 const pollMs = ref(BASE_POLL_MS);
 const pollTimer = ref(null);
 const failedPolls = ref(0);
+const toastItems = ref([]);
+const confirmState = ref({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Lanjutkan',
+    cancelLabel: 'Batal',
+    tone: 'danger',
+});
+let toastSeed = 0;
+let confirmResolver = null;
 
 const onlineUsers = computed(() => props.activeUsers.filter((u) => u.is_active));
+
+const toastToneClass = (tone) => ({
+    success: 'border-emerald-300/60 bg-emerald-50/90 text-emerald-800',
+    error: 'border-rose-300/70 bg-rose-50/90 text-rose-800',
+    warning: 'border-amber-300/70 bg-amber-50/90 text-amber-800',
+    info: 'border-cyan-300/70 bg-cyan-50/90 text-cyan-800',
+}[tone] || 'border-slate-300/70 bg-slate-50/90 text-slate-700');
+
+const pushToast = (message, tone = 'info') => {
+    const id = `toast-${++toastSeed}`;
+    toastItems.value.push({ id, message, tone });
+
+    window.setTimeout(() => {
+        toastItems.value = toastItems.value.filter((item) => item.id !== id);
+    }, 2800);
+};
+
+const askConfirm = (options) => new Promise((resolve) => {
+    confirmResolver = resolve;
+    confirmState.value = {
+        open: true,
+        title: options?.title || 'Konfirmasi Aksi',
+        message: options?.message || 'Lanjutkan aksi ini?',
+        confirmLabel: options?.confirmLabel || 'Lanjutkan',
+        cancelLabel: options?.cancelLabel || 'Batal',
+        tone: options?.tone || 'danger',
+    };
+});
+
+const resolveConfirm = (accepted) => {
+    if (confirmResolver) {
+        confirmResolver(Boolean(accepted));
+    }
+
+    confirmResolver = null;
+    confirmState.value.open = false;
+};
 
 const scrollToBottom = () => {
     nextTick(() => {
@@ -438,9 +487,11 @@ const sendMessage = () => {
         uploadProgress.value = null;
         scrollToBottom();
         syncMessagesNow();
+        pushToast('Pesan berhasil dikirim.', 'success');
     }).catch((error) => {
         const errors = error?.response?.data?.errors || {};
         mediaError.value = errors.attachment?.[0] || (!attachmentFile.value ? errors.content?.[0] : '') || error?.response?.data?.message || 'Gagal mengirim pesan.';
+        pushToast(mediaError.value, 'error');
     }).finally(() => {
         isSubmitting.value = false;
 
@@ -450,23 +501,64 @@ const sendMessage = () => {
     });
 };
 
-const deleteMessage = (messageId) => {
-    if (!isSuperAdmin.value || !messageId) {
+const deleteMessage = async (messageId) => {
+    if (!isSuperAdmin.value || !messageId || isDeletingChat.value) {
         return;
     }
 
-    if (!window.confirm('Hapus pesan chat internal ini secara permanen?')) {
+    const confirmed = await askConfirm({
+        title: 'Hapus Pesan',
+        message: 'Pesan chat internal ini akan dihapus permanen.',
+        confirmLabel: 'Ya, Hapus',
+        tone: 'danger',
+    });
+
+    if (!confirmed) {
         return;
     }
 
-    router.post(route('lawangsewu.chat.destroy', messageId), {
-        _method: 'delete',
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            messages.value = messages.value.filter((item) => item.id !== messageId);
-            syncMessagesNow();
-        },
+    isDeletingChat.value = true;
+
+    window.axios.post(route('lawangsewu.chat.destroy.post', messageId)).then(() => {
+        messages.value = messages.value.filter((item) => item.id !== messageId);
+        syncMessagesNow();
+        pushToast('Pesan berhasil dihapus.', 'success');
+    }).catch((error) => {
+        const message = error?.response?.data?.message || 'Gagal menghapus pesan chat.';
+        pushToast(message, 'error');
+    }).finally(() => {
+        isDeletingChat.value = false;
+    });
+};
+
+const clearAllMessages = async () => {
+    if (!isSuperAdmin.value || isDeletingChat.value) {
+        return;
+    }
+
+    const confirmed = await askConfirm({
+        title: 'Hapus Semua Pesan',
+        message: 'Semua pesan chat internal akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.',
+        confirmLabel: 'Ya, Hapus Semua',
+        tone: 'danger',
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
+    isDeletingChat.value = true;
+
+    window.axios.post(route('lawangsewu.chat.clear')).then((response) => {
+        const deleted = Number(response?.data?.deleted || 0);
+        messages.value = [];
+        syncMessagesNow();
+        pushToast(`Berhasil menghapus ${deleted} pesan chat.`, 'success');
+    }).catch((error) => {
+        const message = error?.response?.data?.message || 'Gagal menghapus semua pesan chat.';
+        pushToast(message, 'error');
+    }).finally(() => {
+        isDeletingChat.value = false;
     });
 };
 
@@ -490,6 +582,19 @@ watch(() => props.initialMessages, (newMessages) => {
         :nav-groups="navGroups"
         :app-meta="appMeta"
     >
+        <div class="pointer-events-none fixed right-4 top-20 z-[70] flex w-[min(92vw,340px)] flex-col gap-2">
+            <transition-group name="toast-fade" tag="div" class="space-y-2">
+                <div
+                    v-for="toast in toastItems"
+                    :key="toast.id"
+                    class="pointer-events-auto rounded-2xl border px-4 py-3 text-sm font-semibold shadow-[0_16px_45px_-30px_rgba(15,23,42,0.45)] backdrop-blur"
+                    :class="toastToneClass(toast.tone)"
+                >
+                    {{ toast.message }}
+                </div>
+            </transition-group>
+        </div>
+
         <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col sm:space-y-6">
             <!-- Header Section -->
             <section class="card-surface p-5 py-4 shrink-0">
@@ -527,7 +632,18 @@ watch(() => props.initialMessages, (newMessages) => {
                             <div class="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500 font-black text-[10px]">#</div>
                             <span class="text-xs font-black uppercase tracking-[0.2em] text-[var(--text-1)]">Internal-Umum</span>
                         </div>
-                        <p class="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest italic opacity-60">Pesan dihapus otomatis dalam 30 hari</p>
+                        <div class="flex items-center gap-2">
+                            <p class="hidden text-[10px] font-bold uppercase tracking-widest italic opacity-60 text-[var(--text-3)] sm:block">Pesan dihapus otomatis dalam 30 hari</p>
+                            <button
+                                v-if="isSuperAdmin"
+                                type="button"
+                                class="rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                                :disabled="isDeletingChat"
+                                @click="clearAllMessages"
+                            >
+                                {{ isDeletingChat ? 'Menghapus...' : 'Hapus Semua Pesan' }}
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Messages List -->
@@ -781,10 +897,51 @@ watch(() => props.initialMessages, (newMessages) => {
                 >
             </div>
         </div>
+
+        <div
+            v-if="confirmState.open"
+            class="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+            @click.self="resolveConfirm(false)"
+        >
+            <article class="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface-1)] p-5 shadow-[0_30px_80px_-42px_rgba(15,23,42,0.8)]">
+                <p class="text-[11px] font-black uppercase tracking-[0.25em]" :class="confirmState.tone === 'danger' ? 'text-rose-600' : 'text-cyan-600'">Konfirmasi</p>
+                <h3 class="mt-2 text-lg font-black text-[var(--text-1)]">{{ confirmState.title }}</h3>
+                <p class="mt-2 text-sm leading-6 text-[var(--text-2)]">{{ confirmState.message }}</p>
+
+                <div class="mt-5 flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        class="rounded-xl border border-[var(--border)] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+                        @click="resolveConfirm(false)"
+                    >
+                        {{ confirmState.cancelLabel }}
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-white transition"
+                        :class="confirmState.tone === 'danger' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-cyan-600 hover:bg-cyan-700'"
+                        @click="resolveConfirm(true)"
+                    >
+                        {{ confirmState.confirmLabel }}
+                    </button>
+                </div>
+            </article>
+        </div>
     </LawangsewuLayout>
 </template>
 
 <style scoped>
+ .toast-fade-enter-active,
+ .toast-fade-leave-active {
+    transition: all 0.24s ease;
+ }
+
+ .toast-fade-enter-from,
+ .toast-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+ }
+
 emoji-picker {
     --border-color: transparent;
     --background: var(--surface-1);

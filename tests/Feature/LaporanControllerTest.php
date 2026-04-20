@@ -8,10 +8,17 @@ use Tests\TestCase;
 
 class LaporanControllerTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_superadmin_can_access_laporan_page(): void
     {
-        $user = User::where('email', 'dbprakom@gmail.com')->first();
-        $this->assertNotNull($user, 'Superadmin user not found');
+        $user = User::factory()->create([
+            'email' => 'dbprakom@gmail.com',
+            'role' => 'admin',
+            'is_superadmin' => true,
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
 
         $response = $this->actingAs($user)->get('/admin/laporan');
 
@@ -20,7 +27,13 @@ class LaporanControllerTest extends TestCase
 
     public function test_laporan_page_returns_inertia_component(): void
     {
-        $user = User::where('email', 'dbprakom@gmail.com')->first();
+        $user = User::factory()->create([
+            'email' => 'dbprakom@gmail.com',
+            'role' => 'admin',
+            'is_superadmin' => true,
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
 
         $response = $this->actingAs($user)->get('/admin/laporan');
 

@@ -234,36 +234,43 @@ class WaCarakaController extends Controller
             ->unique('remote_number')
             ->values();
 
+        // Single efficient query: get all needed marks for current user
         $marksByConversation = WaCarakaConversationMark::query()
             ->where('user_id', $user->id)
             ->whereIn('wa_caraka_conversation_id', $conversationRows->pluck('id'))
             ->get()
             ->keyBy('wa_caraka_conversation_id');
 
-        // Latest message for ordering/recency.
-        $latestMessageIds = WaCarakaMessage::query()
-            ->selectRaw('MAX(id) as latest_id')
-            ->whereIn('conversation_id', $conversationRows->pluck('conversation_id'))
-            ->groupBy('conversation_id');
-
-        $latestMessageByConversation = WaCarakaMessage::query()
-            ->whereIn('id', $latestMessageIds)
+        // Optimized: use subqueries to fetch latest messages (all and inbound) in single efficient query
+        $conversationIds = $conversationRows->pluck('conversation_id')->unique()->values()->all();
+        
+        // Get latest message (any direction) per conversation using raw SQL for efficiency
+        $latestMessagesQuery = WaCarakaMessage::query()
+            ->whereIn('conversation_id', $conversationIds)
+            ->whereRaw('id IN (
+                SELECT MAX(id) FROM wa_caraka_messages 
+                WHERE conversation_id IN (' . implode(',', array_fill(0, count($conversationIds), '?')) . ')
+                GROUP BY conversation_id
+            )', $conversationIds)
             ->select('conversation_id', 'metadata', 'created_at')
-            ->get()
-            ->keyBy('conversation_id');
+            ->get();
 
-        // Prefer latest inbound metadata for profile photo (outbound metadata often lacks avatar fields).
-        $latestInboundMessageIds = WaCarakaMessage::query()
-            ->selectRaw('MAX(id) as latest_id')
-            ->whereIn('conversation_id', $conversationRows->pluck('conversation_id'))
+        $latestMessageByConversation = $latestMessagesQuery->keyBy('conversation_id');
+
+        // Get latest inbound message per conversation using raw SQL for efficiency
+        $latestInboundQuery = WaCarakaMessage::query()
+            ->whereIn('conversation_id', $conversationIds)
             ->where('direction', 'inbound')
-            ->groupBy('conversation_id');
-
-        $latestInboundMessageByConversation = WaCarakaMessage::query()
-            ->whereIn('id', $latestInboundMessageIds)
+            ->whereRaw('id IN (
+                SELECT MAX(id) FROM wa_caraka_messages 
+                WHERE conversation_id IN (' . implode(',', array_fill(0, count($conversationIds), '?')) . ')
+                AND direction = ?
+                GROUP BY conversation_id
+            )', array_merge($conversationIds, ['inbound']))
             ->select('conversation_id', 'metadata')
-            ->get()
-            ->keyBy('conversation_id');
+            ->get();
+
+        $latestInboundMessageByConversation = $latestInboundQuery->keyBy('conversation_id');
 
         $runtimeMetaResponse = $this->waService->resolveContactsMeta(
             $conversationRows->pluck('remote_number')->filter()->values()->all()
@@ -850,50 +857,87 @@ class WaCarakaController extends Controller
     protected function reportStatsData(): array
     {
         $today = now()->startOfDay();
+        
+        // Optimized: Single query for all daily aggregations (instead of 14 separate COUNT queries)
+        $dailyData = WaCarakaMessage::query()
+            ->where('direction', 'inbound')
+            ->where('created_at', '>=', $today->copy()->subDays(13))
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->groupBy('date')
+            ->pluck('count', 'date');
 
-        $daily = collect(range(13, 0))->map(function (int $daysAgo) use ($today) {
-            $start = (clone $today)->subDays($daysAgo);
-            $end = (clone $start)->endOfDay();
+        $daily = collect(range(13, 0))->map(function (int $daysAgo) use ($today, $dailyData) {
+            $date = (clone $today)->subDays($daysAgo);
             return [
-                'label' => $start->format('d M'),
-                'count' => WaCarakaMessage::query()
-                    ->where('direction', 'inbound')
-                    ->whereBetween('created_at', [$start, $end])
-                    ->count(),
+                'label' => $date->format('d M'),
+                'count' => (int) ($dailyData[$date->toDateString()] ?? 0),
             ];
         })->values();
 
-        $weekly = collect(range(11, 0))->map(function (int $weeksAgo) {
+        // Optimized: Single query for all weekly aggregations (instead of 12 separate COUNT queries)
+        $weeklyData = WaCarakaMessage::query()
+            ->where('direction', 'inbound')
+            ->where('created_at', '>=', now()->startOfWeek(Carbon::MONDAY)->subWeeks(11))
+            ->selectRaw('YEAR(created_at) as year, WEEK(created_at, 1) as week, COUNT(*) as count')
+            ->groupBy('year', 'week')
+            ->get()
+            ->keyBy(function ($row) {
+                return $row->year . '-' . str_pad($row->week, 2, '0', STR_PAD_LEFT);
+            })
+            ->pluck('count');
+
+        $weekly = collect(range(11, 0))->map(function (int $weeksAgo) use ($weeklyData) {
             $start = now()->startOfWeek(Carbon::MONDAY)->subWeeks($weeksAgo);
-            $end = (clone $start)->endOfWeek(Carbon::SUNDAY);
+            $year = $start->year;
+            $week = $start->week;
+            $key = $year . '-' . str_pad($week, 2, '0', STR_PAD_LEFT);
             return [
                 'label' => $start->format('d M'),
-                'count' => WaCarakaMessage::query()
-                    ->where('direction', 'inbound')
-                    ->whereBetween('created_at', [$start, $end])
-                    ->count(),
+                'count' => (int) ($weeklyData[$key] ?? 0),
             ];
         })->values();
 
-        $monthly = collect(range(11, 0))->map(function (int $monthsAgo) {
+        // Optimized: Single query for all monthly aggregations (instead of 12 separate COUNT queries)
+        $monthlyData = WaCarakaMessage::query()
+            ->where('direction', 'inbound')
+            ->where('created_at', '>=', now()->startOfMonth()->subMonths(11))
+            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count')
+            ->groupBy('year', 'month')
+            ->get()
+            ->keyBy(function ($row) {
+                return $row->year . '-' . str_pad($row->month, 2, '0', STR_PAD_LEFT);
+            })
+            ->pluck('count');
+
+        $monthly = collect(range(11, 0))->map(function (int $monthsAgo) use ($monthlyData) {
             $start = now()->startOfMonth()->subMonths($monthsAgo);
-            $end = (clone $start)->endOfMonth();
+            $key = $start->year . '-' . str_pad($start->month, 2, '0', STR_PAD_LEFT);
             return [
                 'label' => $start->translatedFormat('M Y'),
-                'count' => WaCarakaMessage::query()
-                    ->where('direction', 'inbound')
-                    ->whereBetween('created_at', [$start, $end])
-                    ->count(),
+                'count' => (int) ($monthlyData[$key] ?? 0),
             ];
         })->values();
+
+        // Optimized: Unified summary query (instead of 4 separate queries)
+        $summary = DB::select(DB::raw('
+            SELECT 
+                SUM(CASE WHEN direction = "inbound" AND DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as inboundToday,
+                SUM(CASE WHEN direction = "inbound" AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) THEN 1 ELSE 0 END) as inboundWeek,
+                SUM(CASE WHEN direction = "inbound" AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN 1 ELSE 0 END) as inboundMonth
+            FROM wa_caraka_messages
+        '))[0] ?? null;
+
+        $activeConversations = WaCarakaConversation::query()
+            ->whereIn('status', ['open', 'pending'])
+            ->count();
 
         return [
             'generatedAt' => now()->toIso8601String(),
             'summary' => [
-                'inboundToday' => WaCarakaMessage::query()->where('direction', 'inbound')->whereDate('created_at', today())->count(),
-                'inboundWeek' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfWeek(Carbon::MONDAY), now()->endOfWeek(Carbon::SUNDAY)])->count(),
-                'inboundMonth' => WaCarakaMessage::query()->where('direction', 'inbound')->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-                'activeConversations' => WaCarakaConversation::query()->whereIn('status', ['open', 'pending'])->count(),
+                'inboundToday' => (int) ($summary->inboundToday ?? 0),
+                'inboundWeek' => (int) ($summary->inboundWeek ?? 0),
+                'inboundMonth' => (int) ($summary->inboundMonth ?? 0),
+                'activeConversations' => $activeConversations,
             ],
             'dailyInbound' => $daily,
             'weeklyInbound' => $weekly,
@@ -906,52 +950,60 @@ class WaCarakaController extends Controller
     {
         $today = now()->startOfDay();
 
+        // Optimized: Combine all aggregations into two queries instead of five
+        // Query 1: Conversation counts and message counts from WaCarakaMessage
+        $messageStats = WaCarakaMessage::query()
+            ->where('direction', 'outbound')
+            ->whereNotNull('user_id')
+            ->selectRaw(
+                'user_id, 
+                COUNT(*) as totalReplies,
+                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as todayReplies,
+                MAX(created_at) as lastReplyAt',
+                [$today]
+            )
+            ->groupBy('user_id')
+            ->pluck('totalReplies', 'user_id');
+
+        $messageStatsDetailed = WaCarakaMessage::query()
+            ->where('direction', 'outbound')
+            ->whereNotNull('user_id')
+            ->selectRaw(
+                'user_id, 
+                COUNT(*) as totalReplies,
+                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as todayReplies,
+                MAX(created_at) as lastReplyAt',
+                [$today]
+            )
+            ->groupBy('user_id')
+            ->get()
+            ->keyBy('user_id');
+
+        // Query 2: Conversation counts
         $conversationCounts = WaCarakaConversation::query()
             ->select('claimed_by', DB::raw('COUNT(*) as total'))
             ->whereNotNull('claimed_by')
             ->groupBy('claimed_by')
             ->pluck('total', 'claimed_by');
 
-        $replyCounts = WaCarakaMessage::query()
-            ->select('user_id', DB::raw('COUNT(*) as total'))
-            ->where('direction', 'outbound')
-            ->whereNotNull('user_id')
-            ->groupBy('user_id')
-            ->pluck('total', 'user_id');
-
-        $replyCountsToday = WaCarakaMessage::query()
-            ->select('user_id', DB::raw('COUNT(*) as total'))
-            ->where('direction', 'outbound')
-            ->whereNotNull('user_id')
-            ->whereBetween('created_at', [$today, now()])
-            ->groupBy('user_id')
-            ->pluck('total', 'user_id');
-
-        $lastReplyAt = WaCarakaMessage::query()
-            ->select('user_id', DB::raw('MAX(created_at) as last_reply_at'))
-            ->where('direction', 'outbound')
-            ->whereNotNull('user_id')
-            ->groupBy('user_id')
-            ->pluck('last_reply_at', 'user_id');
-
         $operatorIds = $conversationCounts->keys()
-            ->merge($replyCounts->keys())
-            ->merge($replyCountsToday->keys())
+            ->merge($messageStatsDetailed->keys())
             ->unique()
             ->values();
 
         $operators = User::query()
             ->whereIn('id', $operatorIds)
             ->get(['id', 'name', 'alias'])
-            ->map(function (User $user) use ($conversationCounts, $replyCounts, $replyCountsToday, $lastReplyAt) {
+            ->map(function (User $user) use ($conversationCounts, $messageStatsDetailed) {
+                $msgStats = $messageStatsDetailed[$user->id];
                 return [
                     'id' => $user->id,
                     'name' => $user->alias ?: $user->name,
                     'conversations' => (int) ($conversationCounts[$user->id] ?? 0),
-                    'outboundMessages' => (int) ($replyCounts[$user->id] ?? 0),
-                    'outboundToday' => (int) ($replyCountsToday[$user->id] ?? 0),
-                    'lastReplyAt' => isset($lastReplyAt[$user->id])
-                        ? Carbon::parse($lastReplyAt[$user->id])->timezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB'
+                    'outboundMessages' => (int) ($msgStats->totalReplies ?? 0),
+                    'outboundToday' => (int) ($msgStats->todayReplies ?? 0),
+                    'lastReplyAt' => isset($msgStats->lastReplyAt)
+                        ? Carbon::parse($msgStats->lastReplyAt)->timezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB'
                         : null,
                 ];
             })

@@ -161,11 +161,18 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaController::class, 'proxy'])
         ->where('action', '.*')
         ->name('lawangsewu.wacaraka.api');
+    
+    // WA Caraka Media Download (proxied from bridge)
+    // Supports: /wa-caraka/media/{token}, /wa-caraka/media/{token}.ext, /wa-caraka/media/{token}/{filename}
+    Route::get('/wa-caraka/media/{path}', [WaCarakaController::class, 'downloadMedia'])
+        ->where('path', '[a-f0-9]{32,}.*')
+        ->name('lawangsewu.wacaraka.media');
 });
 
 Route::middleware(['auth', 'verified', 'active'])->group(function () {
     Route::get('/wa-caraka/reports', [WaCarakaController::class, 'reports'])->name('lawangsewu.wacaraka.reports');
     Route::get('/wa-caraka/reports/data', [WaCarakaController::class, 'reportsData'])->name('lawangsewu.wacaraka.reports.data');
+    Route::get('/wa-caraka/reports/pdf', [WaCarakaController::class, 'reportsPdf'])->name('lawangsewu.wacaraka.reports.pdf');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(function () {

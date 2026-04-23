@@ -40,13 +40,22 @@ class CctvCameraController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'is_active' => $request->has('is_active')
+                ? $request->boolean('is_active')
+                : true,
+            'is_featured' => $request->has('is_featured')
+                ? $request->boolean('is_featured')
+                : false,
+        ]);
+
         $payload = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'zone' => ['nullable', 'string', 'max:255'],
             'iframe_src' => ['required', 'string', 'max:2000', 'starts_with:https://,http://'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'is_active' => ['nullable', 'boolean'],
-            'is_featured' => ['nullable', 'boolean'],
+            'is_active' => ['required', 'boolean'],
+            'is_featured' => ['required', 'boolean'],
         ]);
 
         CctvCamera::query()->create([
@@ -55,8 +64,8 @@ class CctvCameraController extends Controller
             'zone' => $payload['zone'] ?? null,
             'iframe_src' => $payload['iframe_src'],
             'sort_order' => $payload['sort_order'] ?? 0,
-            'is_active' => (bool) ($payload['is_active'] ?? true),
-            'is_featured' => (bool) ($payload['is_featured'] ?? false),
+            'is_active' => $payload['is_active'],
+            'is_featured' => $payload['is_featured'],
         ]);
 
         return back()->with('status', 'Kamera CCTV baru berhasil ditambahkan.');
@@ -64,6 +73,15 @@ class CctvCameraController extends Controller
 
     public function update(Request $request, CctvCamera $camera): RedirectResponse
     {
+        $request->merge([
+            'is_active' => $request->has('is_active')
+                ? $request->boolean('is_active')
+                : false,
+            'is_featured' => $request->has('is_featured')
+                ? $request->boolean('is_featured')
+                : false,
+        ]);
+
         $payload = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'zone' => ['nullable', 'string', 'max:255'],

@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class WaCarakaConversationMark extends Model
+class WaCarakaConversationMark extends WaCarakaModel
 {
     protected $fillable = [
         'user_id',

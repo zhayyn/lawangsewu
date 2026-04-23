@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Schema;
+use App\Support\WaCarakaDatabase;
 
 /**
  * WaCarakaTicket
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Workflow: open → replied → sent → closed
  */
-class WaCarakaTicket extends Model
+class WaCarakaTicket extends WaCarakaModel
 {
     protected $fillable = [
         'assigned_to',
@@ -109,7 +108,7 @@ class WaCarakaTicket extends Model
      */
     public static function recent(int $limit = 20, ?string $type = null, ?string $status = null): array
     {
-        if (!Schema::hasTable('wa_caraka_tickets')) {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_tickets')) {
             return [];
         }
 
@@ -154,7 +153,7 @@ class WaCarakaTicket extends Model
      */
     public static function ticketStats(): array
     {
-        if (!Schema::hasTable('wa_caraka_tickets')) {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_tickets')) {
             return [
                 'total' => 0, 'open' => 0, 'replied' => 0,
                 'sent' => 0, 'closed' => 0,

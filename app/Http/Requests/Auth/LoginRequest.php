@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -28,7 +30,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ];
     }
@@ -42,9 +44,7 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $credentials = array_merge($this->only('email', 'password'), [
-            'is_active' => true,
-        ]);
+        $credentials = $this->resolveCredentials();
 
         if (! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
@@ -55,6 +55,55 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Resolve the submitted identity into login credentials.
+     *
+     * Accepts either the real email or a short alias such as "ptsp1".
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolveCredentials(): array
+    {
+        $identity = Str::lower(trim((string) $this->input('email')));
+
+        return [
+            'email' => $this->resolveEmailFromIdentity($identity),
+            'password' => (string) $this->input('password'),
+            'is_active' => true,
+        ];
+    }
+
+    protected function resolveEmailFromIdentity(string $identity): string
+    {
+        if (Str::contains($identity, '@')) {
+            return $identity;
+        }
+
+        $matchedEmail = $this->findEmailByAliasOrName($identity)
+            ?? $this->findEmailByEmailLocalPart($identity);
+
+        return $matchedEmail
+            ? Str::lower((string) $matchedEmail)
+            : $identity;
+    }
+
+    protected function findEmailByAliasOrName(string $identity): ?string
+    {
+        return User::query()
+            ->where(function (Builder $query) use ($identity): void {
+                $query->whereRaw('lower(alias) = ?', [$identity])
+                    ->orWhereRaw('lower(name) = ?', [$identity]);
+            })
+            ->value('email');
+    }
+
+    protected function findEmailByEmailLocalPart(string $identity): ?string
+    {
+        return User::query()
+            ->whereRaw("lower(substring_index(email, '@', 1)) = ?", [$identity])
+            ->value('email');
     }
 
     /**
@@ -85,6 +134,9 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $identity = Str::lower(trim((string) $this->input('email')));
+        $normalized = $this->resolveEmailFromIdentity($identity);
+
+        return Str::transliterate($normalized.'|'.$this->ip());
     }
 }

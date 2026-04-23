@@ -33,14 +33,18 @@ class LogSlowRequests
         $channel = (string) env('LOG_SLOW_CHANNEL', 'slow_request');
 
         if ($elapsedMs >= $threshold) {
-            Log::channel($channel)->warning('[SlowRequest] ' . $request->method() . ' ' . $request->path(), [
-                'elapsed_ms' => $elapsedMs,
-                'threshold'  => $threshold,
-                'user_id'    => $request->user()?->id,
-                'route'      => optional($request->route())?->getName(),
-                'ip'         => $request->ip(),
-                'status'     => $response->getStatusCode(),
-            ]);
+            try {
+                Log::channel($channel)->warning('[SlowRequest] ' . $request->method() . ' ' . $request->path(), [
+                    'elapsed_ms' => $elapsedMs,
+                    'threshold'  => $threshold,
+                    'user_id'    => $request->user()?->id,
+                    'route'      => optional($request->route())?->getName(),
+                    'ip'         => $request->ip(),
+                    'status'     => $response->getStatusCode(),
+                ]);
+            } catch (\Throwable $e) {
+                // Observability should never break the request lifecycle.
+            }
         }
 
         return $response;

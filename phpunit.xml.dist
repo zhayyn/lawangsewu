@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    This is the distribution configuration file for PHPUnit.
+    
+    DO NOT COMMIT phpunit.xml to version control if it contains sensitive credentials.
+    Instead, commit this phpunit.xml.dist as the template.
+    
+    To use this file:
+    1. Copy it to phpunit.xml: cp phpunit.xml.dist phpunit.xml
+    2. Update credentials in phpunit.xml (or use .env.testing)
+    3. Add phpunit.xml to .gitignore
+    
+    For CI/CD environments (GitHub Actions, etc.):
+    - Use phpunit.xml.dist as template
+    - Inject credentials via environment variables
+    - Set secrets in CI/CD platform
+    
+    For local development:
+    - Use .env.testing to configure test environment
+    - PHPUnit will read from .env.testing automatically
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheResult="false"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- Application Environment -->
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+
+        <!-- Database Configuration -->
+        <!-- These values can be overridden by .env.testing or CI/CD environment variables -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="localhost"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="lawangsewu_test"/>
+        <env name="DB_USERNAME" value="dbprakom"/>
+        <!-- SECURITY: Update this in .env.testing or CI/CD secrets, not here -->
+        <env name="DB_PASSWORD" value=""/>
+        <env name="DB_SOCKET" value="/var/run/mysqld/mysqld.sock"/>
+
+        <!-- SIPP Database Configuration -->
+        <!-- For integration tests with SIPP data source -->
+        <env name="SIPP_DB_HOST" value="192.168.88.10"/>
+        <env name="SIPP_DB_PORT" value="3306"/>
+        <env name="SIPP_DB_DATABASE" value="sipp"/>
+        <env name="SIPP_DB_USERNAME" value="admin"/>
+        <!-- SECURITY: Update this in .env.testing or CI/CD secrets, not here -->
+        <env name="SIPP_DB_PASSWORD" value=""/>
+
+        <!-- Broadcasting & Realtime -->
+        <env name="BROADCAST_CONNECTION" value="log"/>
+
+        <!-- Cache & Session -->
+        <env name="CACHE_STORE" value="array"/>
+        <env name="SESSION_DRIVER" value="array"/>
+
+        <!-- Mail & Queue -->
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+
+        <!-- Monitoring -->
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+
+        <!-- Logging -->
+        <env name="LOG_CHANNEL" value="stderr"/>
+        <env name="LOG_LEVEL" value="debug"/>
+
+        <!-- Feature Flags for Testing -->
+        <env name="WA_CARAKA_ENABLED" value="false"/>
+        <env name="SIPP_ENABLED" value="true"/>
+        <env name="FEATURE_WA_CARAKA" value="false"/>
+        <env name="FEATURE_SIPP_HUB" value="false"/>
+        <env name="FEATURE_PILAR" value="false"/>
+    </php>
+</phpunit>

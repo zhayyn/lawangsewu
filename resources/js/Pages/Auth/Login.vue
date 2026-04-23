@@ -48,6 +48,8 @@ const form = useForm({
     remember: false,
 });
 
+const loginIdentityPlaceholder = 'contoh: ptsp1 atau ptsp1@pa-semarang.go.id';
+
 const submit = () => {
     form.post(route('login'), {
         onFinish: () => form.reset('password'),
@@ -340,17 +342,22 @@ onBeforeUnmount(() => {
 
         <form @submit.prevent="submit" class="space-y-4">
             <div>
-                <InputLabel for="email" value="Email" />
+                <InputLabel for="email" value="Email atau Alias" />
 
                 <TextInput
                     id="email"
-                    type="email"
+                    type="text"
                     class="mt-1 block w-full"
                     v-model="form.email"
+                    :placeholder="loginIdentityPlaceholder"
                     required
                     autofocus
                     autocomplete="username"
                 />
+
+                <p class="mt-2 text-xs text-gray-400">
+                    Gunakan email lengkap atau alias operator seperti <span class="font-semibold text-gray-500">ptsp1</span>.
+                </p>
 
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>

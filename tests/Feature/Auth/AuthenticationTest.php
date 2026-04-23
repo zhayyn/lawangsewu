@@ -33,6 +33,24 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    public function test_users_can_authenticate_using_alias_on_the_login_screen(): void
+    {
+        $user = User::factory()->create([
+            'alias' => 'ptsp-1',
+            'email' => 'ptsp1@pa-semarang.go.id',
+            'is_active' => true,
+            'role' => 'operator',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'ptsp1',
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
     public function test_users_can_not_authenticate_with_invalid_password(): void
     {
         $user = User::factory()->create([

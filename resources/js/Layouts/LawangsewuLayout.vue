@@ -315,7 +315,7 @@ onMounted(() => {
 
                 <div class="flex min-w-0 flex-1 flex-col">
                     <header class="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--surface-0)]/85 backdrop-blur">
-                        <div class="mx-auto flex max-w-[1800px] items-center gap-3 px-4 py-4 sm:px-6 xl:px-8">
+                        <div class="mx-auto flex max-w-[1960px] items-center gap-3 px-4 py-4 sm:px-6 xl:px-8">
                             <button
                                 type="button"
                                 class="group relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-1)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--accent-border)] hover:bg-[var(--surface-2)] hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.65)] lg:hidden"
@@ -433,7 +433,7 @@ onMounted(() => {
                         </div>
                     </header>
 
-                    <main class="mx-auto w-full max-w-[1800px] flex-1 px-4 py-5 pb-8 sm:px-6 lg:px-8 xl:pb-10">
+                    <main class="mx-auto w-full max-w-[1960px] flex-1 px-4 py-5 pb-8 sm:px-6 lg:px-8 xl:pb-10">
                         <slot />
                     </main>
                 </div>

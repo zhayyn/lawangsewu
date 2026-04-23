@@ -82,6 +82,26 @@ return [
             ]) : [],
         ],
 
+        'wa_caraka' => [
+            'driver' => env('WA_CARAKA_DB_DRIVER', env('DB_CONNECTION', 'mysql')),
+            'url' => env('WA_CARAKA_DB_URL', env('DB_URL')),
+            'host' => env('WA_CARAKA_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('WA_CARAKA_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('WA_CARAKA_DB_DATABASE', env('DB_DATABASE', 'laravel')),
+            'username' => env('WA_CARAKA_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('WA_CARAKA_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('WA_CARAKA_DB_SOCKET', env('DB_SOCKET', '')),
+            'charset' => env('WA_CARAKA_DB_CHARSET', env('DB_CHARSET', 'utf8mb4')),
+            'collation' => env('WA_CARAKA_DB_COLLATION', env('DB_COLLATION', 'utf8mb4_unicode_ci')),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => filter_var(env('WA_CARAKA_DB_STRICT', env('DB_STRICT', true)), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('WA_CARAKA_DB_SSL_CA', env('MYSQL_ATTR_SSL_CA')),
+            ]) : [],
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

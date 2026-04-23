@@ -47,9 +47,9 @@ function mountLogin(props = {}) {
                 InputLabel: { props: ['value', 'for'], template: '<label :for="for">{{ value }}</label>' },
                 PrimaryButton: { template: '<button type="submit"><slot /></button>' },
                 TextInput: {
-                    props: ['modelValue', 'type', 'id', 'required', 'autocomplete', 'autofocus'],
+                    props: ['modelValue', 'type', 'id', 'required', 'autocomplete', 'autofocus', 'placeholder'],
                     emits: ['update:modelValue'],
-                    template: '<input :id="id" :type="type" :value="modelValue" :required="required" :autocomplete="autocomplete" :autofocus="autofocus" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+                    template: '<input :id="id" :type="type" :value="modelValue" :required="required" :autocomplete="autocomplete" :autofocus="autofocus" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
                 },
             },
         },

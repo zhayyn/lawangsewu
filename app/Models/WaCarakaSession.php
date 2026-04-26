@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
 /**
  * WaCarakaSession
  *
@@ -14,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * we create a session record. When they send their next message (the input),
  * we look it up here to know what they're responding to.
  */
-class WaCarakaSession extends Model
+class WaCarakaSession extends WaCarakaModel
 {
     protected $fillable = [
         'remote_number',

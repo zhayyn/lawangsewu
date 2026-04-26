@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -13,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Supports inbound (received from WA) and outbound (sent from Lawangsewu).
  * Linked to the operator who sent or is assigned to handle the message.
  */
-class WaCarakaMessage extends Model
+class WaCarakaMessage extends WaCarakaModel
 {
     use HasFactory;
 
@@ -100,7 +99,7 @@ class WaCarakaMessage extends Model
      */
     public static function conversationIdFor(string $remoteNumber): string
     {
-        $normalized = strtolower(trim($remoteNumber));
+        $normalized = static::normalizeRemoteNumber($remoteNumber);
 
         if ($normalized === '') {
             return 'wa_unknown';
@@ -118,5 +117,44 @@ class WaCarakaMessage extends Model
         $hash = substr(sha1($normalized), 0, 10);
 
         return sprintf('wa_%s_%s_%s', $kind, $digits, $hash);
+    }
+
+    public static function normalizeRemoteNumber(?string $remoteNumber): string
+    {
+        $normalized = strtolower(trim((string) $remoteNumber));
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = preg_replace('/@llid$/i', '@lid', $normalized) ?: $normalized;
+
+        if (str_ends_with($normalized, '@g.us')) {
+            return $normalized;
+        }
+
+        if (str_ends_with($normalized, '@lid')) {
+            $base = preg_replace('/@lid$/i', '', $normalized) ?: '';
+            $digits = preg_replace('/\D/', '', $base) ?: $base;
+
+            return trim($digits) !== '' ? $digits . '@lid' : $normalized;
+        }
+
+        $base = preg_replace('/@(s\.whatsapp\.net|c\.us|pn)$/i', '', $normalized) ?: $normalized;
+        $digits = preg_replace('/\D/', '', $base) ?: '';
+
+        if ($digits === '') {
+            return $base;
+        }
+
+        if (str_starts_with($digits, '0')) {
+            return '62' . substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            return '62' . $digits;
+        }
+
+        return $digits;
     }
 }

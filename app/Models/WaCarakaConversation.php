@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -17,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *   - claimed_by: the operator who first replied and now "owns" this conversation
  *   - Other operators may request a handover (see WaCarakaHandover)
  */
-class WaCarakaConversation extends Model
+class WaCarakaConversation extends WaCarakaModel
 {
     use HasFactory;
 

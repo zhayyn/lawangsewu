@@ -6,8 +6,8 @@ use Illuminate\Console\Command;
 use App\Models\WaCarakaConversation;
 use App\Models\WaCarakaMessage;
 use App\Models\WaCarakaLog;
+use App\Support\WaCarakaDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
@@ -51,7 +51,7 @@ class ArchiveWaMessages extends Command
         }
 
         // 1. wa_caraka_messages
-        if (Schema::hasTable('wa_caraka_messages')) {
+        if (WaCarakaDatabase::hasTable('wa_caraka_messages')) {
             $query = WaCarakaMessage::where('created_at', '<', $threshold);
             $count = $query->count();
 
@@ -77,7 +77,7 @@ class ArchiveWaMessages extends Command
         $this->newLine();
 
         // 2. wa_caraka_logs
-        if (Schema::hasTable('wa_caraka_logs')) {
+        if (WaCarakaDatabase::hasTable('wa_caraka_logs')) {
             $query = WaCarakaLog::where('created_at', '<', $threshold);
             $count = $query->count();
 
@@ -103,7 +103,7 @@ class ArchiveWaMessages extends Command
         $this->newLine();
 
         // 3. wa_caraka_conversations — hapus percakapan yang tidak punya pesan aktif
-        if (Schema::hasTable('wa_caraka_conversations') && Schema::hasTable('wa_caraka_messages')) {
+        if (WaCarakaDatabase::hasTable('wa_caraka_conversations') && WaCarakaDatabase::hasTable('wa_caraka_messages')) {
             $staleConvos = WaCarakaConversation::where('last_activity_at', '<', $threshold)->count();
             $this->line("💬 wa_caraka_conversations stale : {$staleConvos} baris");
 

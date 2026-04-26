@@ -112,4 +112,41 @@ class CctvManagementTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_superadmin_can_deactivate_camera(): void
+    {
+        $superadmin = User::factory()->create([
+            'email' => Config::string('auth.super_admin_email'),
+            'is_active' => true,
+            'role' => 'admin',
+            'email_verified_at' => now(),
+        ]);
+
+        $camera = CctvCamera::query()->create([
+            'key' => 'cam-kantor-utama',
+            'name' => 'Kantor Utama',
+            'zone' => 'Kantor',
+            'iframe_src' => 'https://example.test/cctv/kantor',
+            'sort_order' => 2,
+            'is_active' => true,
+            'is_featured' => false,
+        ]);
+
+        $response = $this->actingAs($superadmin)->patch(route('admin.cctv.update', $camera), [
+            'name' => 'Kantor Utama',
+            'zone' => 'Kantor',
+            'iframe_src' => 'https://example.test/cctv/kantor',
+            'sort_order' => 2,
+            'is_active' => false,
+            'is_featured' => false,
+        ]);
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('cctv_cameras', [
+            'id' => $camera->id,
+            'name' => 'Kantor Utama',
+            'is_active' => false,
+        ]);
+    }
 }

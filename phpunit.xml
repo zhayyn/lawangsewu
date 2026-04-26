@@ -19,11 +19,12 @@
         </include>
     </source>
     <php>
+        <!-- Application Environment -->
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="log"/>
-        <env name="CACHE_STORE" value="array"/>
+
+        <!-- Database Configuration - Read from .env.testing -->
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_HOST" value="localhost"/>
         <env name="DB_PORT" value="3306"/>
@@ -31,16 +32,38 @@
         <env name="DB_USERNAME" value="dbprakom"/>
         <env name="DB_PASSWORD" value="semakinhebat@26"/>
         <env name="DB_SOCKET" value="/var/run/mysqld/mysqld.sock"/>
-        <!-- SIPP: use same socket server for testing (will fail gracefully if unreachable) -->
+
+        <!-- SIPP Database Configuration -->
         <env name="SIPP_DB_HOST" value="192.168.88.10"/>
+        <env name="SIPP_DB_PORT" value="3306"/>
         <env name="SIPP_DB_DATABASE" value="sipp"/>
         <env name="SIPP_DB_USERNAME" value="admin"/>
         <env name="SIPP_DB_PASSWORD" value="R4h4514@"/>
-        <env name="LOG_CHANNEL" value="stderr"/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
+
+        <!-- Broadcasting & Realtime -->
+        <env name="BROADCAST_CONNECTION" value="log"/>
+
+        <!-- Cache & Session -->
+        <env name="CACHE_STORE" value="array"/>
         <env name="SESSION_DRIVER" value="array"/>
+
+        <!-- Mail & Queue -->
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+
+        <!-- Monitoring -->
+        <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+
+        <!-- Logging -->
+        <env name="LOG_CHANNEL" value="stderr"/>
+        <env name="LOG_LEVEL" value="debug"/>
+
+        <!-- Feature Flags for Testing -->
+        <env name="WA_CARAKA_ENABLED" value="false"/>
+        <env name="SIPP_ENABLED" value="true"/>
+        <env name="FEATURE_WA_CARAKA" value="false"/>
+        <env name="FEATURE_SIPP_HUB" value="false"/>
+        <env name="FEATURE_PILAR" value="false"/>
     </php>
 </phpunit>

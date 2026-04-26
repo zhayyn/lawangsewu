@@ -1,6 +1,6 @@
 <script setup>
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 
 const props = defineProps({
@@ -19,38 +19,62 @@ const createForm = useForm({
     is_featured: false,
 });
 
+const saveFeedback = reactive({});
+
 const cameraForms = reactive(
     props.cameras.reduce((acc, camera) => {
-        acc[camera.id] = {
+        acc[camera.id] = useForm({
             name: camera.name,
             zone: camera.zone ?? '',
             iframe_src: camera.iframe_src,
             sort_order: camera.sort_order ?? 0,
             is_active: Boolean(camera.is_active),
             is_featured: Boolean(camera.is_featured),
-        };
+        });
 
         return acc;
     }, {}),
 );
 
 const submitCreate = () => {
-    createForm.post(route('admin.cctv.store'), {
-        onSuccess: () => {
-            createForm.reset();
-            createForm.is_active = true;
-            createForm.is_featured = false;
-            createForm.sort_order = 0;
-        },
-        preserveScroll: true,
-    });
+    createForm
+        .transform((data) => ({
+            ...data,
+            is_active: data.is_active ? 1 : 0,
+            is_featured: data.is_featured ? 1 : 0,
+        }))
+        .post(route('admin.cctv.store'), {
+            onSuccess: () => {
+                createForm.reset();
+                createForm.is_active = true;
+                createForm.is_featured = false;
+                createForm.sort_order = 0;
+            },
+            preserveScroll: true,
+        });
 };
 
 const saveCamera = (cameraId) => {
-    router.patch(route('admin.cctv.update', cameraId), cameraForms[cameraId], {
-        preserveScroll: true,
-        preserveState: true,
-    });
+    saveFeedback[cameraId] = null;
+
+    cameraForms[cameraId]
+        .transform((data) => ({
+            ...data,
+            _method: 'patch',
+            is_active: data.is_active ? 1 : 0,
+            is_featured: data.is_featured ? 1 : 0,
+        }))
+        .post(route('admin.cctv.update', cameraId), {
+            preserveScroll: true,
+            preserveState: true,
+            onError: (errors) => {
+                saveFeedback[cameraId] = Object.values(errors || {}).find(Boolean)
+                    || 'Perubahan tidak berhasil disimpan. Periksa data kamera lalu coba lagi.';
+            },
+            onSuccess: () => {
+                saveFeedback[cameraId] = null;
+            },
+        });
 };
 </script>
 
@@ -183,8 +207,9 @@ const saveCamera = (cameraId) => {
                             type="button"
                             class="github-button !bg-blue-600 hover:!bg-blue-700"
                             @click="saveCamera(camera.id)"
+                            :disabled="cameraForms[camera.id].processing"
                         >
-                            Simpan Perubahan
+                            {{ cameraForms[camera.id].processing ? 'Menyimpan...' : 'Simpan Perubahan' }}
                         </button>
                     </div>
 
@@ -192,14 +217,23 @@ const saveCamera = (cameraId) => {
                         <div class="space-y-2 lg:col-span-2">
                             <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Nama Kamera</label>
                             <input v-model="cameraForms[camera.id].name" type="text" class="input-surface w-full" required>
+                            <p v-if="cameraForms[camera.id].errors.name" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.name }}
+                            </p>
                         </div>
                         <div class="space-y-2">
                             <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Zona</label>
                             <input v-model="cameraForms[camera.id].zone" type="text" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.zone" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.zone }}
+                            </p>
                         </div>
                         <div class="space-y-2">
                             <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Urutan</label>
                             <input v-model.number="cameraForms[camera.id].sort_order" type="number" min="0" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.sort_order" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.sort_order }}
+                            </p>
                         </div>
                         <div class="flex items-center gap-4 pt-7 lg:col-span-2">
                             <label class="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-2)]">
@@ -211,9 +245,17 @@ const saveCamera = (cameraId) => {
                                 Tampil di dashboard
                             </label>
                         </div>
+                        <div v-if="cameraForms[camera.id].errors.is_active || cameraForms[camera.id].errors.is_featured || saveFeedback[camera.id]" class="lg:col-span-2">
+                            <p class="text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.is_active || cameraForms[camera.id].errors.is_featured || saveFeedback[camera.id] }}
+                            </p>
+                        </div>
                         <div class="space-y-2 lg:col-span-6">
                             <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">URL Sumber CCTV / Embed</label>
                             <input v-model="cameraForms[camera.id].iframe_src" type="url" class="input-surface w-full" required>
+                            <p v-if="cameraForms[camera.id].errors.iframe_src" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.iframe_src }}
+                            </p>
                         </div>
                     </div>
                 </div>

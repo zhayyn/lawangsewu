@@ -1,6 +1,8 @@
 [Unit]
 Description=Lawangsewu Laravel Queue Worker
 After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -8,12 +10,17 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/lawangsewu
 Environment=APP_ENV=production
-ExecStart=/usr/bin/php artisan queue:work --sleep=1 --tries=3 --max-time=3600
+ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work database --queue=default --sleep=1 --tries=3 --backoff=5 --timeout=120 --max-jobs=200 --max-time=1800 --memory=192 --no-interaction
 ExecReload=/usr/bin/php artisan queue:restart
-Restart=always
-RestartSec=5
+Restart=on-failure
+RestartSec=10
 KillSignal=SIGTERM
-TimeoutStopSec=30
+TimeoutStopSec=360
+KillMode=mixed
+MemoryMax=384M
+MemoryHigh=320M
+TasksMax=128
+Nice=5
 
 [Install]
 WantedBy=multi-user.target

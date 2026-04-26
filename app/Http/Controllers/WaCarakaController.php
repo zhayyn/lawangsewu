@@ -4,405 +4,459 @@ namespace App\Http\Controllers;
 
 use App\Models\WaCarakaConversation;
 use App\Models\WaCarakaConversationMark;
+use App\Models\WaCarakaDailyMetric;
 use App\Models\WaCarakaHandover;
 use App\Models\WaCarakaMessage;
+use App\Models\WaCarakaMonthlySnapshot;
+use App\Models\WaCarakaSyncRun;
 use App\Models\WaCarakaTicket;
-use App\Models\User;
 use App\Services\WaCarakaConversationService;
 use App\Services\WaCarakaService;
+use App\Services\WaCarakaTicketService;
 use App\Support\LawangsewuPortal;
-use Illuminate\Http\JsonResponse;
+use App\Support\WaCarakaDatabase;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class WaCarakaController extends Controller
 {
-    protected WaCarakaService $waService;
-    protected WaCarakaConversationService $conversationService;
+    public function __construct(
+        protected WaCarakaService $wa,
+        protected WaCarakaConversationService $conversations,
+        protected WaCarakaTicketService $tickets,
+    ) {}
 
-    public function __construct(WaCarakaService $waService, WaCarakaConversationService $conversationService)
+    public function index()
     {
-        $this->waService = $waService;
-        $this->conversationService = $conversationService;
-    }
-
-    /**
-     * Display the WaCaraka Dashboard (Operator Inbox / Control Center).
-     */
-    public function index(): Response
-    {
-        $user = auth()->user();
-
         return Inertia::render('Lawangsewu/WaCaraka/Index', [
-            'appMeta'       => LawangsewuPortal::appMeta(),
-            'navGroups'     => LawangsewuPortal::navGroups(),
-            'authUser'      => [
-                'id'           => $user->id,
-                'name'         => $user->name,
-                'alias'        => $user->alias,
-                'role'         => $user->role,
-                'isAdmin'      => $user->isSuperAdmin() || $user->role === 'admin',
-                'isSuperAdmin' => $user->isSuperAdmin(),
+            'appMeta' => LawangsewuPortal::appMeta(),
+            'navGroups' => LawangsewuPortal::navGroups(),
+            'config' => [
+                'baseUrl' => $this->wa->baseUrl(),
+                'background' => Cache::get('wacaraka_background'),
+                'maxMediaBytes' => (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024),
             ],
-            // Runtime config info for UI display
-            'config'        => [
-                'baseUrl'        => $this->waService->baseUrl(),
-                'broadcastLimit' => $this->waService->broadcastLimit(),
-                'loggingEnabled' => config('wa_caraka.logging_enabled', true),
-                'timeout'        => config('wa_caraka.timeout', 20),
-                'background'     => \Illuminate\Support\Facades\Cache::get('wacaraka_background'),
-            ],
-            // Legacy log stats (wa_caraka_logs table)
-            'stats'         => $this->waService->stats(),
-            'messageStats'  => $this->waService->messageStats(),
-            'convoStats'    => $this->getConvoStats(),
-            'reportStats'   => $this->operatorReplyStatsData(),
-            'ticketStats'   => WaCarakaTicket::ticketStats(),
-            'recentTickets' => WaCarakaTicket::recent(30),
+            'messageStats' => $this->wa->messageStats(),
+            'convoStats' => $this->conversations->stats(),
+            'ticketStats' => WaCarakaTicket::ticketStats(),
+            'recentTickets' => WaCarakaTicket::recent(12),
         ]);
     }
 
-    public function reports(): Response
+    public function proxy(Request $request, string $action)
     {
-        $user = auth()->user();
-        if (!$this->isAdmin($user)) {
-            abort(403, 'Halaman ini hanya untuk admin/superadmin.');
+        $user = $request->user();
+
+        if (in_array($action, ['restart', 'disconnect', 'reconnect', 'broadcast'], true) && !$this->isAdmin($user)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'Aksi ini hanya dapat dilakukan oleh admin.',
+            ], 403);
         }
 
+        $result = match ($action) {
+            'health' => $this->wa->health(),
+            'qr' => $this->wa->qr(),
+            'refresh-qr' => $this->wa->refreshQr(),
+            'restart' => $this->wa->restart(),
+            'disconnect' => $this->wa->disconnect(),
+            'reconnect' => $this->wa->reconnect(),
+            'history' => $this->wa->history(),
+            'lid-mappings' => $this->wa->getLidMappings(),
+            'sync-contacts' => $this->wa->syncContacts(),
+            'stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->stats()],
+            'message-stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->messageStats()],
+            'convo-stats' => ['ok' => true, 'status' => 200, 'data' => $this->conversations->stats()],
+            'operator-stats' => ['ok' => true, 'status' => 200, 'data' => [
+                'generatedAt' => now()->toISOString(),
+                'operatorStats' => $this->buildReportStats()['operatorStats'] ?? [],
+            ]],
+            'logs' => ['ok' => true, 'status' => 200, 'data' => $this->wa->recentLogs(50)],
+            'inbox' => ['ok' => true, 'status' => 200, 'data' => [
+                'conversations' => $this->inboxData($user),
+            ]],
+            'conversation' => $this->conversationData($request),
+            'pull-inbox' => $this->wa->pullInbox($request->query('since')),
+            'send-text' => $this->sendText($request),
+            'reply' => $this->reply($request),
+            'send-media' => $this->sendMedia($request),
+            'broadcast' => $this->broadcast($request),
+            'tickets' => ['ok' => true, 'status' => 200, 'data' => $this->tickets->listTickets(
+                $request->query('type'),
+                $request->query('status'),
+                min(50, max(1, (int) $request->query('limit', 30))),
+            )],
+            'ticket-stats' => ['ok' => true, 'status' => 200, 'data' => WaCarakaTicket::ticketStats()],
+            'ticket-reply' => $this->ticketReply($request),
+            'ticket-send' => $this->ticketSend($request),
+            'ticket-transfer' => $this->ticketTransfer($request),
+            'ticket-close' => $this->ticketClose($request),
+            'request-handover' => $this->requestHandover($request),
+            'approve-handover' => $this->approveHandover($request),
+            'reject-handover' => $this->rejectHandover($request),
+            'force-handover' => $this->forceHandover($request),
+            'close' => $this->closeConversation($request),
+            'mark-read' => $this->markRead($request),
+            'mark-customer' => $this->markCustomer($request),
+            'unmark-customer' => $this->unmarkCustomer($request),
+            'delete-message' => $this->deleteMessage($request),
+            'clear-conversation' => $this->clearConversation($request),
+            'reset-state' => $this->resetState(),
+            'get-handover-enabled' => ['ok' => true, 'status' => 200, 'data' => [
+                'handoverEnabled' => Cache::get('wacaraka_handover_enabled', true),
+            ]],
+            'toggle-handover-enabled' => $this->toggleHandoverEnabled($request),
+            default => ['ok' => false, 'status' => 404, 'error' => 'Aksi tidak valid.'],
+        };
+
+        if (!($result['ok'] ?? false)) {
+            return response()->json([
+                'ok' => false,
+                'error' => $result['error'] ?? 'Terjadi kesalahan.',
+                'detail' => $result['detail'] ?? null,
+            ], $result['status'] ?? 502);
+        }
+
+        return response()->json($result['data'] ?? ['ok' => true], $result['status'] ?? 200);
+    }
+
+    public function downloadMedia(string $path)
+    {
+        if (!preg_match('/^([a-f0-9]{32,})/i', $path, $matches)) {
+            abort(404);
+        }
+
+        $token = strtolower($matches[1]);
+        $runtimePath = '/internal/media/' . $path;
+
+        /** @var HttpResponse $response */
+        $response = Http::timeout((int) config('wa_caraka.timeout', 20))
+            ->withHeaders($this->runtimeHeaders())
+            ->get(rtrim($this->wa->baseUrl(), '/') . $runtimePath);
+
+        if ($response->failed()) {
+            abort($response->status() === 404 ? 404 : 502);
+        }
+
+        return response($response->body(), 200, [
+            'Content-Type' => $response->header('Content-Type', 'application/octet-stream'),
+            'Content-Length' => $response->header('Content-Length'),
+            'Content-Disposition' => $response->header('Content-Disposition', 'attachment; filename="' . $token . '"'),
+            'Cache-Control' => $response->header('Cache-Control', 'private, max-age=3600'),
+        ]);
+    }
+
+    public function reports()
+    {
         return Inertia::render('Lawangsewu/WaCaraka/Reports', [
             'appMeta' => LawangsewuPortal::appMeta(),
             'navGroups' => LawangsewuPortal::navGroups(),
-            'authUser' => [
-                'id'           => $user->id,
-                'name'         => $user->name,
-                'alias'        => $user->alias,
-                'role'         => $user->role,
-                'isAdmin'      => $this->isAdmin($user),
-                'isSuperAdmin' => $user->isSuperAdmin(),
-            ],
-            'reportStats' => $this->reportStatsData(),
+            'authUser' => request()->user(),
+            'reportStats' => $this->buildReportStats(),
         ]);
     }
 
-    public function reportsData(): JsonResponse
+    public function reportsData()
     {
-        $user = auth()->user();
-        if (!$this->isAdmin($user)) {
-            return response()->json(['error' => 'Aksi ini hanya dapat dilakukan oleh admin/superadmin.'], 403);
-        }
-
-        return response()->json($this->reportStatsData());
+        return response()->json($this->buildReportStats());
     }
 
-    /**
-     * Unified Proxy / Action Router for the Frontend.
-     */
-    public function proxy(Request $request, string $action): JsonResponse
+    public function reportsPdf()
     {
-        $user = $request->user();
-        $sender = $user?->name ?? $user?->email ?? 'operator';
-        $userId = $user?->id;
+        $report = $this->buildReportStats();
+        $authUser = request()->user();
+        $generatedAtLabel = now()->timezone('Asia/Jakarta')->translatedFormat('d M Y H:i') . ' WIB';
 
-        try {
-            return match ($action) {
-                // ──────────────────────────────────────────────
-                // 1. Runtime / Device Logic (Direct Proxy)
-                // ──────────────────────────────────────────────
-                'health'      => response()->json($this->waService->health()['data'] ?? []),
-                'qr'          => response()->json($this->waService->qr()['data'] ?? []),
-                'refresh-qr'  => response()->json($this->waService->refreshQr()['data'] ?? ['ok' => true]),
-                'restart'     => $this->adminOnlyRuntimeAction($user, fn () => $this->waService->restart()),
-                'reconnect'   => $this->adminOnlyRuntimeAction($user, fn () => $this->waService->reconnect()),
-                'disconnect'  => $this->adminOnlyRuntimeAction($user, fn () => $this->waService->disconnect()),
-                'history'     => response()->json($this->waService->history()['data'] ?? []),
-                'history/clear' => $this->adminOnlyRuntimeAction($user, fn () => $this->waService->clearHistory()),
-                'lid-mappings'  => response()->json($this->waService->getLidMappings()['data'] ?? []),
-                'sync-contacts' => $this->adminOnlyRuntimeAction($user, fn () => $this->syncContactsAndUpdateNames()),
+        $pdf = Pdf::loadView('pdf.wa-caraka-report', compact('report', 'authUser', 'generatedAtLabel'));
 
-                // ──────────────────────────────────────────────
-                // 2. Messaging & Inbox (Local DB + Service)
-                // ──────────────────────────────────────────────
-                'inbox' => $this->getInbox(),
-                'conversation' => $this->getConversationMessages($request),
-                'mark-read' => $this->markAsRead($request),
-                'pull-inbox' => response()->json($this->waService->pullInbox()['data']),
-                
-                'reply' => $this->sendReply($request),
-                'send-text' => $this->sendDirect($request, $sender, $userId),
-                'broadcast' => $this->broadcast($request, $user),
-
-                // ──────────────────────────────────────────────
-                // 3. Handover / Ownership
-                // ──────────────────────────────────────────────
-                'request-handover' => $this->requestHandover($request),
-                'approve-handover' => $this->respondHandover($request, true),
-                'reject-handover'  => $this->respondHandover($request, false),
-                'force-handover'   => $this->forceHandover($request),
-                'close'            => $this->closeConversation($request),
-                'mark-customer'    => $this->markCustomer($request),
-                'unmark-customer'  => $this->unmarkCustomer($request),
-
-                // ──────────────────────────────────────────────
-                // 4. Tickets (Pengaduan / Konsultasi)
-                // ──────────────────────────────────────────────
-                'tickets'      => response()->json(WaCarakaTicket::recent(
-                    max(1, min((int) $request->input('limit', 30), 100)),
-                    $request->input('type'),
-                    $request->input('status')
-                )),
-                'ticket-stats' => response()->json(WaCarakaTicket::ticketStats()),
-                'ticket-reply' => $this->saveTicketReply($request),
-                'ticket-send'  => $this->sendTicketReply($request),
-                'ticket-transfer' => $this->transferTicket($request),
-                'ticket-close'    => $this->closeTicket($request),
-
-                // ──────────────────────────────────────────────
-                // 5. Manage Messages
-                // ──────────────────────────────────────────────
-                'delete-message'  => $this->deleteMessage($request),
-                'clear-conversation' => $this->superAdminOnlyAction($user, fn () => $this->clearConversationState($request)),
-                'report-stats' => $this->adminOnlyRuntimeAction($user, fn () => [
-                    'ok' => true,
-                    'status' => 200,
-                    'data' => $this->reportStatsData(),
-                ]),
-                'operator-stats' => response()->json($this->operatorReplyStatsData()),
-
-                // ──────────────────────────────────────────────
-                // 5. Admin Tools
-                // ──────────────────────────────────────────────
-                'reset-state'   => $this->adminOnlyRuntimeAction($user, fn () => $this->softResetState()),
-                'clear-inbox'   => $this->superAdminOnlyAction($user, fn () => $this->clearInboxState()),
-                'toggle-handover-enabled' => $this->superAdminOnlyAction($user, fn () => $this->toggleHandoverEnabled($request)),
-                'get-handover-enabled' => response()->json(['ok' => true, 'handoverEnabled' => \App\Models\WaCarakaSetting::get('handover_enabled', true)]),
-
-                // ──────────────────────────────────────────────
-                // 6. Global Stats
-                // ──────────────────────────────────────────────
-                'stats'         => response()->json($this->waService->stats()),
-                'logs'          => response()->json($this->waService->recentLogs(100)),
-                'message-stats' => response()->json($this->waService->messageStats()),
-                'convo-stats'   => response()->json($this->getConvoStats()),
-
-                default => response()->json(['error' => "Action '$action' not defined."], 404),
-            };
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Data tidak valid.',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('[WaCaraka] Proxy action failed', [
-                'action' => $action,
-                'user_id' => $user?->id,
-                'message' => $e->getMessage(),
-                'class' => $e::class,
-            ]);
-
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return $pdf->download('wa-caraka-report-' . now()->format('Ymd-His') . '.pdf');
     }
 
-    // ══════════════════════════════════════════════
-    // Inbox / Conversation Helpers
-    // ══════════════════════════════════════════════
-
-    protected function getInbox(): JsonResponse
+    private function sendText(Request $request): array
     {
-        $user = auth()->user();
+        $validated = $request->validate([
+            'to' => 'required_without:conversation_id|string|min:8|max:32',
+            'conversation_id' => 'nullable|string|max:255',
+            'text' => 'required|string|max:4096',
+        ]);
 
-        $conversationRows = WaCarakaConversation::query()
-            ->with('owner:id,name,alias', 'pendingHandover.requestor:id,name,alias')
-            ->whereIn('conversation_id', function ($query) {
-                $query->from('wa_caraka_messages')
-                    ->select('conversation_id')
-                    ->whereNotNull('conversation_id')
-                    ->groupBy('conversation_id');
-            })
-            ->orderByDesc('last_activity_at')
-            ->limit(200)
-            ->get()
-            // Defensive dedupe: one inbox row per remote number.
-            ->unique('remote_number')
-            ->values();
+        $to = $validated['to'] ?? $this->remoteNumberFromConversationId((string) ($validated['conversation_id'] ?? ''));
 
-        // Single efficient query: get all needed marks for current user
-        $marksByConversation = WaCarakaConversationMark::query()
-            ->where('user_id', $user->id)
-            ->whereIn('wa_caraka_conversation_id', $conversationRows->pluck('id'))
-            ->get()
-            ->keyBy('wa_caraka_conversation_id');
+        if (!$to) {
+            return ['ok' => false, 'status' => 422, 'error' => 'Nomor tujuan tidak ditemukan.'];
+        }
 
-        // Optimized: use subqueries to fetch latest messages (all and inbound) in single efficient query
-        $conversationIds = $conversationRows->pluck('conversation_id')->unique()->values()->all();
-        
-        // Get latest message (any direction) per conversation using raw SQL for efficiency
-        $latestMessagesQuery = WaCarakaMessage::query()
-            ->whereIn('conversation_id', $conversationIds)
-            ->whereRaw('id IN (
-                SELECT MAX(id) FROM wa_caraka_messages 
-                WHERE conversation_id IN (' . implode(',', array_fill(0, count($conversationIds), '?')) . ')
-                GROUP BY conversation_id
-            )', $conversationIds)
-            ->select('conversation_id', 'metadata', 'created_at')
-            ->get();
-
-        $latestMessageByConversation = $latestMessagesQuery->keyBy('conversation_id');
-
-        // Get latest inbound message per conversation using raw SQL for efficiency
-        $latestInboundQuery = WaCarakaMessage::query()
-            ->whereIn('conversation_id', $conversationIds)
-            ->where('direction', 'inbound')
-            ->whereRaw('id IN (
-                SELECT MAX(id) FROM wa_caraka_messages 
-                WHERE conversation_id IN (' . implode(',', array_fill(0, count($conversationIds), '?')) . ')
-                AND direction = ?
-                GROUP BY conversation_id
-            )', array_merge($conversationIds, ['inbound']))
-            ->select('conversation_id', 'metadata')
-            ->get();
-
-        $latestInboundMessageByConversation = $latestInboundQuery->keyBy('conversation_id');
-
-        $runtimeMetaResponse = $this->waService->resolveContactsMeta(
-            $conversationRows->pluck('remote_number')->filter()->values()->all()
+        return $this->wa->sendText(
+            $to,
+            $validated['text'],
+            $this->senderLabel($request->user()),
+            $request->user()->id,
         );
-
-        $runtimeMetaByRemoteNumber = collect(is_array($runtimeMetaResponse['data']['items'] ?? null)
-            ? $runtimeMetaResponse['data']['items']
-            : [])
-            ->filter(fn ($item) => is_array($item) && !empty($item['jid']))
-            ->keyBy('jid');
-
-        $conversations = $conversationRows
-            ->map(function ($c) use ($user, $marksByConversation, $latestMessageByConversation, $latestInboundMessageByConversation, $runtimeMetaByRemoteNumber) {
-                $permission = $this->conversationService->canReply($c, $user);
-                $isGroup = str_ends_with((string) $c->remote_number, '@g.us');
-                $latestAny = $latestMessageByConversation->get($c->conversation_id);
-                $latestInbound = $latestInboundMessageByConversation->get($c->conversation_id);
-                $metadata = is_array($latestAny?->metadata) ? $latestAny->metadata : [];
-                $inboundMetadata = is_array($latestInbound?->metadata) ? $latestInbound->metadata : [];
-                $runtimeMeta = $runtimeMetaByRemoteNumber->get($c->remote_number);
-                $runtimeMeta = is_array($runtimeMeta) ? $runtimeMeta : [];
-
-                // Use server-recorded last_activity_at for ordering (matches WhatsApp Web behaviour:
-                // newest received/sent at the top, not by the WA message creation timestamp).
-                $effectiveLastActivity = $c->last_activity_at ?? $latestAny?->created_at;
-
-                $resolvedName = $this->resolveConversationDisplayName($c, $metadata, $runtimeMeta);
-                $groupName = $isGroup
-                    ? ($this->extractGroupName($metadata, $runtimeMeta)
-                        ?: $resolvedName
-                        ?: ('Grup ' . preg_replace('/@g\.us$/', '', (string) $c->remote_number)))
-                    : null;
-                $displayTitle = $isGroup
-                    ? ($groupName ?: 'Grup WhatsApp')
-                    : ($resolvedName ?: $c->remote_number);
-
-                $conversation = [
-                'conversationId'   => $c->conversation_id,
-                'remoteNumber'     => $c->remote_number,
-                'remoteName'       => $resolvedName,
-                'displayTitle'     => $displayTitle,
-                'isGroup'          => $isGroup,
-                'groupName'        => $groupName,
-                'status'           => $c->status,
-                'unreadCount'      => $c->unread_count,
-                'lastActivityAt'   => $effectiveLastActivity?->diffForHumans(),
-                'lastActivityTs'   => $effectiveLastActivity?->getTimestamp(),
-                'claimedAt'        => $c->claimed_at?->diffForHumans(),
-                'owner'            => $c->owner ? ['id' => $c->owner->id, 'name' => $c->owner->name, 'alias' => $c->owner->alias] : null,
-                'ownership'        => $c->claimed_by === null ? 'unclaimed' : ($c->claimed_by === $user?->id ? 'mine' : 'locked'),
-                'ownerPresence'    => $this->ownerPresenceFor($c),
-                'justClaimed'      => $this->wasJustClaimed($c),
-                'canReply'         => $permission['allowed'],
-                'lockReason'       => $permission['reason'],
-                'pendingHandover'  => $c->pendingHandover ? [
-                    'id'        => $c->pendingHandover->id,
-                    'requestor' => ['id' => $c->pendingHandover->requestor->id, 'name' => $c->pendingHandover->requestor->name],
-                ] : null,
-                'customerMark'     => null,
-                'profilePhotoUrl'  => $this->extractProfilePhotoUrl($inboundMetadata, $runtimeMeta),
-                ];
-
-                $mark = $marksByConversation->get($c->id);
-                if (!$mark) {
-                    return $conversation;
-                }
-
-                $conversation['customerMark'] = [
-                    'label' => $mark->label,
-                    'tone' => $mark->tone,
-                    'note' => $mark->note,
-                    'isPinned' => (bool) $mark->is_pinned,
-                ];
-
-                return $conversation;
-            })
-            ->sortByDesc(fn (array $conversation) => (int) ($conversation['lastActivityTs'] ?? 0))
-            ->take(50)
-            ->values();
-
-        return response()->json(['conversations' => $conversations]);
     }
 
-    protected function effectiveMessageTime(?WaCarakaMessage $message, ?Carbon $fallback = null): ?Carbon
+    private function reply(Request $request): array
     {
-        if (!$message) {
-            return $fallback;
-        }
-
-        $metadata = is_array($message->metadata) ? $message->metadata : [];
-        $rawTs = $metadata['timestamp'] ?? ($metadata['raw']['timestamp'] ?? null);
-
-        if (is_numeric($rawTs)) {
-            $value = (int) $rawTs;
-            if ($value > 9999999999) {
-                $value = (int) floor($value / 1000);
-            }
-            try {
-                return Carbon::createFromTimestamp($value);
-            } catch (\Throwable $e) {
-                // fallback below
-            }
-        }
-
-        if (is_string($rawTs) && trim($rawTs) !== '') {
-            try {
-                return Carbon::parse($rawTs);
-            } catch (\Throwable $e) {
-                // fallback below
-            }
-        }
-
-        return $message->created_at ?? $fallback;
-    }
-
-    protected function markCustomer(Request $request): JsonResponse
-    {
-        $payload = $request->validate([
-            'conversation_id' => ['required', 'string'],
-            'label' => ['required', 'string', 'max:40'],
-            'tone' => ['nullable', 'string', 'in:amber,emerald,rose,sky,violet,slate'],
-            'note' => ['nullable', 'string', 'max:255'],
-            'is_pinned' => ['nullable', 'boolean'],
+        $validated = $request->validate([
+            'conversation_id' => 'required|string|max:255',
+            'text'            => 'required|string|max:4096',
         ]);
 
+        // Cari conversation berdasarkan conversation_id
         $conversation = WaCarakaConversation::query()
-            ->where('conversation_id', $payload['conversation_id'])
+            ->where('conversation_id', $validated['conversation_id'])
             ->first();
 
         if (!$conversation) {
-            return response()->json(['error' => 'Conversation not found'], 404);
+            return ['ok' => false, 'status' => 404, 'error' => 'Percakapan tidak ditemukan.'];
         }
+
+        $remoteNumber = $conversation->remote_number;
+
+        if (!$remoteNumber) {
+            return ['ok' => false, 'status' => 422, 'error' => 'Nomor tujuan tidak ditemukan di percakapan.'];
+        }
+
+        // Kirim pesan via service (langsung pakai remote_number, tidak perlu inboundMessage)
+        $result = $this->wa->sendText(
+            $remoteNumber,
+            $validated['text'],
+            $this->senderLabel($request->user()),
+            $request->user()->id,
+        );
+
+        if (!($result['ok'] ?? false)) {
+            return $result;
+        }
+
+        // Tandai pesan inbound terakhir sebagai replied (opsional, tidak blocking)
+        $inboundMessage = WaCarakaMessage::query()
+            ->where('conversation_id', $validated['conversation_id'])
+            ->where('direction', 'inbound')
+            ->latest('id')
+            ->first();
+
+        if ($inboundMessage && !$inboundMessage->replied_at) {
+            $inboundMessage->update(['replied_at' => now()]);
+        }
+
+        $conversation->refresh();
+
+        return [
+            'ok'     => true,
+            'status' => 200,
+            'data'   => [
+                'ok'           => true,
+                'conversation' => $this->formatConversation(
+                    $conversation->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']),
+                    $request->user()
+                ),
+            ],
+        ];
+    }
+
+    private function sendMedia(Request $request): array
+    {
+        $validated = $request->validate([
+            'to' => 'required_without:conversation_id|string|min:8|max:32',
+            'conversation_id' => 'nullable|string|max:255',
+            'media_kind' => 'required|string|in:image,sticker,video,audio,document',
+            'media_url' => 'required|string',
+            'mime_type' => 'nullable|string|max:255',
+            'file_name' => 'nullable|string|max:255',
+            'caption' => 'nullable|string|max:4096',
+            'ptt' => 'nullable|boolean',
+        ]);
+
+        $maxBytes = (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024);
+        $payloadBytes = $this->mediaPayloadBytes((string) $validated['media_url']);
+
+        if ($payloadBytes > $maxBytes) {
+            return [
+                'ok' => false,
+                'status' => 422,
+                'error' => 'Ukuran file melebihi batas maksimum ' . max(1, (int) round($maxBytes / (1024 * 1024))) . ' MB.',
+            ];
+        }
+
+        $to = $validated['to'] ?? $this->remoteNumberFromConversationId((string) ($validated['conversation_id'] ?? ''));
+
+        if (!$to) {
+            return ['ok' => false, 'status' => 422, 'error' => 'Nomor tujuan tidak ditemukan.'];
+        }
+
+        return $this->wa->sendMedia(
+            $to,
+            $validated,
+            $this->senderLabel($request->user()),
+            $request->user()->id,
+        );
+    }
+
+    private function broadcast(Request $request): array
+    {
+        $validated = $request->validate([
+            'recipients' => 'required|array|min:1|max:' . $this->wa->broadcastLimit(),
+            'recipients.*' => 'required|string|min:8|max:32',
+            'text' => 'required|string|max:4096',
+        ]);
+
+        return $this->wa->broadcastText(
+            $validated['recipients'],
+            $validated['text'],
+            $this->senderLabel($request->user()),
+            $request->user()->id,
+        );
+    }
+
+    private function conversationData(Request $request): array
+    {
+        $validated = $request->validate([
+            'conversation_id' => 'required|string|max:255',
+            'limit' => 'nullable|integer|min:1|max:200',
+        ]);
+
+        return [
+            'ok' => true,
+            'status' => 200,
+            'data' => [
+                'messages' => $this->wa->conversationMessages(
+                    $validated['conversation_id'],
+                    (int) ($validated['limit'] ?? 50),
+                    true,
+                ),
+            ],
+        ];
+    }
+
+    private function ticketReply(Request $request): array
+    {
+        $validated = $request->validate([
+            'ticket_id' => 'required|integer',
+            'reply' => 'required|string|max:4096',
+        ]);
+
+        return $this->tickets->replyTicket($validated['ticket_id'], $validated['reply'], null, $request->user()->id);
+    }
+
+    private function ticketSend(Request $request): array
+    {
+        $validated = $request->validate([
+            'ticket_id' => 'required|integer',
+        ]);
+
+        return $this->tickets->sendTicketReply($validated['ticket_id'], $request->user()->id);
+    }
+
+    private function ticketTransfer(Request $request): array
+    {
+        $validated = $request->validate([
+            'ticket_id' => 'required|integer',
+            'new_type' => 'required|string',
+        ]);
+
+        return $this->tickets->transferTicket($validated['ticket_id'], $validated['new_type']);
+    }
+
+    private function ticketClose(Request $request): array
+    {
+        $validated = $request->validate([
+            'ticket_id' => 'required|integer',
+        ]);
+
+        return $this->tickets->closeTicket($validated['ticket_id']);
+    }
+
+    private function requestHandover(Request $request): array
+    {
+        $validated = $request->validate([
+            'conversation_id' => 'required|string',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        if (!Cache::get('wacaraka_handover_enabled', true)) {
+            return ['ok' => false, 'status' => 403, 'error' => 'Fitur alih chat sedang dinonaktifkan.'];
+        }
+
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        $result = $this->conversations->requestHandover($conversation, $request->user(), $validated['reason'] ?? null);
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 422, 'error' => $result['error'] ?? 'Gagal meminta handover.'];
+    }
+
+    private function approveHandover(Request $request): array
+    {
+        $validated = $request->validate(['handover_id' => 'required|integer']);
+        $handover = WaCarakaHandover::query()->with('conversation')->findOrFail($validated['handover_id']);
+        $result = $this->conversations->approveHandover($handover, $request->user());
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal menyetujui handover.'];
+    }
+
+    private function rejectHandover(Request $request): array
+    {
+        $validated = $request->validate(['handover_id' => 'required|integer']);
+        $handover = WaCarakaHandover::query()->with('conversation')->findOrFail($validated['handover_id']);
+        $result = $this->conversations->rejectHandover($handover, $request->user());
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal menolak handover.'];
+    }
+
+    private function forceHandover(Request $request): array
+    {
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        $result = $this->conversations->forceHandover($conversation, $request->user());
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal melakukan force handover.'];
+    }
+
+    private function closeConversation(Request $request): array
+    {
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        $result = $this->conversations->closeConversation($conversation, $request->user());
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal menutup percakapan.'];
+    }
+
+    private function markRead(Request $request): array
+    {
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        $conversation->markRead();
+
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
+    }
+
+    private function markCustomer(Request $request): array
+    {
+        $validated = $request->validate([
+            'conversation_id' => 'required|string',
+            'label' => 'required|string|max:60',
+            'tone' => 'nullable|string|max:32',
+            'note' => 'nullable|string|max:500',
+            'is_pinned' => 'nullable|boolean',
+        ]);
+
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
 
         $mark = WaCarakaConversationMark::query()->updateOrCreate(
             [
@@ -410,815 +464,437 @@ class WaCarakaController extends Controller
                 'wa_caraka_conversation_id' => $conversation->id,
             ],
             [
-                'label' => trim($payload['label']),
-                'tone' => $payload['tone'] ?? 'amber',
-                'note' => isset($payload['note']) ? trim((string) $payload['note']) : null,
-                'is_pinned' => (bool) ($payload['is_pinned'] ?? false),
+                'label' => $validated['label'],
+                'tone' => $validated['tone'] ?? 'amber',
+                'note' => $validated['note'] ?? null,
+                'is_pinned' => (bool) ($validated['is_pinned'] ?? false),
             ],
         );
 
-        return response()->json([
-            'ok' => true,
-            'mark' => [
-                'label' => $mark->label,
-                'tone' => $mark->tone,
-                'note' => $mark->note,
-                'isPinned' => (bool) $mark->is_pinned,
-            ],
-        ]);
+        return ['ok' => true, 'status' => 200, 'data' => [
+            'mark' => $this->formatMark($mark),
+        ]];
     }
 
-    protected function unmarkCustomer(Request $request): JsonResponse
+    private function unmarkCustomer(Request $request): array
     {
-        $payload = $request->validate([
-            'conversation_id' => ['required', 'string'],
-        ]);
-
-        $conversation = WaCarakaConversation::query()
-            ->where('conversation_id', $payload['conversation_id'])
-            ->first();
-
-        if (!$conversation) {
-            return response()->json(['error' => 'Conversation not found'], 404);
-        }
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
 
         WaCarakaConversationMark::query()
             ->where('user_id', $request->user()->id)
             ->where('wa_caraka_conversation_id', $conversation->id)
             ->delete();
 
-        return response()->json(['ok' => true]);
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
-    protected function getConversationMessages(Request $request): JsonResponse
+    private function deleteMessage(Request $request): array
     {
-        $remoteNumber = $request->input('remote_number');
-        if (!$remoteNumber) return response()->json(['error' => 'Remote number is required'], 422);
+        $validated = $request->validate(['message_id' => 'required|integer']);
+        WaCarakaMessage::query()->whereKey($validated['message_id'])->delete();
 
-        $messages = $this->waService->conversationMessages($remoteNumber);
-        return response()->json(['messages' => $messages]);
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
-    protected function markAsRead(Request $request): JsonResponse
+    private function clearConversation(Request $request): array
     {
-        $convoId = $request->input('conversation_id');
-        $convo = WaCarakaConversation::where('conversation_id', $convoId)->first();
-        if ($convo) $convo->markRead();
-        return response()->json(['ok' => true]);
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+
+        WaCarakaDatabase::transaction(function () use ($conversation) {
+            WaCarakaConversationMark::query()
+                ->where('wa_caraka_conversation_id', $conversation->id)
+                ->delete();
+
+            WaCarakaHandover::query()
+                ->where('conversation_id', $conversation->id)
+                ->delete();
+
+            WaCarakaMessage::query()
+                ->where('conversation_id', $conversation->conversation_id)
+                ->delete();
+
+            $conversation->delete();
+        });
+
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
-    protected function sendReply(Request $request): JsonResponse
+    private function resetState(): array
     {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['error' => 'Sesi login tidak valid. Silakan muat ulang halaman dan login kembali.'], 401);
-        }
+        $now = now();
 
-        $convoId = trim((string) $request->input('conversation_id', ''));
-        $text = trim((string) $request->input('text', ''));
-
-        if ($convoId === '' || $text === '') {
-            return response()->json(['error' => 'conversation_id dan text wajib diisi.'], 422);
-        }
-
-        $convo = WaCarakaConversation::where('conversation_id', $convoId)->first();
-        if (!$convo) return response()->json(['error' => 'Conversation not found'], 404);
-
-        $permission = $this->conversationService->canReply($convo, $user);
-        if (!$permission['allowed']) {
-            return response()->json(['error' => $permission['reason'] ?? 'This conversation is claimed by another operator'], 403);
-        }
-
-        try {
-            $convo = $this->conversationService->claimForReply($convo, $user);
-        } catch (\Illuminate\Database\QueryException $e) {
-            return response()->json(['error' => 'Percakapan sedang diproses operator lain. Coba kirim ulang.'], 409);
-        }
-
-        $target = $this->resolveReplyTarget($convo);
-
-        $res = $this->waService->queueText($target, $text, 'OPERATOR', $user->id);
-
-        if ($res['ok']) {
-            // Mark all unreplied inbound messages in this conversation as replied
-            WaCarakaMessage::where('conversation_id', $convo->conversation_id)
+        if (WaCarakaDatabase::hasTable('wa_caraka_messages')) {
+            WaCarakaMessage::query()
                 ->where('direction', 'inbound')
                 ->whereNull('replied_at')
-                ->update(['replied_at' => now()]);
+                ->update(['replied_at' => $now]);
         }
 
-        return response()->json([
-            'ok' => $res['ok'],
-            'data' => $res['data'] ?? null,
-            'error' => $res['error'] ?? null,
-            'queued' => $res['queued'] ?? false,
-            'conversation' => [
-                'conversationId' => $convo->conversation_id,
-                'owner' => $convo->owner ? ['id' => $convo->owner->id, 'name' => $convo->owner->name, 'alias' => $convo->owner->alias] : null,
-                'claimedAt' => $convo->claimed_at?->diffForHumans(),
-                'status' => $convo->status,
-            ],
-        ]);
-    }
-
-    protected function sendDirect(Request $request, string $sender, ?int $userId): JsonResponse
-    {
-        $validated = $request->validate([
-            'to'   => 'required|string|min:8|max:20',
-            'text' => 'required|string|max:4096',
-        ]);
-
-        $res = $this->waService->queueText($validated['to'], $validated['text'], $sender, $userId);
-        return response()->json(['ok' => $res['ok'], 'data' => $res['data'] ?? null, 'error' => $res['error'] ?? null, 'queued' => $res['queued'] ?? false]);
-    }
-
-    private function resolveReplyTarget(WaCarakaConversation $convo): string
-    {
-        $remote = (string) $convo->remote_number;
-
-        if (str_ends_with($remote, '@g.us') || str_ends_with($remote, '@lid')) {
-            return $remote;
+        if (WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
+            WaCarakaConversation::query()->update(['unread_count' => 0]);
+            WaCarakaConversation::query()
+                ->where('status', '!=', 'closed')
+                ->update(['status' => 'open']);
         }
 
-        $latestInbound = WaCarakaMessage::where('conversation_id', $convo->conversation_id)
-            ->where('direction', 'inbound')
-            ->latest('id')
-            ->first(['metadata']);
-
-        if (!$latestInbound || !is_array($latestInbound->metadata)) {
-            return $remote;
-        }
-
-        $lid = data_get($latestInbound->metadata, 'fromRaw')
-            ?? data_get($latestInbound->metadata, 'fromLid')
-            ?? data_get($latestInbound->metadata, 'raw.fromRaw')
-            ?? data_get($latestInbound->metadata, 'raw.fromLid');
-
-        if (is_string($lid) && str_ends_with($lid, '@lid')) {
-            return $lid;
-        }
-
-        return $remote;
-    }
-
-    protected function broadcast(Request $request, $user): JsonResponse
-    {
-        if (!$this->isAdmin($user)) {
-            return response()->json(['error' => 'Aksi ini hanya dapat dilakukan oleh admin.'], 403);
-        }
-
-        $validated = $request->validate([
-            'recipients'   => 'required|array|min:1|max:' . $this->waService->broadcastLimit(),
-            'recipients.*' => 'required|string|min:8|max:20',
-            'text'         => 'required|string|max:4096',
-        ]);
-
-        $res = $this->waService->queueBroadcastText(
-            $validated['recipients'],
-            $validated['text'],
-            $user?->name ?? $user?->email ?? 'operator',
-            $user?->id,
-        );
-
-        return response()->json($res['data'] ?? ['ok' => $res['ok']], $res['status'] ?? 200);
-    }
-
-    // ══════════════════════════════════════════════
-    // Handover Helpers
-    // ══════════════════════════════════════════════
-
-    protected function requestHandover(Request $request): JsonResponse
-    {
-        // Check if handover is enabled
-        if (!\App\Models\WaCarakaSetting::get('handover_enabled', true)) {
-            return response()->json(['error' => 'Fitur alih chat sedang dinonaktifkan'], 403);
-        }
-
-        $convoId = $request->input('conversation_id');
-        $reason  = $request->input('reason');
-
-        $convo = WaCarakaConversation::where('conversation_id', $convoId)->first();
-        if (!$convo || !$convo->claimed_by) return response()->json(['error' => 'Invalid conversation'], 422);
-
-        $handover = WaCarakaHandover::create([
-            'conversation_id' => $convo->id,
-            'requested_by'    => auth()->id(),
-            'requested_to'    => $convo->claimed_by,
-            'status'          => 'pending',
-            'reason'          => $reason,
-        ]);
-
-        return response()->json(['ok' => true, 'handover_id' => $handover->id]);
-    }
-
-    protected function respondHandover(Request $request, bool $approve): JsonResponse
-    {
-        $handoverId = $request->input('handover_id');
-        $handover   = WaCarakaHandover::findOrFail($handoverId);
-
-        if ($handover->requested_to !== auth()->id() && !auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Unauthorized response'], 403);
-        }
-
-        if ($approve) $handover->approve();
-        else $handover->reject();
-
-        return response()->json(['ok' => true]);
-    }
-
-    protected function forceHandover(Request $request): JsonResponse
-    {
-        $convoId = $request->input('conversation_id');
-        $convo   = WaCarakaConversation::where('conversation_id', $convoId)->first();
-
-        if (!auth()->user()->isSuperAdmin() && auth()->user()->role !== 'admin') {
-            return response()->json(['error' => 'Admin only'], 403);
-        }
-
-        $this->conversationService->forceHandover($convo, auth()->user());
-        return response()->json(['ok' => true]);
-    }
-
-    protected function closeConversation(Request $request): JsonResponse
-    {
-        $convoId = $request->input('conversation_id');
-        $convo   = WaCarakaConversation::where('conversation_id', $convoId)->first();
-
-        if (!$convo) {
-            return response()->json(['error' => 'Conversation not found'], 404);
-        }
-
-        return response()->json($this->conversationService->closeConversation($convo, auth()->user()));
-    }
-
-    protected function ownerPresenceFor(WaCarakaConversation $conversation): ?string
-    {
-        if (!$conversation->claimed_by || !$conversation->last_activity_at) {
-            return null;
-        }
-
-        if ($conversation->last_activity_at->gte(now()->subMinutes(2))) {
-            return 'active';
-        }
-
-        if ($conversation->last_activity_at->gte(now()->subMinutes(10))) {
-            return 'standby';
-        }
-
-        return 'idle';
-    }
-
-    protected function wasJustClaimed(WaCarakaConversation $conversation): bool
-    {
-        return (bool) $conversation->claimed_at?->gte(now()->subMinutes(3));
-    }
-
-    // ══════════════════════════════════════════════
-    // Ticket Helpers
-    // ══════════════════════════════════════════════
-
-    protected function saveTicketReply(Request $request): JsonResponse
-    {
-        $ticketId = $request->input('ticket_id');
-        $reply    = $request->input('reply');
-
-        $ticket = WaCarakaTicket::findOrFail($ticketId);
-        $ticket->update([
-            'reply'       => $reply,
-            'status'      => 'replied',
-            'replied_at'  => now(),
-            'assigned_to' => auth()->id(),
-        ]);
-
-        return response()->json(['ok' => true]);
-    }
-
-    protected function sendTicketReply(Request $request): JsonResponse
-    {
-        $ticketId = $request->input('ticket_id');
-        $ticket   = WaCarakaTicket::findOrFail($ticketId);
-
-        if (!$ticket->reply) return response()->json(['error' => 'Reply content is empty'], 422);
-
-        $fullReply = $ticket->replyPrefix() . "\n\n" . $ticket->reply;
-        $res = $this->waService->sendText($ticket->remote_number, $fullReply, 'TICKET_REPLY', auth()->id());
-
-        if ($res['ok']) {
-            $ticket->update([
-                'status'  => 'sent',
-                'sent_at' => now(),
-            ]);
-        }
-
-        return response()->json(['ok' => $res['ok'], 'error' => $res['error'] ?? null]);
-    }
-
-    protected function transferTicket(Request $request): JsonResponse
-    {
-        $ticketId = $request->input('ticket_id');
-        $newType  = $request->input('new_type');
-
-        if (!in_array($newType, ['pengaduan', 'konsultasi', 'umum'], true)) {
-            return response()->json(['error' => 'Tipe tiket tidak valid'], 422);
-        }
-
-        $ticket = WaCarakaTicket::findOrFail($ticketId);
-        $ticket->update(['type' => $newType]);
-
-        return response()->json(['ok' => true]);
-    }
-
-    protected function closeTicket(Request $request): JsonResponse
-    {
-        $ticketId = $request->input('ticket_id');
-        $ticket   = WaCarakaTicket::findOrFail($ticketId);
-        $ticket->update(['status' => 'closed']);
-
-        return response()->json(['ok' => true]);
-    }
-
-    // ══════════════════════════════════════════════
-    // Manage Messages Helpers
-    // ══════════════════════════════════════════════
-
-    protected function deleteMessage(Request $request): JsonResponse
-    {
-        if (!$this->isAdmin(auth()->user())) {
-            return response()->json(['error' => 'Aksi ini hanya dapat dilakukan oleh admin/superadmin.'], 403);
-        }
-
-        $messageId = $request->input('message_id');
-        $message = WaCarakaMessage::find($messageId);
-
-        if ($message) {
-            $message->delete();
-        }
-
-        return response()->json(['ok' => true]);
-    }
-
-    protected function clearConversationState(Request $request): array
-    {
-        $conversationId = (string) $request->input('conversation_id', '');
-        if ($conversationId === '') {
-            return ['ok' => false, 'status' => 422, 'error' => 'conversation_id wajib diisi.'];
-        }
-
-        $conversation = WaCarakaConversation::query()
-            ->where('conversation_id', $conversationId)
-            ->first();
-
-        if (!$conversation) {
-            return ['ok' => true, 'status' => 200, 'data' => ['ok' => true, 'deleted' => ['messages' => 0, 'marks' => 0, 'handovers' => 0, 'conversation' => 0]]];
-        }
-
-        $deleted = ['messages' => 0, 'marks' => 0, 'handovers' => 0, 'conversation' => 0];
-
-        DB::transaction(function () use (&$deleted, $conversation) {
-            $deleted['handovers'] = WaCarakaHandover::query()->where('conversation_id', $conversation->id)->delete();
-            $deleted['marks'] = WaCarakaConversationMark::query()->where('wa_caraka_conversation_id', $conversation->id)->delete();
-            $deleted['messages'] = WaCarakaMessage::query()->where('conversation_id', $conversation->conversation_id)->delete();
-            $deleted['conversation'] = WaCarakaConversation::query()->where('id', $conversation->id)->delete();
-        });
-
-        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true, 'deleted' => $deleted]];
-    }
-
-    // ══════════════════════════════════════════════
-    // Meta / Stats
-    // ══════════════════════════════════════════════
-
-    protected function getConvoStats(): array
-    {
-        return [
-            'total'            => WaCarakaConversation::count(),
-            'open'             => WaCarakaConversation::open()->count(),
-            'pending'          => WaCarakaConversation::pending()->count(),
-            'closed'           => WaCarakaConversation::closed()->count(),
-            'pendingHandovers' => WaCarakaHandover::where('status', 'pending')->count(),
-        ];
-    }
-
-    protected function syncContactsAndUpdateNames(): array
-    {
-        $result = $this->waService->syncContacts();
-
-        $conversations = WaCarakaConversation::query()
-            ->select('id', 'conversation_id', 'remote_number', 'remote_name')
-            ->get();
-
-        $latestInboundMessageIds = WaCarakaMessage::query()
-            ->selectRaw('MAX(id) as latest_id')
-            ->whereIn('conversation_id', $conversations->pluck('conversation_id'))
-            ->where('direction', 'inbound')
-            ->groupBy('conversation_id');
-
-        $latestMessageByConversation = WaCarakaMessage::query()
-            ->whereIn('id', $latestInboundMessageIds)
-            ->select('conversation_id', 'metadata')
-            ->get()
-            ->keyBy('conversation_id');
-
-        $runtimeMetaResponse = $this->waService->resolveContactsMeta(
-            $conversations->pluck('remote_number')->filter()->values()->all()
-        );
-
-        $runtimeMetaByRemoteNumber = collect(is_array($runtimeMetaResponse['data']['items'] ?? null)
-            ? $runtimeMetaResponse['data']['items']
-            : [])
-            ->filter(fn ($item) => is_array($item) && !empty($item['jid']))
-            ->keyBy('jid');
-
-        $updatedNames = 0;
-
-        foreach ($conversations as $conversation) {
-            $latest = $latestMessageByConversation->get($conversation->conversation_id);
-            $metadata = is_array($latest?->metadata) ? $latest->metadata : [];
-            $runtimeMeta = $runtimeMetaByRemoteNumber->get($conversation->remote_number);
-            $runtimeMeta = is_array($runtimeMeta) ? $runtimeMeta : [];
-            $resolvedName = $this->resolveConversationDisplayName($conversation, $metadata, $runtimeMeta);
-
-            if (!$resolvedName || $conversation->remote_name === $resolvedName) {
-                continue;
-            }
-
-            $conversation->remote_name = $resolvedName;
-            $conversation->save();
-            $updatedNames++;
-        }
-
-        $result['data'] = array_merge($result['data'] ?? [], [
-            'updatedNames' => $updatedNames,
-        ]);
-
-        return $result;
-    }
-
-    protected function reportStatsData(): array
-    {
-        $today = now()->startOfDay();
-        
-        // Optimized: Single query for all daily aggregations (instead of 14 separate COUNT queries)
-        $dailyData = WaCarakaMessage::query()
-            ->where('direction', 'inbound')
-            ->where('created_at', '>=', $today->copy()->subDays(13))
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
-            ->groupBy('date')
-            ->pluck('count', 'date');
-
-        $daily = collect(range(13, 0))->map(function (int $daysAgo) use ($today, $dailyData) {
-            $date = (clone $today)->subDays($daysAgo);
-            return [
-                'label' => $date->format('d M'),
-                'count' => (int) ($dailyData[$date->toDateString()] ?? 0),
-            ];
-        })->values();
-
-        // Optimized: Single query for all weekly aggregations (instead of 12 separate COUNT queries)
-        $weeklyData = WaCarakaMessage::query()
-            ->where('direction', 'inbound')
-            ->where('created_at', '>=', now()->startOfWeek(Carbon::MONDAY)->subWeeks(11))
-            ->selectRaw('YEAR(created_at) as year, WEEK(created_at, 1) as week, COUNT(*) as count')
-            ->groupBy('year', 'week')
-            ->get()
-            ->keyBy(function ($row) {
-                return $row->year . '-' . str_pad($row->week, 2, '0', STR_PAD_LEFT);
-            })
-            ->pluck('count');
-
-        $weekly = collect(range(11, 0))->map(function (int $weeksAgo) use ($weeklyData) {
-            $start = now()->startOfWeek(Carbon::MONDAY)->subWeeks($weeksAgo);
-            $year = $start->year;
-            $week = $start->week;
-            $key = $year . '-' . str_pad($week, 2, '0', STR_PAD_LEFT);
-            return [
-                'label' => $start->format('d M'),
-                'count' => (int) ($weeklyData[$key] ?? 0),
-            ];
-        })->values();
-
-        // Optimized: Single query for all monthly aggregations (instead of 12 separate COUNT queries)
-        $monthlyData = WaCarakaMessage::query()
-            ->where('direction', 'inbound')
-            ->where('created_at', '>=', now()->startOfMonth()->subMonths(11))
-            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count')
-            ->groupBy('year', 'month')
-            ->get()
-            ->keyBy(function ($row) {
-                return $row->year . '-' . str_pad($row->month, 2, '0', STR_PAD_LEFT);
-            })
-            ->pluck('count');
-
-        $monthly = collect(range(11, 0))->map(function (int $monthsAgo) use ($monthlyData) {
-            $start = now()->startOfMonth()->subMonths($monthsAgo);
-            $key = $start->year . '-' . str_pad($start->month, 2, '0', STR_PAD_LEFT);
-            return [
-                'label' => $start->translatedFormat('M Y'),
-                'count' => (int) ($monthlyData[$key] ?? 0),
-            ];
-        })->values();
-
-        // Optimized: Unified summary query (instead of 4 separate queries)
-        $summary = DB::select(DB::raw('
-            SELECT 
-                SUM(CASE WHEN direction = "inbound" AND DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as inboundToday,
-                SUM(CASE WHEN direction = "inbound" AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) THEN 1 ELSE 0 END) as inboundWeek,
-                SUM(CASE WHEN direction = "inbound" AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN 1 ELSE 0 END) as inboundMonth
-            FROM wa_caraka_messages
-        '))[0] ?? null;
-
-        $activeConversations = WaCarakaConversation::query()
-            ->whereIn('status', ['open', 'pending'])
-            ->count();
-
-        return [
-            'generatedAt' => now()->toIso8601String(),
-            'summary' => [
-                'inboundToday' => (int) ($summary->inboundToday ?? 0),
-                'inboundWeek' => (int) ($summary->inboundWeek ?? 0),
-                'inboundMonth' => (int) ($summary->inboundMonth ?? 0),
-                'activeConversations' => $activeConversations,
-            ],
-            'dailyInbound' => $daily,
-            'weeklyInbound' => $weekly,
-            'monthlyInbound' => $monthly,
-            'operatorStats' => $this->operatorReplyStatsData()['operatorStats'],
-        ];
-    }
-
-    protected function operatorReplyStatsData(): array
-    {
-        $today = now()->startOfDay();
-
-        // Optimized: Combine all aggregations into two queries instead of five
-        // Query 1: Conversation counts and message counts from WaCarakaMessage
-        $messageStats = WaCarakaMessage::query()
-            ->where('direction', 'outbound')
-            ->whereNotNull('user_id')
-            ->selectRaw(
-                'user_id, 
-                COUNT(*) as totalReplies,
-                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as todayReplies,
-                MAX(created_at) as lastReplyAt',
-                [$today]
-            )
-            ->groupBy('user_id')
-            ->pluck('totalReplies', 'user_id');
-
-        $messageStatsDetailed = WaCarakaMessage::query()
-            ->where('direction', 'outbound')
-            ->whereNotNull('user_id')
-            ->selectRaw(
-                'user_id, 
-                COUNT(*) as totalReplies,
-                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as todayReplies,
-                MAX(created_at) as lastReplyAt',
-                [$today]
-            )
-            ->groupBy('user_id')
-            ->get()
-            ->keyBy('user_id');
-
-        // Query 2: Conversation counts
-        $conversationCounts = WaCarakaConversation::query()
-            ->select('claimed_by', DB::raw('COUNT(*) as total'))
-            ->whereNotNull('claimed_by')
-            ->groupBy('claimed_by')
-            ->pluck('total', 'claimed_by');
-
-        $operatorIds = $conversationCounts->keys()
-            ->merge($messageStatsDetailed->keys())
-            ->unique()
-            ->values();
-
-        $operators = User::query()
-            ->whereIn('id', $operatorIds)
-            ->get(['id', 'name', 'alias'])
-            ->map(function (User $user) use ($conversationCounts, $messageStatsDetailed) {
-                $msgStats = $messageStatsDetailed[$user->id];
-                return [
-                    'id' => $user->id,
-                    'name' => $user->alias ?: $user->name,
-                    'conversations' => (int) ($conversationCounts[$user->id] ?? 0),
-                    'outboundMessages' => (int) ($msgStats->totalReplies ?? 0),
-                    'outboundToday' => (int) ($msgStats->todayReplies ?? 0),
-                    'lastReplyAt' => isset($msgStats->lastReplyAt)
-                        ? Carbon::parse($msgStats->lastReplyAt)->timezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB'
-                        : null,
-                ];
-            })
-            ->sortByDesc(fn (array $row) => ($row['outboundToday'] * 1000000) + ($row['outboundMessages'] * 1000) + $row['conversations'])
-            ->values();
-
-        return [
-            'generatedAt' => now()->toIso8601String(),
-            'operatorStats' => $operators,
-        ];
-    }
-
-    protected function resolveConversationDisplayName(WaCarakaConversation $conversation, array $metadata, array $runtimeMeta = []): ?string
-    {
-        $fallback = $this->cleanResolvedName($conversation->remote_name);
-
-        if (str_ends_with((string) $conversation->remote_number, '@g.us')) {
-            return $this->extractGroupName($metadata, $runtimeMeta) ?: $fallback;
-        }
-
-        return $this->extractContactName($metadata, $runtimeMeta) ?: $fallback;
-    }
-
-    protected function extractContactName(array $metadata, array $runtimeMeta = []): ?string
-    {
-        $candidates = [
-            data_get($runtimeMeta, 'displayName'),
-            data_get($metadata, 'senderName'),
-            data_get($metadata, 'participantName'),
-            data_get($metadata, 'pushName'),
-            data_get($metadata, 'raw.meta.notifyName'),
-            data_get($metadata, 'raw.notifyName'),
-            data_get($metadata, 'raw.meta.senderName'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $resolved = $this->cleanResolvedName($candidate);
-            if ($resolved !== null) {
-                return $resolved;
-            }
-        }
-
-        return null;
-    }
-
-    protected function extractGroupName(array $metadata, array $runtimeMeta = []): ?string
-    {
-        $candidates = [
-            data_get($runtimeMeta, 'groupName'),
-            data_get($runtimeMeta, 'displayName'),
-            data_get($metadata, 'groupName'),
-            data_get($metadata, 'groupSubject'),
-            data_get($metadata, 'raw.groupName'),
-            data_get($metadata, 'raw.groupSubject'),
-            data_get($metadata, 'raw.meta.subject'),
-            data_get($metadata, 'raw.subject'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $resolved = $this->cleanResolvedName($candidate);
-            if ($resolved !== null) {
-                return $resolved;
-            }
-        }
-
-        return null;
-    }
-
-    protected function cleanResolvedName(mixed $value): ?string
-    {
-        if (!is_string($value)) {
-            return null;
-        }
-
-        $trimmed = trim($value);
-        if ($trimmed === '') {
-            return null;
-        }
-
-        if (str_contains($trimmed, '@s.whatsapp.net') || str_contains($trimmed, '@g.us') || str_contains($trimmed, '@lid')) {
-            return null;
-        }
-
-        return $trimmed;
-    }
-
-    protected function extractProfilePhotoUrl(array $metadata, array $runtimeMeta = []): ?string
-    {
-        $candidates = [
-            data_get($runtimeMeta, 'profilePhotoUrl'),
-            data_get($runtimeMeta, 'avatarUrl'),
-            data_get($metadata, 'profilePhotoUrl'),
-            data_get($metadata, 'avatarUrl'),
-            data_get($metadata, 'profilePicUrl'),
-            data_get($metadata, 'senderProfilePicUrl'),
-            data_get($metadata, 'raw.profilePhotoUrl'),
-            data_get($metadata, 'raw.avatarUrl'),
-            data_get($metadata, 'raw.profilePicUrl'),
-            data_get($metadata, 'raw.senderProfilePicUrl'),
-            data_get($metadata, 'raw.meta.profilePhotoUrl'),
-            data_get($metadata, 'raw.meta.avatarUrl'),
-            data_get($metadata, 'raw.meta.profilePicUrl'),
-            data_get($metadata, 'raw.meta.senderProfilePicUrl'),
-            data_get($metadata, 'raw.meta.profilePicUrl'),
-            data_get($metadata, 'raw.meta.avatar'),
-            data_get($metadata, 'raw.contextInfo.profilePicUrl'),
-            data_get($metadata, 'raw.msgContextInfo.profilePicUrl'),
-            data_get($metadata, 'raw.messageContextInfo.profilePicUrl'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (!is_string($candidate) || trim($candidate) === '') {
-                continue;
-            }
-
-            $url = trim($candidate);
-            if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://') || str_starts_with($url, 'data:image/')) {
-                return $url;
-            }
-        }
-
-        return null;
-    }
-
-    protected function softResetState(): array
-    {
-        $updated = WaCarakaMessage::query()
-            ->where('direction', 'inbound')
-            ->whereNull('replied_at')
-            ->update(['replied_at' => now()]);
-
-        WaCarakaConversation::query()
-            ->where('status', '!=', 'closed')
-            ->update(['status' => 'open', 'unread_count' => 0]);
-
-        return ['ok' => true, 'data' => ['ok' => true, 'updatedMessages' => $updated]];
-    }
-
-    protected function clearInboxState(): array
-    {
-        $deleted = [
-            'handovers' => 0,
-            'marks' => 0,
-            'messages' => 0,
-            'conversations' => 0,
-            'logs' => 0,
-        ];
-
-        DB::transaction(function () use (&$deleted) {
-            if (Schema::hasTable('wa_caraka_handovers')) {
-                $deleted['handovers'] = DB::table('wa_caraka_handovers')->delete();
-            }
-            if (Schema::hasTable('wa_caraka_conversation_marks')) {
-                $deleted['marks'] = DB::table('wa_caraka_conversation_marks')->delete();
-            }
-            if (Schema::hasTable('wa_caraka_messages')) {
-                $deleted['messages'] = DB::table('wa_caraka_messages')->delete();
-            }
-            if (Schema::hasTable('wa_caraka_conversations')) {
-                $deleted['conversations'] = DB::table('wa_caraka_conversations')->delete();
-            }
-            if (Schema::hasTable('wa_caraka_logs')) {
-                $deleted['logs'] = DB::table('wa_caraka_logs')->delete();
-            }
-        });
-
-        // Best effort: clear runtime history too.
-        $this->waService->clearHistory();
-
-        return [
-            'ok' => true,
-            'status' => 200,
-            'data' => [
-                'ok' => true,
-                'deleted' => $deleted,
-            ],
-        ];
-    }
-
-    protected function adminOnlyRuntimeAction($user, callable $callback): JsonResponse
-    {
-        if (!$this->isAdmin($user)) {
-            return response()->json(['error' => 'Aksi ini hanya dapat dilakukan oleh admin.'], 403);
-        }
-
-        $result = $callback();
-
-        return response()->json($result['data'] ?? [], $result['status'] ?? 200);
-    }
-
-    protected function superAdminOnlyAction($user, callable $callback): JsonResponse
-    {
-        if (!$user?->isSuperAdmin()) {
-            return response()->json(['error' => 'Aksi ini hanya dapat dilakukan oleh superadmin.'], 403);
-        }
-
-        $result = $callback();
-
-        return response()->json($result['data'] ?? [], $result['status'] ?? 200);
-    }
-
-    protected function isAdmin($user): bool
-    {
-        return (bool) ($user?->isSuperAdmin() || $user?->role === 'admin');
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
     private function toggleHandoverEnabled(Request $request): array
     {
-        $enabled = $request->input('enabled', false);
-        \App\Models\WaCarakaSetting::set('handover_enabled', (bool) $enabled, 'boolean');
-        
-        return [
+        if (!$request->user()->isSuperAdmin()) {
+            return ['ok' => false, 'status' => 403, 'error' => 'Hanya superadmin yang dapat mengubah pengaturan ini.'];
+        }
+
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        Cache::forever('wacaraka_handover_enabled', (bool) $validated['enabled']);
+
+        return ['ok' => true, 'status' => 200, 'data' => [
             'ok' => true,
-            'handoverEnabled' => $enabled,
-            'message' => 'Pengaturan alih chat telah ' . ($enabled ? 'diaktifkan' : 'dinonaktifkan'),
+            'handoverEnabled' => (bool) $validated['enabled'],
+        ]];
+    }
+
+    private function inboxData($user): array
+    {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
+            return [];
+        }
+
+        $latestMessages = WaCarakaMessage::query()
+            ->with('user:id,name,alias')
+            ->whereIn('id', function ($query) {
+                $query->from('wa_caraka_messages')
+                    ->selectRaw('MAX(id)')
+                    ->groupBy('conversation_id');
+            })
+            ->get()
+            ->keyBy('conversation_id');
+
+        $marks = WaCarakaConversationMark::query()
+            ->where('user_id', $user->id)
+            ->get()
+            ->keyBy('wa_caraka_conversation_id');
+
+        $rows = WaCarakaConversation::query()
+            ->with(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias'])
+            ->orderByDesc('last_activity_at')
+            ->get();
+
+        $deduped = $rows
+            ->groupBy(fn (WaCarakaConversation $conversation) => WaCarakaMessage::normalizeRemoteNumber((string) $conversation->remote_number))
+            ->map(function (Collection $group) use ($latestMessages) {
+                return $group->sortByDesc(function (WaCarakaConversation $conversation) use ($latestMessages) {
+                    $message = $latestMessages->get($conversation->conversation_id);
+                    return optional($message?->created_at)->timestamp ?? optional($conversation->last_activity_at)->timestamp ?? 0;
+                })->first();
+            })
+            ->values();
+
+        return $deduped->map(function (WaCarakaConversation $conversation) use ($latestMessages, $marks, $user) {
+            $formatted = $this->formatConversation($conversation, $user);
+            $message = $latestMessages->get($conversation->conversation_id);
+            $mark = $marks->get($conversation->id);
+
+            return array_merge($formatted, [
+                'lastMessagePreview' => $message ? (trim((string) $message->message_text) !== '' ? $message->message_text : $this->messageFallback($message)) : 'Belum ada pesan',
+                'lastMessageType' => $message?->message_type ?? 'text',
+                'lastMessageDirection' => $message?->direction ?? 'inbound',
+                'lastActivityTs' => $message?->created_at?->timestamp ?? $conversation->last_activity_at?->timestamp ?? 0,
+                'lastMessageMedia' => $message ? $this->lastMessageMedia($message) : null,
+                'customerMark' => $mark ? $this->formatMark($mark) : null,
+            ]);
+        })->all();
+    }
+
+    private function formatConversation(WaCarakaConversation $conversation, $user): array
+    {
+        $conversation->loadMissing(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']);
+
+        $ownerPresence = null;
+        if ($conversation->claimed_by && $conversation->last_activity_at) {
+            $ownerPresence = $conversation->last_activity_at->gte(now()->subMinutes(2))
+                ? 'active'
+                : ($conversation->last_activity_at->gte(now()->subMinutes(10)) ? 'standby' : 'idle');
+        }
+
+        return [
+            'conversationId' => $conversation->conversation_id,
+            'remoteNumber' => $conversation->remote_number,
+            'remoteName' => $conversation->remote_name,
+            'status' => $conversation->status,
+            'unreadCount' => (int) $conversation->unread_count,
+            'lastActivityAt' => $conversation->last_activity_at?->diffForHumans(),
+            'claimedAt' => $conversation->claimed_at?->diffForHumans(),
+            'ownership' => !$conversation->claimed_by ? 'unclaimed' : ($conversation->claimed_by === $user->id ? 'mine' : 'locked'),
+            'ownerPresence' => $ownerPresence,
+            'justClaimed' => (bool) $conversation->claimed_at?->gte(now()->subMinutes(3)),
+            'canReply' => true,
+            'owner' => $conversation->owner ? [
+                'id' => $conversation->owner->id,
+                'name' => $conversation->owner->name,
+                'alias' => $conversation->owner->alias,
+            ] : null,
+            'pendingHandover' => $conversation->pendingHandover ? [
+                'id' => $conversation->pendingHandover->id,
+                'requestor' => [
+                    'id' => $conversation->pendingHandover->requestor?->id,
+                    'name' => $conversation->pendingHandover->requestor?->name,
+                ],
+            ] : null,
         ];
+    }
+
+    private function formatMark(WaCarakaConversationMark $mark): array
+    {
+        return [
+            'label' => $mark->label,
+            'tone' => $mark->tone,
+            'note' => $mark->note,
+            'isPinned' => (bool) $mark->is_pinned,
+        ];
+    }
+
+    private function lastMessageMedia(WaCarakaMessage $message): ?array
+    {
+        $media = is_array($message->metadata['media'] ?? null) ? $message->metadata['media'] : null;
+        if (!$media) {
+            return null;
+        }
+
+        $mime = $media['mimetype'] ?? null;
+        $kind = $media['kind'] ?? $message->message_type;
+        $url = $media['dataUrl'] ?? $media['url'] ?? null;
+
+        return [
+            'kind' => $kind,
+            'url' => $url,
+            'fileName' => $media['fileName'] ?? null,
+            'mimeType' => $mime,
+            'hasVisualPreview' => (bool) ($url && (in_array($kind, ['image', 'sticker'], true) || Str::startsWith((string) $mime, 'image/'))),
+        ];
+    }
+
+    private function messageFallback(WaCarakaMessage $message): string
+    {
+        return match ($message->message_type) {
+            'image' => '[image]',
+            'sticker' => '[sticker]',
+            'document' => '[document]',
+            'video' => '[video]',
+            'audio' => '[audio]',
+            default => '[pesan kosong]',
+        };
+    }
+
+    private function buildReportStats(): array
+    {
+        $today = now()->toDateString();
+        $weekStart = now()->subDays(6)->toDateString();
+        $monthStart = now()->startOfMonth()->toDateString();
+
+        $dailyMetrics = WaCarakaDatabase::hasTable('wa_caraka_daily_metrics')
+            ? WaCarakaDailyMetric::query()->orderBy('metric_date')->get()
+            : collect();
+
+        $dailyByDate = $dailyMetrics->keyBy('metric_date');
+
+        $summary = [
+            'inboundToday' => (int) optional($dailyByDate->get($today))->inbound_messages,
+            'inboundWeek' => (int) $dailyMetrics->where('metric_date', '>=', $weekStart)->sum('inbound_messages'),
+            'inboundMonth' => (int) $dailyMetrics->where('metric_date', '>=', $monthStart)->sum('inbound_messages'),
+            'activeConversations' => WaCarakaDatabase::hasTable('wa_caraka_conversations')
+                ? WaCarakaConversation::query()->whereIn('status', ['pending', 'open'])->count()
+                : 0,
+        ];
+
+        $dailyInbound = collect(range(6, 0))
+            ->map(function ($offset) use ($dailyByDate) {
+                $date = now()->subDays($offset)->toDateString();
+                return [
+                    'label' => Carbon::parse($date)->translatedFormat('d M'),
+                    'count' => (int) optional($dailyByDate->get($date))->inbound_messages,
+                ];
+            })->all();
+
+        $weeklyInbound = collect(range(3, 0))
+            ->map(function ($offset) {
+                $start = now()->startOfWeek()->subWeeks($offset);
+                $end = $start->copy()->endOfWeek();
+                $count = WaCarakaDatabase::hasTable('wa_caraka_daily_metrics')
+                    ? WaCarakaDailyMetric::query()
+                        ->whereBetween('metric_date', [$start->toDateString(), $end->toDateString()])
+                        ->sum('inbound_messages')
+                    : 0;
+
+                return [
+                    'label' => $start->translatedFormat('d M'),
+                    'count' => (int) $count,
+                ];
+            })->all();
+
+        $monthlyInbound = collect(range(11, 0))
+            ->map(function ($offset) {
+                $month = now()->startOfMonth()->subMonths($offset);
+                $count = WaCarakaDatabase::hasTable('wa_caraka_daily_metrics')
+                    ? WaCarakaDailyMetric::query()
+                        ->whereBetween('metric_date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()])
+                        ->sum('inbound_messages')
+                    : 0;
+
+                return [
+                    'label' => $month->translatedFormat('M Y'),
+                    'count' => (int) $count,
+                ];
+            })->all();
+
+        $latestSync = WaCarakaDatabase::hasTable('wa_caraka_sync_runs')
+            ? WaCarakaSyncRun::query()->latest('updated_at')->first()
+            : null;
+
+        $messageTypes = WaCarakaDatabase::hasTable('wa_caraka_messages')
+            ? WaCarakaMessage::query()
+                ->selectRaw('message_type, COUNT(*) as aggregate')
+                ->groupBy('message_type')
+                ->orderByDesc('aggregate')
+                ->limit(6)
+                ->get()
+                ->map(fn ($row) => [
+                    'type' => $row->message_type ?: 'unknown',
+                    'label' => ucfirst((string) ($row->message_type ?: 'unknown')),
+                    'count' => (int) $row->aggregate,
+                ])->all()
+            : [];
+
+        $topContacts = WaCarakaDatabase::hasTable('wa_caraka_messages')
+            ? WaCarakaMessage::query()
+                ->selectRaw('remote_number, COUNT(*) as aggregate')
+                ->groupBy('remote_number')
+                ->orderByDesc('aggregate')
+                ->limit(6)
+                ->get()
+                ->map(fn ($row) => [
+                    'name' => $row->remote_number,
+                    'messages' => (int) $row->aggregate,
+                ])->all()
+            : [];
+
+        $operatorStats = WaCarakaDatabase::hasTable('wa_caraka_messages')
+            ? WaCarakaMessage::query()
+                ->with('user:id,name,alias')
+                ->where('direction', 'outbound')
+                ->whereNotNull('user_id')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function (Collection $messages) {
+                    $user = $messages->first()?->user;
+                    return [
+                        'name' => $user ? ($user->alias ?: $user->name) : 'Operator',
+                        'conversations' => $messages->pluck('conversation_id')->filter()->unique()->count(),
+                        'outboundMessages' => $messages->count(),
+                    ];
+                })
+                ->sortByDesc('outboundMessages')
+                ->values()
+                ->take(8)
+                ->all()
+            : [];
+
+        $snapshots = WaCarakaDatabase::hasTable('wa_caraka_monthly_snapshots')
+            ? WaCarakaMonthlySnapshot::query()
+                ->orderByDesc('month_key')
+                ->limit(12)
+                ->get()
+                ->map(fn (WaCarakaMonthlySnapshot $snapshot) => [
+                    'monthKey' => $snapshot->month_key,
+                    'label' => Carbon::parse($snapshot->month_start)->translatedFormat('M Y'),
+                    'totalMessages' => (int) $snapshot->total_messages,
+                    'inboundMessages' => (int) $snapshot->inbound_messages,
+                    'outboundMessages' => (int) $snapshot->outbound_messages,
+                    'historyMessages' => (int) $snapshot->history_messages,
+                    'realtimeMessages' => (int) $snapshot->realtime_messages,
+                    'activeConversations' => (int) $snapshot->active_conversations,
+                    'uniqueContacts' => (int) $snapshot->unique_contacts,
+                    'topOperatorName' => $snapshot->top_operator_name,
+                ])
+                ->values()
+            : collect();
+
+        $latestSnapshot = $snapshots->first();
+
+        return [
+            'generatedAt' => now()->toISOString(),
+            'summary' => $summary,
+            'dailyInbound' => $dailyInbound,
+            'weeklyInbound' => $weeklyInbound,
+            'monthlyInbound' => $monthlyInbound,
+            'historySync' => [
+                'latest' => $latestSync ? [
+                    'status' => $latestSync->status,
+                    'messagesReceived' => (int) $latestSync->messages_received,
+                    'messagesImported' => (int) $latestSync->messages_imported,
+                    'messagesDuplicate' => (int) $latestSync->messages_duplicate,
+                    'progress' => (int) $latestSync->progress,
+                    'updatedAt' => $latestSync->updated_at?->toISOString(),
+                ] : null,
+            ],
+            'messageTypes' => $messageTypes,
+            'topContacts' => $topContacts,
+            'operatorStats' => $operatorStats,
+            'executiveSummary' => [
+                'totalMessages' => WaCarakaDatabase::hasTable('wa_caraka_messages') ? WaCarakaMessage::query()->count() : 0,
+                'totalConversations' => WaCarakaDatabase::hasTable('wa_caraka_conversations') ? WaCarakaConversation::query()->count() : 0,
+            ],
+            'snapshots' => [
+                'latest' => $latestSnapshot,
+                'timeline' => $snapshots->all(),
+            ],
+        ];
+    }
+
+    private function runtimeHeaders(): array
+    {
+        $token = (string) config('wa_caraka.token', env('LW_WA_V2_TOKEN', ''));
+
+        return $token !== '' ? ['X-WA-V2-Token' => $token] : [];
+    }
+
+    private function mediaPayloadBytes(string $dataUrl): int
+    {
+        if (preg_match('/^data:[^;]+;base64,(.*)$/s', $dataUrl, $matches)) {
+            $decoded = base64_decode($matches[1], true);
+            return $decoded === false ? PHP_INT_MAX : strlen($decoded);
+        }
+
+        return strlen($dataUrl);
+    }
+
+    private function remoteNumberFromConversationId(string $conversationId): ?string
+    {
+        return WaCarakaConversation::query()
+            ->where('conversation_id', $conversationId)
+            ->value('remote_number');
+    }
+
+    private function senderLabel($user): string
+    {
+        return $user->alias ?: $user->name ?: $user->email ?: 'operator';
+    }
+
+    private function isAdmin($user): bool
+    {
+        return $user->role === 'admin' || $user->isSuperAdmin();
+    }
+
+    private function findConversationOrFail(string $conversationId): WaCarakaConversation
+    {
+        return WaCarakaConversation::query()
+            ->where('conversation_id', $conversationId)
+            ->firstOrFail();
     }
 }

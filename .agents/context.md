@@ -124,6 +124,13 @@ Middleware stack: `auth → verified → active → role:xxx`
 - Contoh: `lawangsewu.ptsp.index`, `lawangsewu.guestbook.store`
 - Admin: `admin.[resource].[aksi]`
 
+### Gaya Penulisan & Keterbacaan (Clean Code)
+- **Analogi Sederhana:** Saat menjelaskan konsep, alur kerja, atau mendokumentasikan kode kepada User, AI WAJIB menyertakan analogi dunia nyata yang simpel agar mudah dipelajari.
+- **Self-Documenting Code:** Penamaan variabel dan fungsi WAJIB sangat deskriptif dan sesuai dengan fungsinya. Tujuannya agar kode bisa menjelaskan dirinya sendiri tanpa perlu menambahkan komentar penjelas yang berlebihan.
+- **Watermark Elegan:** Pada setiap akhir file atau script utama yang baru dibuat, tinggalkan jejak pembuat dengan gaya yang elegan, *cool*, dan simpel di baris paling bawah.
+  - PHP/JS: `// developed by dbprakom™`
+  - HTML/Vue: `<!-- developed by dbprakom™ -->`
+
 ---
 
 ## Testing Conventions

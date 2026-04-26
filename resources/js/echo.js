@@ -21,10 +21,34 @@ window.__reverbState = {
 const echo = new Echo({
     broadcaster: 'reverb',
     key: import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost: import.meta.env.VITE_REVERB_HOST,
-    wsPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
-    wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
-    forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
+    wsHost: import.meta.env.VITE_REVERB_HOST || window.location.hostname,
+    wsPort: (() => {
+        const rawPort = Number(import.meta.env.VITE_REVERB_PORT ?? 0);
+        if (Number.isFinite(rawPort) && rawPort > 0) {
+            return rawPort;
+        }
+        return 80;
+    })(),
+    wssPort: (() => {
+        const rawPort = Number(import.meta.env.VITE_REVERB_PORT ?? 0);
+        const envScheme = String(import.meta.env.VITE_REVERB_SCHEME ?? '').toLowerCase();
+        const forceTls = envScheme ? envScheme === 'https' : window.location.protocol === 'https:';
+
+        if (Number.isFinite(rawPort) && rawPort > 0) {
+            // Common production pitfall: env still set to 8080 while app served via HTTPS.
+            if (forceTls && rawPort === 8080) {
+                return 443;
+            }
+
+            return rawPort;
+        }
+
+        return 443;
+    })(),
+    forceTLS: (() => {
+        const envScheme = String(import.meta.env.VITE_REVERB_SCHEME ?? '').toLowerCase();
+        return envScheme ? envScheme === 'https' : window.location.protocol === 'https:';
+    })(),
     enabledTransports: ['ws', 'wss'],
     // Exponential backoff: 1s → 2s → 4s … max 30s
     activityTimeout: 30_000,

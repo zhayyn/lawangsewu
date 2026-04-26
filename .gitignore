@@ -11,6 +11,8 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+phpunit.xml
+phpunit.xml.local
 Homestead.json
 Homestead.yaml
 npm-debug.log
@@ -37,6 +39,18 @@ id_ed25519.pub
 # Additional local env files
 .env.local
 .env.*.local
+.user.ini
+public/.user.ini
+
+# Local debug and ad-hoc test endpoints
+public/debug.php
+public/debug_request.php
+public/index-test.php
+public/simple-health.php
+public/test*.php
+
+# User-generated uploads
+public/guestbook/photos/*
 
 # WA runtime sensitive/volatile artifacts
 wa-runtime/baileys_auth_info/
@@ -44,3 +58,12 @@ wa-runtime/server.log
 wa-runtime/*.log
 wa-runtime/logs/
 wa-runtime/.cache/
+
+# WA Engine & Bridge (sessions dan env sensitif)
+wa-lawangsewu/sessions/
+wa-lawangsewu/node_modules/
+wa-lawangsewu/.env
+wa-lawangsewu/*.log
+wa-bridge/node_modules/
+wa-bridge/.env
+wa-bridge/*.log

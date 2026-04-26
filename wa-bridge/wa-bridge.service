@@ -1,0 +1,17 @@
+[Unit]
+Description=WA Bridge Adapter for Lawangsewu
+After=network.target
+
+[Service]
+Type=simple
+User=dbprakom
+WorkingDirectory=/home/dbprakom/wa-bridge
+ExecStart=/usr/bin/node /home/dbprakom/wa-bridge/index.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/dbprakom/wa-bridge/bridge.log
+StandardError=append:/home/dbprakom/wa-bridge/bridge.log
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

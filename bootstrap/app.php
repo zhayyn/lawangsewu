@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->preventRequestForgery(except: [
             'auth/google/callback',
             'wa-caraka/webhook/inbound',
+            'wa-caraka/api/*',
+            'admin/wa-caraka/api/*',
         ]);
 
         $middleware->alias([

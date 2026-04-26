@@ -10,6 +10,7 @@ use App\Models\ServiceCounter;
 use App\Models\SidangQueueTicket;
 use App\Models\SippCache;
 use App\Models\WaCarakaLog;
+use App\Support\WaCarakaDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
@@ -243,7 +244,7 @@ class LawangsewuPortal
 
     public static function dashboardPayload(): array
     {
-        $waCount = Schema::hasTable('wa_caraka_logs') ? WaCarakaLog::whereDate('created_at', today())->count() : 0;
+        $waCount = WaCarakaDatabase::hasTable('wa_caraka_logs') ? WaCarakaLog::whereDate('created_at', today())->count() : 0;
 
         return [
             'appMeta' => self::appMeta(),
@@ -399,7 +400,7 @@ class LawangsewuPortal
 
     public static function waCarakaPayload(): array
     {
-        $stats = Schema::hasTable('wa_caraka_logs') ? [
+        $stats = WaCarakaDatabase::hasTable('wa_caraka_logs') ? [
             'total'    => WaCarakaLog::count(),
             'sent'     => WaCarakaLog::where('status', 'sent')->count(),
             'failed'   => WaCarakaLog::where('status', 'failed')->count(),

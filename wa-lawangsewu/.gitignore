@@ -1,0 +1,6 @@
+node_modules/
+sessions/
+*.db
+*.db-wal
+*.db-journal
+.env

@@ -21,6 +21,8 @@ const isLoading      = ref(false);
 const isBusy        = ref(false);
 const autoRefresh   = ref(true);
 const pollRef       = ref(null);
+const activeThreadRequestId = ref(0);
+let nextThreadRequestId = 0;
 
 const runtimeHealth     = ref({});
 const qrDataUrl         = ref('');
@@ -37,13 +39,23 @@ const latestMsgStats    = ref({ ...props.messageStats });
 const latestConvoStats  = ref({ ...props.convoStats });
 const latestOperatorStats = ref(Array.isArray(props.reportStats?.operatorStats) ? props.reportStats.operatorStats : []);
 const operatorStatsGeneratedAt = ref(props.reportStats?.generatedAt || null);
+const conversationSearch = ref('');
+const conversationFilter = ref('all');
 
 // Inbox
 const conversations         = ref([]);
 const activeConvoId         = ref('');
 const conversationMessages  = ref([]);
+const conversationMessageCache = ref({});
+const recentlyUpdatedConversationIds = ref({});
+const visibleConversationCount = ref(40);
+const threadLoading         = ref(false);
+const threadLoadingVisible  = ref(false);
 const activeConvo           = computed(() => conversations.value.find(c => c.conversationId === activeConvoId.value) || null);
 const threadEl              = ref(null);
+const sidebarListEl         = ref(null);
+const replyTextareaRef      = ref(null);
+const mediaViewer           = ref(null);
 const threadZoom            = ref(100);
 const threadVisibleCount    = ref(12);
 const markEditorOpen        = ref(false);
@@ -59,11 +71,19 @@ const markForm              = ref({
 // Reply / Send
 const replyText  = ref('');
 const replyState = ref('idle');
+const replyProgress = ref(0);
+const mediaInputRef = ref(null);
+const mediaAttachment = ref(null);
 const sendTo     = ref('');
 const sendText   = ref('');
 const sendState  = ref('idle');
 const replyCooldownRef = ref(null);
 const sendCooldownRef = ref(null);
+const pendingReadConversationIds = new Set();
+const pendingConversationFetchIds = new Set();
+const MAX_MEDIA_FILE_BYTES = Number(props.config?.maxMediaBytes || 15 * 1024 * 1024);
+let threadLoadingDelayRef = null;
+let inboxRefreshTimerRef = null;
 
 // Handover
 const handoverReason  = ref('');
@@ -90,6 +110,8 @@ const ticketTransferTo  = ref('');
 const isAdmin      = computed(() => Boolean(props.authUser?.isAdmin));
 const isSuperAdmin = computed(() => Boolean(props.authUser?.isSuperAdmin));
 const isOperator   = computed(() => props.authUser?.role === 'operator');
+const operatorLiteMode = computed(() => isOperator.value && !isAdmin.value && !isSuperAdmin.value);
+const conversationFetchLimit = computed(() => operatorLiteMode.value ? 45 : 70);
 const isConnected  = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
 const hasRealtime = computed(() => typeof window !== 'undefined' && Boolean(window.Echo));
 const myId = computed(() => props.authUser?.id);
@@ -123,6 +145,51 @@ const operatorStatsUpdatedAtText = computed(() => {
     }) + ' WIB';
 });
 
+const filteredConversations = computed(() => {
+    const keyword = conversationSearch.value.trim().toLowerCase();
+    const filter = conversationFilter.value;
+
+    return conversations.value.filter((conversation) => {
+        if (filter === 'unread' && Number(conversation.unreadCount || 0) <= 0) {
+            return false;
+        }
+
+        if (filter === 'mine' && conversation.owner?.id !== myId.value) {
+            return false;
+        }
+
+        if (filter === 'group' && !conversation.isGroup) {
+            return false;
+        }
+
+        if (keyword === '') {
+            return true;
+        }
+
+        const haystack = [
+            conversation.displayTitle,
+            conversation.remoteName,
+            conversation.remoteNumber,
+            conversation.groupName,
+            conversation.lastMessagePreview,
+            conversation.customerMark?.label,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        return haystack.includes(keyword);
+    });
+});
+
+const renderedConversations = computed(() => (
+    filteredConversations.value.slice(0, visibleConversationCount.value)
+));
+
+const activeConversationIndex = computed(() => (
+    filteredConversations.value.findIndex((conversation) => conversation.conversationId === activeConvoId.value)
+));
+
 const currentOperatorStat = computed(() => latestOperatorStats.value.find((item) => item.id === myId.value) || null);
 
 const statusClass = computed(() => ({
@@ -155,6 +222,8 @@ const threadViewportStyle = computed(() => ({
     minHeight: `${Math.max(260, threadHeightPx.value - 140)}px`,
     maxHeight: `${threadHeightPx.value}px`,
 }));
+
+const mediaViewerOpen = computed(() => Boolean(mediaViewer.value?.src));
 
 const customBackgroundStyle = computed(() => {
     if (!props.config?.background) return null;
@@ -296,11 +365,89 @@ const callApi = async (action, options = {}) => {
 
     const query = options.params ? '?' + new URLSearchParams(options.params).toString() : '';
     const res = await fetch(url + query, fetchOpts);
-    const json = await res.json();
+    let json = {};
+    try {
+        json = await res.json();
+    } catch {
+        json = {};
+    }
 
-    if (!res.ok) throw { status: res.status, error: json?.error || 'Terjadi kesalahan.' };
+    if (!res.ok) throw normalizeApiError(res.status, json?.error);
     return json;
 };
+
+const normalizeApiError = (status, rawError = null) => {
+    if (typeof rawError === 'string' && rawError.trim() !== '') {
+        return { status, error: rawError };
+    }
+
+    if (status === 413) {
+        return {
+            status,
+            error: `Ukuran lampiran terlalu besar untuk server. Coba file di bawah ${Math.max(1, Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024)))} MB.`,
+        };
+    }
+
+    if (status === 419) {
+        return { status, error: 'Sesi login sudah berubah. Muat ulang halaman lalu coba kirim lagi.' };
+    }
+
+    if (status === 422) {
+        return { status, error: 'Data lampiran tidak valid atau melebihi batas kirim.' };
+    }
+
+    if (status >= 500) {
+        return { status, error: 'Server gagal memproses permintaan. Coba lagi beberapa saat.' };
+    }
+
+    return { status, error: 'Terjadi kesalahan.' };
+};
+
+const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) => {
+    const method = String(options.method || 'get').toUpperCase();
+    const url = route('lawangsewu.wacaraka.api', { action });
+    const query = options.params ? '?' + new URLSearchParams(options.params).toString() : '';
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url + query, true);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (csrfToken) xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+
+    if (options.data) {
+        xhr.setRequestHeader('Content-Type', 'application/json');
+    }
+
+    xhr.onreadystatechange = () => {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+
+        let json = {};
+        try {
+            json = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch {
+            json = {};
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(json);
+            return;
+        }
+
+        reject(normalizeApiError(xhr.status, json?.error));
+    };
+
+    xhr.onerror = () => reject({ status: 0, error: 'Jaringan terputus saat mengirim permintaan.' });
+
+    if (typeof options.onUploadProgress === 'function' && xhr.upload) {
+        xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return;
+            options.onUploadProgress(Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100))));
+        };
+    }
+
+    xhr.send(options.data ? JSON.stringify(options.data) : null);
+});
 
 const appendLog = (title, payload = null) => {
     const stamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -312,6 +459,7 @@ const scheduleReplyStateReset = (delay = 1200) => {
     if (replyCooldownRef.value) clearTimeout(replyCooldownRef.value);
     replyCooldownRef.value = setTimeout(() => {
         replyState.value = 'idle';
+        replyProgress.value = 0;
         replyCooldownRef.value = null;
     }, delay);
 };
@@ -324,8 +472,354 @@ const scheduleSendStateReset = (delay = 1200) => {
     }, delay);
 };
 
+const detectMediaKindFromFile = (file) => {
+    const normalized = String(file?.type || '').toLowerCase();
+    const fileName = String(file?.name || '').toLowerCase();
+    if (normalized === 'image/webp' || fileName.endsWith('.webp')) return 'sticker';
+    if (normalized.startsWith('image/')) return 'image';
+    if (normalized.startsWith('video/')) return 'video';
+    if (normalized.startsWith('audio/')) return 'audio';
+    return 'document';
+};
+
+const inferMimeTypeFromFile = (file) => {
+    const normalized = String(file?.type || '').trim().toLowerCase();
+    if (normalized) return normalized;
+
+    const fileName = String(file?.name || '').toLowerCase();
+    const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
+
+    return {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        heic: 'image/heic',
+        heif: 'image/heif',
+        mp4: 'video/mp4',
+        mov: 'video/quicktime',
+        avi: 'video/x-msvideo',
+        mp3: 'audio/mpeg',
+        ogg: 'audio/ogg',
+        oga: 'audio/ogg',
+        wav: 'audio/wav',
+        m4a: 'audio/mp4',
+        pdf: 'application/pdf',
+        rtf: 'application/rtf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        json: 'application/json',
+        xml: 'application/xml',
+        zip: 'application/zip',
+        rar: 'application/vnd.rar',
+        '7z': 'application/x-7z-compressed',
+    }[extension] || 'application/octet-stream';
+};
+
+const dataUrlByteLength = (dataUrl) => {
+    const value = String(dataUrl || '');
+    if (!value.startsWith('data:')) return 0;
+
+    const parts = value.split(',', 2);
+    if (parts.length !== 2) return 0;
+
+    const payload = (parts[1] || '').replace(/\s+/g, '');
+    if (!payload) return 0;
+
+    let padding = 0;
+    if (payload.endsWith('==')) padding = 2;
+    else if (payload.endsWith('=')) padding = 1;
+
+    return Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
+};
+
+const compressImageDataUrl = async (dataUrl, mimeType = 'image/jpeg', maxBytes = MAX_MEDIA_FILE_BYTES) => {
+    const sourceUrl = String(dataUrl || '');
+    if (!sourceUrl.startsWith('data:image/')) return sourceUrl;
+
+    const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Gagal membaca gambar'));
+        img.src = sourceUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return sourceUrl;
+
+    let width = image.naturalWidth || image.width;
+    let height = image.naturalHeight || image.height;
+    let quality = 0.86;
+    const outputMime = mimeType === 'image/png' ? 'image/jpeg' : (mimeType || 'image/jpeg');
+
+    const applySize = () => {
+        canvas.width = Math.max(1, Math.round(width));
+        canvas.height = Math.max(1, Math.round(height));
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL(outputMime, quality);
+    };
+
+    if (Math.max(width, height) > 1920) {
+        const ratio = 1920 / Math.max(width, height);
+        width *= ratio;
+        height *= ratio;
+    }
+
+    let result = applySize();
+    let attempts = 0;
+
+    while (dataUrlByteLength(result) > maxBytes && attempts < 6) {
+        attempts += 1;
+        quality = Math.max(0.45, quality - 0.08);
+        width *= 0.9;
+        height *= 0.9;
+        result = applySize();
+    }
+
+    return result;
+};
+
+const clearMediaAttachment = () => {
+    mediaAttachment.value = null;
+    if (mediaInputRef.value) {
+        mediaInputRef.value.value = '';
+    }
+};
+
+const noteConversationActivity = (convoId) => {
+    if (!convoId || convoId === activeConvoId.value) return;
+
+    recentlyUpdatedConversationIds.value = {
+        ...recentlyUpdatedConversationIds.value,
+        [convoId]: Date.now(),
+    };
+
+    window.setTimeout(() => {
+        const current = recentlyUpdatedConversationIds.value[convoId];
+        if (!current) return;
+        if (Date.now() - current < 2200) return;
+
+        const next = { ...recentlyUpdatedConversationIds.value };
+        delete next[convoId];
+        recentlyUpdatedConversationIds.value = next;
+    }, 2400);
+};
+
+const isConversationRecentlyUpdated = (convoId) => Boolean(recentlyUpdatedConversationIds.value[convoId]);
+
+const resetVisibleConversationWindow = () => {
+    visibleConversationCount.value = 40;
+};
+
+const maybeExpandConversationWindow = () => {
+    const el = sidebarListEl.value;
+    if (!el) return;
+    if (visibleConversationCount.value >= filteredConversations.value.length) return;
+
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distance <= 180) {
+        visibleConversationCount.value = Math.min(
+            filteredConversations.value.length,
+            visibleConversationCount.value + 30,
+        );
+    }
+};
+
+const attachmentPreviewUrl = computed(() => {
+    if (!mediaAttachment.value) return '';
+    if (!['image', 'sticker', 'video', 'audio'].includes(mediaAttachment.value.kind)) return '';
+    return mediaAttachment.value.dataUrl || '';
+});
+
+const isPreviewableAttachment = computed(() => Boolean(attachmentPreviewUrl.value));
+
+const setThreadLoadingState = (value) => {
+    threadLoading.value = value;
+
+    if (threadLoadingDelayRef) {
+        clearTimeout(threadLoadingDelayRef);
+        threadLoadingDelayRef = null;
+    }
+
+    if (value) {
+        threadLoadingDelayRef = setTimeout(() => {
+            if (threadLoading.value) {
+                threadLoadingVisible.value = true;
+            }
+            threadLoadingDelayRef = null;
+        }, 120);
+        return;
+    }
+
+    threadLoadingVisible.value = false;
+};
+
+const composerRows = () => {
+    const textarea = replyTextareaRef.value;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const nextHeight = Math.min(textarea.scrollHeight, 180);
+    textarea.style.height = `${Math.max(76, nextHeight)}px`;
+};
+
+const isThreadNearBottom = (threshold = 120) => {
+    const el = threadEl.value;
+    if (!el) return true;
+
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return distance <= threshold;
+};
+
+const scrollThreadToBottom = (behavior = 'auto') => {
+    const el = threadEl.value;
+    if (!el) return;
+
+    el.scrollTo({
+        top: el.scrollHeight,
+        behavior,
+    });
+};
+
+const handleReplyKeydown = (event) => {
+    if (event.key !== 'Enter') return;
+    if (event.shiftKey) return;
+
+    event.preventDefault();
+
+    if (replyState.value === 'sending' || !activeConvo.value || !canReply.value) {
+        return;
+    }
+
+    replyToConversation();
+};
+
+const focusConversationSearch = () => {
+    const input = typeof document !== 'undefined'
+        ? document.querySelector('input[placeholder="Cari nama, nomor, alias, preview..."]')
+        : null;
+    input?.focus();
+    input?.select?.();
+};
+
+const selectAdjacentConversation = (delta) => {
+    const list = filteredConversations.value;
+    if (!list.length) return;
+
+    const currentIndex = activeConversationIndex.value;
+    const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+    const nextIndex = Math.max(0, Math.min(list.length - 1, baseIndex + delta));
+    const target = list[nextIndex];
+    if (!target) return;
+
+    selectConversation(target.conversationId);
+};
+
+const handleGlobalShortcuts = (event) => {
+    const target = event.target;
+    const tagName = String(target?.tagName || '').toLowerCase();
+    const isTypingField = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+
+    if (event.key === 'Escape' && mediaViewerOpen.value) {
+        event.preventDefault();
+        mediaViewer.value = null;
+        return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        focusConversationSearch();
+        return;
+    }
+
+    if (isTypingField) return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    if (event.key.toLowerCase() === 'j') {
+        event.preventDefault();
+        selectAdjacentConversation(1);
+        return;
+    }
+
+    if (event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        selectAdjacentConversation(-1);
+    }
+};
+
+const pickMediaFile = () => {
+    if (!activeConvo.value || !canReply.value || replyState.value === 'sending') return;
+    mediaInputRef.value?.click();
+};
+
+const onMediaFileChange = async (event) => {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_MEDIA_FILE_BYTES) {
+        replyState.value = 'error';
+        appendLog('File terlalu besar', { maxMb: Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024)), fileSizeMb: (file.size / (1024 * 1024)).toFixed(2) });
+        scheduleReplyStateReset(2200);
+        clearMediaAttachment();
+        return;
+    }
+
+    try {
+        const initialDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Gagal membaca file'));
+            reader.readAsDataURL(file);
+        });
+
+        const kind = detectMediaKindFromFile(file);
+        const mime = inferMimeTypeFromFile(file);
+        const finalDataUrl = kind === 'image'
+            ? await compressImageDataUrl(initialDataUrl, mime, MAX_MEDIA_FILE_BYTES)
+            : initialDataUrl;
+        const finalByteLength = dataUrlByteLength(finalDataUrl);
+
+        if (finalByteLength > MAX_MEDIA_FILE_BYTES) {
+            replyState.value = 'error';
+            appendLog('File masih terlalu besar setelah diproses', {
+                maxMb: Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024)),
+                finalSizeMb: (finalByteLength / (1024 * 1024)).toFixed(2),
+            });
+            scheduleReplyStateReset(2200);
+            clearMediaAttachment();
+            return;
+        }
+
+        mediaAttachment.value = {
+            name: file.name,
+            size: finalByteLength || file.size,
+            mime,
+            kind,
+            dataUrl: finalDataUrl,
+        };
+    } catch {
+        replyState.value = 'error';
+        appendLog('Gagal memproses lampiran media');
+        scheduleReplyStateReset(2200);
+        clearMediaAttachment();
+    }
+};
+
 const sortConversations = (list) => {
     return [...list].sort((a, b) => {
+        const pinnedA = Number(Boolean(a?.customerMark?.isPinned));
+        const pinnedB = Number(Boolean(b?.customerMark?.isPinned));
+        if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+
         const activityA = Number(a?.lastActivityTs || 0);
         const activityB = Number(b?.lastActivityTs || 0);
         if (activityA !== activityB) return activityB - activityA;
@@ -359,10 +853,43 @@ const mergeConversation = (incoming) => {
     }
 
     conversations.value = sortConversations(conversations.value);
+    noteConversationActivity(normalized.conversationId);
+};
+
+const applyConversationReadState = (convoId) => {
+    if (!convoId) return;
+
+    mergeConversation({
+        conversationId: convoId,
+        unreadCount: 0,
+    });
+};
+
+const markConversationRead = async (convoId, { optimistic = true } = {}) => {
+    if (!convoId) return;
+
+    if (optimistic) {
+        applyConversationReadState(convoId);
+    }
+
+    if (pendingReadConversationIds.has(convoId)) {
+        return;
+    }
+
+    pendingReadConversationIds.add(convoId);
+
+    try {
+        await callApi('mark-read', { method: 'post', data: { conversation_id: convoId } });
+    } catch {
+        // Polling and realtime will reconcile if the backend state lags.
+    } finally {
+        pendingReadConversationIds.delete(convoId);
+    }
 };
 
 const upsertConversationMessage = (incoming) => {
     if (!incoming) return;
+    const shouldStickToBottom = isThreadNearBottom();
 
     const normalizedIncoming = normalizeMessage(incoming);
 
@@ -375,6 +902,7 @@ const upsertConversationMessage = (incoming) => {
             ...conversationMessages.value[existingById],
             ...normalizedIncoming,
         };
+        persistConversationCache(normalizedIncoming.conversationId || activeConvoId.value, conversationMessages.value);
         return;
     }
 
@@ -393,12 +921,16 @@ const upsertConversationMessage = (incoming) => {
     }
 
     nextTick(() => {
-        if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight;
+        if (shouldStickToBottom) {
+            scrollThreadToBottom('smooth');
+        }
     });
+    persistConversationCache(normalizedIncoming.conversationId || activeConvoId.value, conversationMessages.value);
 };
 
-const pushTempOutboundMessage = (text) => {
+const pushTempOutboundMessage = (text, media = null) => {
     const tempId = `temp-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const safeMedia = media && typeof media === 'object' ? media : null;
     conversationMessages.value.push(normalizeMessage({
         _tempId: tempId,
         direction: 'outbound',
@@ -407,15 +939,45 @@ const pushTempOutboundMessage = (text) => {
         senderKey: String(props.authUser?.id || 'self'),
         sentAt: 'sekarang',
         text,
-        type: 'text',
+        type: safeMedia?.kind || 'text',
+        metadata: safeMedia ? {
+            media: {
+                kind: safeMedia.kind,
+                mimetype: safeMedia.mime,
+                fileName: safeMedia.name,
+                caption: text,
+                dataUrl: safeMedia.dataUrl,
+                byteLength: safeMedia.size,
+            },
+        } : {},
         status: 'sending',
     }));
 
     nextTick(() => {
-        if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight;
+        scrollThreadToBottom('smooth');
     });
+    persistConversationCache(activeConvoId.value, conversationMessages.value);
 
     return tempId;
+};
+
+const persistConversationCache = (convoId, messages) => {
+    if (!convoId) return;
+
+    conversationMessageCache.value = {
+        ...conversationMessageCache.value,
+        [convoId]: Array.isArray(messages) ? [...messages] : [],
+    };
+};
+
+const hydrateConversationFromCache = (convoId) => {
+    if (!convoId) return false;
+
+    const cached = conversationMessageCache.value[convoId];
+    if (!Array.isArray(cached)) return false;
+
+    conversationMessages.value = [...cached];
+    return true;
 };
 
 const markTempMessageStatus = (tempId, status) => {
@@ -425,6 +987,14 @@ const markTempMessageStatus = (tempId, status) => {
         ...conversationMessages.value[idx],
         status,
     };
+    persistConversationCache(activeConvoId.value, conversationMessages.value);
+};
+
+const removeTempMessage = (tempId) => {
+    if (!tempId) return;
+    const nextMessages = conversationMessages.value.filter((msg) => msg._tempId !== tempId);
+    conversationMessages.value = nextMessages;
+    persistConversationCache(activeConvoId.value, nextMessages);
 };
 
 const memberColorMap = [
@@ -525,6 +1095,9 @@ const formatRemoteLabel = (value) => {
     }
 
     if (normalized.endsWith('@lid')) {
+        // Tampilkan nomor WA jika sudah ada di peta LID
+        const mapped = getMappedWaNumber(normalized);
+        if (mapped) return `${mapped} (wa)`;
         return `${normalized.replace(/@lid$/i, '')} (lid)`;
     }
 
@@ -568,7 +1141,7 @@ const normalizeMessage = (raw = {}) => {
     const media = metadata?.media && typeof metadata.media === 'object' ? metadata.media : {};
     const mediaKind = raw.mediaKind || media.kind || (raw.type === 'sticker' ? 'sticker' : (raw.type === 'image' ? 'image' : null));
     const mediaMime = raw.mediaMime || media.mimetype || metadata?.mimetype || null;
-    const mediaUrl = raw.mediaUrl || media.dataUrl || media.previewDataUrl || null;
+    const mediaUrl = raw.mediaUrl || media.dataUrl || media.url || media.previewDataUrl || null;
     const hasVisualMedia = Boolean(mediaUrl && (mediaKind === 'image' || mediaKind === 'sticker' || String(mediaMime || '').startsWith('image/')));
     const mediaCaption = String(raw.text || media.caption || '').trim();
 
@@ -631,12 +1204,70 @@ const bubbleFooterClass = (msg) => (
     msg.direction === 'outbound' ? 'text-slate-500' : 'text-slate-500'
 );
 
+const inboxPreviewMedia = (conversation) => {
+    const media = conversation?.lastMessageMedia;
+    if (!media || typeof media !== 'object') return null;
+    return media;
+};
+
+const hasInboxVisualPreview = (conversation) => Boolean(inboxPreviewMedia(conversation)?.hasVisualPreview);
+
+const inboxPreviewLabel = (conversation) => {
+    const media = inboxPreviewMedia(conversation);
+    if (!media) return '';
+
+    return ({
+        image: 'gambar',
+        sticker: 'stiker',
+        document: 'dokumen',
+        video: 'video',
+        audio: 'audio',
+    })[media.kind] || 'lampiran';
+};
+
+const isStickerMessage = (msg) => msg?.mediaKind === 'sticker';
+const isImageMessage = (msg) => msg?.hasVisualMedia && !isStickerMessage(msg);
+const isVideoMessage = (msg) => msg?.mediaKind === 'video' && Boolean(msg?.mediaUrl);
+const isAudioMessage = (msg) => msg?.mediaKind === 'audio' && Boolean(msg?.mediaUrl);
+
+const extractMessageFileName = (msg) => (
+    msg?.metadata?.media?.fileName
+    || msg?.metadata?.fileName
+    || msg?.text
+    || `file-${msg?.id || 'media'}`
+);
+
+const humanFileSize = (bytes) => {
+    const value = Number(bytes || 0);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const documentMetaText = (msg) => {
+    const parts = [
+        msg?.mediaMime || null,
+        humanFileSize(msg?.metadata?.media?.byteLength || msg?.metadata?.media?.fileLength || msg?.metadata?.media?.size),
+    ].filter(Boolean);
+
+    return parts.join(' · ') || 'File WhatsApp';
+};
+
 const outgoingStatusClass = (msg) => ({
     sent: 'text-sky-600',
     queued: 'text-slate-500',
     sending: 'text-slate-500',
     failed: 'text-rose-500',
 }[msg.status] || '');
+
+const messageContentFallback = (msg = null) => {
+    const normalized = String(msg?.type || msg?.message_type || '').toLowerCase();
+    if (normalized === 'notification_template') return '[Notifikasi WhatsApp]';
+    if (normalized === 'e2e_notification') return '[Notifikasi keamanan]';
+    if (msg?.mediaKind) return `[${msg.mediaKind}]`;
+    return '[pesan kosong]';
+};
 
 const messageTypeLabel = (type, msg = null) => {
     const normalized = String(type || '').toLowerCase();
@@ -646,12 +1277,21 @@ const messageTypeLabel = (type, msg = null) => {
     if (normalized === 'document') return 'dokumen';
     if (normalized === 'video') return 'video';
     if (normalized === 'audio') return 'audio';
+    if (normalized === 'notification_template') return 'notifikasi';
+    if (normalized === 'e2e_notification') return 'keamanan';
 
     if (msg?.hasVisualMedia) {
         return msg.mediaKind === 'sticker' ? 'stiker' : 'gambar';
     }
 
     return normalized || 'pesan';
+};
+
+const conversationPreviewText = (conversation) => {
+    if (!conversation) return '';
+
+    const prefix = conversation.lastMessageDirection === 'outbound' ? 'Anda: ' : '';
+    return `${prefix}${conversation.lastMessagePreview || 'Belum ada pesan'}`;
 };
 
 const syncMarkFormFromActive = () => {
@@ -862,7 +1502,7 @@ const refreshStats = async () => {
 };
 
 const refreshHistory = async () => {
-    if (!isAdmin.value) { historyItems.value = []; return; }
+    if (!isSuperAdmin.value) { historyItems.value = []; return; }
     try {
         const d = await callApi('history');
         historyItems.value = Array.isArray(d?.items) ? d.items : (Array.isArray(d) ? d : []);
@@ -888,30 +1528,110 @@ const refreshLidMappings = async () => {
 const refreshInboxList = async (preserveActive = true) => {
     try {
         const data = await callApi('inbox');
-        conversations.value = sortConversations((data?.conversations || []).map(normalizeConversation));
-        if (!preserveActive || !activeConvoId.value || !conversations.value.some(c => c.conversationId === activeConvoId.value)) {
+        const normalizedList = (data?.conversations || []).map(normalizeConversation).map((conversation) => (
+            preserveActive && activeConvoId.value && conversation.conversationId === activeConvoId.value
+                ? { ...conversation, unreadCount: 0 }
+                : conversation
+        ));
+        conversations.value = sortConversations(normalizedList);
+        const persistedConvoId = typeof window !== 'undefined'
+            ? localStorage.getItem('wacaraka.activeConversationId')
+            : '';
+        const preferredConvoId = preserveActive && activeConvoId.value ? activeConvoId.value : persistedConvoId;
+
+        if (!preferredConvoId || !conversations.value.some(c => c.conversationId === preferredConvoId)) {
             activeConvoId.value = conversations.value[0]?.conversationId || '';
+        } else {
+            activeConvoId.value = preferredConvoId;
         }
-    } catch { /* silent */ }
+
+        conversations.value
+            .slice(0, operatorLiteMode.value ? 2 : 4)
+            .forEach((conversation) => prefetchConversation(conversation.conversationId));
+    } catch {
+        /* silent */
+    }
 };
 
-const refreshConvoMessages = async (convoId = activeConvoId.value) => {
+const applyThreadMessages = async (messages, { preserveViewport = false } = {}) => {
+    const shouldStickToBottom = preserveViewport ? isThreadNearBottom() : true;
+    conversationMessages.value = messages;
+
+    await nextTick();
+
+    if (shouldStickToBottom) {
+        scrollThreadToBottom(preserveViewport ? 'smooth' : 'auto');
+    }
+};
+
+const refreshConvoMessages = async (convoId = activeConvoId.value, options = {}) => {
+    const { force = false, background = false } = options;
     const convo = conversations.value.find(c => c.conversationId === convoId);
-    if (!convoId || !convo) { conversationMessages.value = []; return; }
+    const isVisibleThread = convoId === activeConvoId.value;
+    if (!convoId || !convo) {
+        if (isVisibleThread) {
+            conversationMessages.value = [];
+            setThreadLoadingState(false);
+        }
+        return;
+    }
+
+    if (!force && pendingConversationFetchIds.has(convoId)) {
+        return;
+    }
+
+    const requestId = ++nextThreadRequestId;
+    if (isVisibleThread) {
+        activeThreadRequestId.value = requestId;
+    }
+    pendingConversationFetchIds.add(convoId);
+    if (isVisibleThread && (!background || !hydrateConversationFromCache(convoId))) {
+        setThreadLoadingState(true);
+    }
+    if (isVisibleThread) {
+        markConversationRead(convoId);
+    }
+
     try {
-        const data = await callApi('conversation', { params: { remote_number: convo.remoteNumber } });
+        const data = await callApi('conversation', {
+            params: {
+                conversation_id: convo.conversationId,
+                remote_number: convo.remoteNumber,
+                limit: conversationFetchLimit.value,
+            },
+        });
         const serverMessages = (data?.messages || []).map(normalizeMessage);
+
+        if (!isVisibleThread) {
+            persistConversationCache(convoId, serverMessages);
+            return;
+        }
+
+        if (activeThreadRequestId.value !== requestId || activeConvoId.value !== convoId) return;
+
         // Preserve temp messages (sending/failed) that are not yet in DB
         const pendingTemps = conversationMessages.value.filter(
             (m) => m._tempId && ['sending', 'failed'].includes(m.status)
         );
-        conversationMessages.value = [...serverMessages, ...pendingTemps];
-        // Mark as read
-        await callApi('mark-read', { method: 'post', data: { conversation_id: convoId } });
-        // Scroll to bottom
-        await nextTick();
-        if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight;
-    } catch { /* silent */ }
+        const mergedMessages = [...serverMessages, ...pendingTemps];
+        await applyThreadMessages(mergedMessages, { preserveViewport: background });
+        persistConversationCache(convoId, conversationMessages.value);
+    } catch {
+        /* silent */
+    } finally {
+        pendingConversationFetchIds.delete(convoId);
+        if (isVisibleThread && activeThreadRequestId.value === requestId) {
+            setThreadLoadingState(false);
+        }
+    }
+};
+
+const prefetchConversation = (convoId) => {
+    if (!convoId || convoId === activeConvoId.value) return;
+    if (conversationMessageCache.value[convoId]?.length) return;
+    if (pendingConversationFetchIds.has(convoId)) return;
+
+    refreshConvoMessages(convoId, { background: true });
 };
 
 const pullInbox = async () => {
@@ -928,13 +1648,21 @@ const refreshAll = async () => {
     if (isLoading.value) return;
     isLoading.value = true;
     try {
-        await Promise.all([refreshHealth(), refreshStats(), refreshHistory(), refreshLidMappings(), refreshOperatorStats()]);
+        await refreshHealth();
+
+        if (!operatorLiteMode.value) {
+            await Promise.all([refreshStats(), refreshHistory(), refreshLidMappings(), refreshOperatorStats()]);
+        }
         
         // Only attempt heavier calls if connected or at least has health response
         if (runtimeHealth.value?.status) {
             // Pull first, then refresh list so ordering reflects newest incoming chat immediately.
             await pullInbox();
-            await Promise.all([refreshInboxList(), refreshQr(), refreshConvoMessages()]);
+            await Promise.all([
+                refreshInboxList(),
+                operatorLiteMode.value ? Promise.resolve() : refreshQr(),
+                activeConvoId.value ? refreshConvoMessages(activeConvoId.value, { background: true }) : Promise.resolve(),
+            ]);
         } else {
             // Unset data to indicate downtime
             activeConvoId.value = '';
@@ -950,7 +1678,7 @@ const refreshAll = async () => {
 };
 
 const refreshOperatorStats = async () => {
-    if (!isOperator.value) return;
+    if (!isOperator.value || operatorLiteMode.value) return;
 
     try {
         const data = await callApi('operator-stats');
@@ -961,12 +1689,51 @@ const refreshOperatorStats = async () => {
     }
 };
 
+const refreshStatsIfNeeded = () => {
+    if (operatorLiteMode.value) return;
+    refreshStats();
+};
+
+const messageToConversationPatch = (rawMessage = {}) => {
+    const message = normalizeMessage(rawMessage);
+    const preview = String(message.text || '').trim() || messageContentFallback(message);
+
+    return {
+        conversationId: message.conversationId,
+        remoteNumber: message.remoteNumber,
+        remoteName: rawMessage.remoteName || rawMessage.senderName || message.senderDisplay,
+        lastMessagePreview: preview,
+        lastMessageType: message.mediaKind || message.type || 'text',
+        lastMessageDirection: message.direction || 'inbound',
+        lastActivityAt: 'baru saja',
+        lastActivityTs: Math.floor(Date.now() / 1000),
+        unreadCount: activeConvo.value?.conversationId === message.conversationId ? 0 : undefined,
+        lastMessageMedia: message.mediaKind ? {
+            kind: message.mediaKind,
+            url: message.mediaUrl,
+            fileName: extractMessageFileName(message),
+            mimeType: message.mediaMime,
+            hasVisualPreview: Boolean(message.hasVisualMedia && message.mediaUrl),
+        } : null,
+    };
+};
+
+const scheduleInboxRefresh = (delay = 900) => {
+    if (inboxRefreshTimerRef) clearTimeout(inboxRefreshTimerRef);
+    inboxRefreshTimerRef = setTimeout(async () => {
+        inboxRefreshTimerRef = null;
+        await refreshInboxList();
+    }, delay);
+};
+
 const scheduleNextRefresh = () => {
     if (!autoRefresh.value) return;
     if (pollRef.value) clearTimeout(pollRef.value);
     
-    // Backoff logic: 10s normal, 30s if disconnected
-    const delay = isConnected.value ? 10000 : 30000;
+    // Operator mode is lighter and refreshes less aggressively.
+    const delay = isConnected.value
+        ? (operatorLiteMode.value ? 15000 : 10000)
+        : (operatorLiteMode.value ? 45000 : 30000);
     pollRef.value = setTimeout(refreshAll, delay);
 };
 
@@ -1048,21 +1815,63 @@ const openReportsPage = () => {
 };
 
 const selectConversation = async (convoId) => {
+    if (!convoId) return;
+
+    if (activeConvoId.value === convoId) {
+        markEditorOpen.value = false;
+        markConversationRead(convoId);
+        if (!hydrateConversationFromCache(convoId)) {
+            conversationMessages.value = [];
+        }
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('wacaraka.activeConversationId', convoId);
+        }
+        await refreshConvoMessages(convoId, { force: true });
+        return;
+    }
+
     activeConvoId.value = convoId;
     markEditorOpen.value = false;
-    await refreshConvoMessages(convoId);
+    applyConversationReadState(convoId);
+    if (!hydrateConversationFromCache(convoId)) {
+        conversationMessages.value = [];
+    }
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('wacaraka.activeConversationId', convoId);
+    }
 };
 
 const replyToConversation = async () => {
     const text = replyText.value.trim();
-    if (!activeConvoId.value || !text) { replyState.value = 'error'; return; }
+    const media = mediaAttachment.value;
+    if (!activeConvoId.value || (!text && !media)) { replyState.value = 'error'; return; }
     replyState.value = 'sending';
-    const tempId = pushTempOutboundMessage(text);
+    replyProgress.value = media ? 1 : 0;
+    const tempId = pushTempOutboundMessage(text, media);
     replyText.value = '';
+    clearMediaAttachment();
+    composerRows();
 
     try {
-        const result = await callApi('reply', { method: 'post', data: { conversation_id: activeConvoId.value, text } });
+        const result = media
+            ? await callApiWithXhr('send-media', {
+                method: 'post',
+                data: {
+                    conversation_id: activeConvoId.value,
+                    media_kind: media.kind,
+                    media_url: media.dataUrl,
+                    mime_type: media.mime,
+                    file_name: media.name,
+                    caption: text || null,
+                    ptt: media.kind === 'audio',
+                },
+                onUploadProgress: (progress) => {
+                    replyProgress.value = Math.max(replyProgress.value, progress);
+                },
+            })
+            : await callApi('reply', { method: 'post', data: { conversation_id: activeConvoId.value, text } });
         markTempMessageStatus(tempId, result?.queued ? 'queued' : 'sent');
+        replyProgress.value = 100;
         replyState.value = 'sent';
         if (result?.conversation) {
             mergeConversation({
@@ -1083,8 +1892,8 @@ const replyToConversation = async () => {
                 pendingHandover: null,
             });
         }
-        appendLog(result?.queued ? 'Balasan masuk antrean kirim' : 'Balasan terkirim', { convoId: activeConvoId.value, mode: 'optimistic' });
-        refreshStats();
+        appendLog(result?.queued ? 'Balasan masuk antrean kirim' : (media ? 'Media terkirim' : 'Balasan terkirim'), { convoId: activeConvoId.value, mode: 'optimistic' });
+        refreshStatsIfNeeded();
         if (!hasRealtime.value) {
             refreshInboxList();
         }
@@ -1092,9 +1901,60 @@ const replyToConversation = async () => {
     } catch (err) {
         markTempMessageStatus(tempId, 'failed');
         replyState.value = 'error';
-        appendLog('Balasan gagal', { error: err?.error });
+        
+        const errorMsg = err?.error || err?.message || 'Terjadi kesalahan sistem.';
+        appendLog('Balasan gagal', { error: errorMsg });
+        alert(`Gagal mengirim pesan: ${errorMsg}`);
+        
+        // Restore input jika gagal agar ketikan user tidak hilang
+        if (!replyText.value && text) replyText.value = text;
+        if (!mediaAttachment.value && media) mediaAttachment.value = media;
+        nextTick(() => composerRows());
+        
         scheduleReplyStateReset(2200);
     }
+};
+
+const retryMessage = async (msg) => {
+    if (!msg || replyState.value === 'sending') return;
+
+    const retryMedia = msg?.metadata?.media
+        ? {
+            kind: msg.metadata.media.kind || msg.mediaKind || 'document',
+            mime: msg.metadata.media.mimetype || msg.mediaMime || 'application/octet-stream',
+            name: msg.metadata.media.fileName || extractMessageFileName(msg),
+            size: msg.metadata.media.byteLength || msg.metadata.media.fileLength || msg.metadata.media.size || 0,
+            dataUrl: msg.metadata.media.dataUrl || msg.metadata.media.url || msg.mediaUrl || '',
+        }
+        : null;
+
+    if (retryMedia && !retryMedia.dataUrl) {
+        appendLog('Retry gagal', { error: 'File media asli tidak tersedia untuk dikirim ulang.' });
+        return;
+    }
+
+    replyText.value = msg.text || '';
+    mediaAttachment.value = retryMedia;
+    composerRows();
+    await nextTick();
+    replyTextareaRef.value?.focus();
+
+    if (msg._tempId) {
+        removeTempMessage(msg._tempId);
+    }
+
+    await replyToConversation();
+};
+
+const openMediaViewer = (src, options = {}) => {
+    const normalized = String(src || '').trim();
+    if (!normalized) return;
+
+    mediaViewer.value = {
+        src: normalized,
+        alt: options.alt || 'Media WhatsApp',
+        fileName: options.fileName || '',
+    };
 };
 
 const sendDirectMessage = async () => {
@@ -1106,7 +1966,7 @@ const sendDirectMessage = async () => {
         sendState.value = 'sent';
         sendText.value = '';
         appendLog('Pesan langsung masuk antrean kirim', { to });
-        refreshStats();
+        refreshStatsIfNeeded();
         if (!hasRealtime.value) {
             refreshInboxList();
         }
@@ -1173,7 +2033,7 @@ const deleteMessageAction = async (messageId) => {
         await callApi('delete-message', { method: 'post', data: { message_id: messageId } });
         appendLog('Pesan dihapus');
         await refreshConvoMessages();
-        await refreshStats();
+        await refreshStatsIfNeeded();
     } catch (err) {
         appendLog('Gagal menghapus pesan', { error: err?.error });
         alert(err?.error || 'Gagal menghapus pesan.');
@@ -1285,9 +2145,17 @@ const connectRealtime = () => {
             appendLog('Pesan masuk (Reverb)', event?.message?.remoteNumber && { from: event.message.remoteNumber });
             if (event?.message?.conversationId === activeConvoId.value) {
                 upsertConversationMessage(event.message);
+                persistConversationCache(event.message.conversationId, conversationMessages.value);
+                markConversationRead(event.message.conversationId);
             }
-            refreshInboxList();
-            refreshStats();
+            mergeConversation(messageToConversationPatch(event.message));
+            noteConversationActivity(event?.message?.conversationId);
+            if (operatorLiteMode.value) {
+                scheduleInboxRefresh(1200);
+            } else {
+                refreshInboxList();
+            }
+            refreshStatsIfNeeded();
         })
         .listen('.wa-caraka.message.synced', (event) => {
             const message = event?.message;
@@ -1295,15 +2163,15 @@ const connectRealtime = () => {
 
             if (!activeConvoId.value || message.conversationId === activeConvoId.value) {
                 upsertConversationMessage(message);
+                persistConversationCache(message.conversationId, conversationMessages.value);
             }
 
-            mergeConversation({
-                conversationId: message.conversationId,
-                remoteNumber: message.remoteNumber,
-                lastActivityAt: 'baru saja',
-                unreadCount: activeConvo.value?.conversationId === message.conversationId ? 0 : undefined,
-            });
-            refreshStats();
+            mergeConversation(messageToConversationPatch(message));
+            noteConversationActivity(message.conversationId);
+            if (operatorLiteMode.value) {
+                scheduleInboxRefresh(1800);
+            }
+            refreshStatsIfNeeded();
         })
         .listen('.wa-caraka.conversation.updated', (event) => {
             if (!event?.conversation) return;
@@ -1320,9 +2188,26 @@ const setAutoRefresh = (val) => {
 // Watch active convo — refresh messages on change
 watch(activeConvoId, (id) => {
     if (id) {
-        refreshConvoMessages(id);
+        activeThreadRequestId.value = ++nextThreadRequestId;
+        applyConversationReadState(id);
+        const hasCache = hydrateConversationFromCache(id);
+        if (!hasCache) {
+            conversationMessages.value = [];
+        }
+        refreshConvoMessages(id, { background: hasCache });
+    } else {
+        activeThreadRequestId.value = ++nextThreadRequestId;
+        setThreadLoadingState(false);
     }
     syncMarkFormFromActive();
+});
+
+watch(replyText, () => {
+    nextTick(() => composerRows());
+});
+
+watch([conversationSearch, conversationFilter], () => {
+    resetVisibleConversationWindow();
 });
 
 watch(() => activeConvo.value?.customerMark, () => {
@@ -1368,36 +2253,46 @@ onMounted(async () => {
     if (typeof window !== 'undefined') {
         setThreadZoom(localStorage.getItem('wacaraka.thread.zoom') ?? threadZoom.value);
         setThreadVisibleCount(localStorage.getItem('wacaraka.thread.visibleCount') ?? threadVisibleCount.value);
+        activeConvoId.value = localStorage.getItem('wacaraka.activeConversationId') || '';
     }
 
     await fetchHandoverStatus();
     await refreshAll();
-    await loadTickets();
+    if (!operatorLiteMode.value && isSuperAdmin.value) {
+        await loadTickets();
+    }
     setAutoRefresh(true);
     connectRealtime();
+    nextTick(() => composerRows());
+    window.addEventListener('keydown', handleGlobalShortcuts);
 });
 
 onUnmounted(() => {
     if (pollRef.value) clearTimeout(pollRef.value);
     if (replyCooldownRef.value) clearTimeout(replyCooldownRef.value);
     if (sendCooldownRef.value) clearTimeout(sendCooldownRef.value);
+    if (threadLoadingDelayRef) clearTimeout(threadLoadingDelayRef);
+    if (inboxRefreshTimerRef) clearTimeout(inboxRefreshTimerRef);
     stopQrPolling();
+    window.removeEventListener('keydown', handleGlobalShortcuts);
     window.Echo?.leave('lawangsewu.wacaraka.inbox');
 });
 </script>
 
 <template>
-    <Head title="WA Live PTSP" />
+    <Head title="WA Caraka" />
 
     <LawangsewuLayout current-route="wacaraka" :nav-groups="navGroups" :app-meta="appMeta">
 
         <!-- ░░ Operator Desk Banner ░░ -->
-        <section class="relative overflow-hidden rounded-3xl border border-[var(--accent-border)] bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_36%),linear-gradient(145deg,rgba(5,10,23,0.96),rgba(15,23,42,0.95))] p-4 text-white shadow-[0_20px_60px_rgba(2,6,23,0.45)] lg:px-6 lg:py-4 mb-6">
+        <section class="relative overflow-hidden rounded-[1.75rem] border border-[var(--accent-border)] bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_36%),linear-gradient(145deg,rgba(5,10,23,0.96),rgba(15,23,42,0.95))] p-3.5 text-white shadow-[0_20px_60px_rgba(2,6,23,0.45)] lg:px-5 lg:py-3.5 mb-4">
             <div class="absolute -right-10 -top-10 h-52 w-52 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
             <div class="absolute -bottom-12 left-1/3 h-44 w-44 rounded-full bg-cyan-400/8 blur-3xl pointer-events-none" />
 
             <div class="relative z-10 flex flex-wrap items-center justify-between gap-4">
-                <p class="text-[10px] font-black uppercase tracking-[0.3em] text-sky-300/90">WA Live PTSP • Operator Desk</p>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.3em] text-sky-300/90">WA Caraka • Operator Desk</p>
+                </div>
                 
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="statusClass">
@@ -1416,7 +2311,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div class="relative z-10 mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
                 <article v-for="card in [
                     { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
                     { label: 'Aktif', value: latestConvoStats.open, color: 'text-emerald-300' },
@@ -1425,38 +2320,73 @@ onUnmounted(() => {
                     { label: 'Pesan Masuk', value: latestMsgStats.todayInbound, color: 'text-cyan-300' },
                     { label: 'Belum Dibalas', value: latestMsgStats.unreplied, color: latestMsgStats.unreplied > 0 ? 'text-rose-300' : 'text-emerald-300' },
                     { label: 'Pending Handover', value: latestConvoStats.pendingHandovers, color: latestConvoStats.pendingHandovers > 0 ? 'text-orange-300' : 'text-slate-400' },
-                ]" :key="`operator-summary-${card.label}`" class="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 backdrop-blur transition hover:bg-white/10">
-                    <p class="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400">{{ card.label }}</p>
-                    <p class="mt-0.5 text-lg font-black leading-none" :class="card.color">{{ card.value ?? 0 }}</p>
+                ]" :key="`operator-summary-${card.label}`" class="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 backdrop-blur transition hover:bg-white/10">
+                    <p class="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">{{ card.label }}</p>
+                    <p class="mt-0.5 text-base font-black leading-none sm:text-[17px]" :class="card.color">{{ card.value ?? 0 }}</p>
                 </article>
             </div>
         </section>
 
         <!-- ░░ Main: Inbox + Thread ░░ -->
-        <section class="grid min-w-0 grid-cols-[minmax(150px,42%),minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(180px,36%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(280px,28%,360px),minmax(0,1fr)] xl:gap-6">
+        <section class="grid min-w-0 grid-cols-[minmax(190px,44%),minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(230px,37%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(420px,30%,500px),minmax(0,1fr)] xl:gap-5 2xl:grid-cols-[clamp(450px,31%,540px),minmax(0,1fr)]">
 
             <!-- Sidebar: Conversation List -->
-            <aside class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-4rem)] xl:sticky xl:top-4 xl:rounded-[2rem]">
-                <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-3 flex-shrink-0 sm:px-4 sm:py-4 xl:px-5">
-                    <h2 class="text-sm font-black text-[var(--text-1)] sm:text-base">Inbox</h2>
+            <aside class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-1rem)] xl:sticky xl:top-2 xl:rounded-[2rem]">
+                <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2.5 flex-shrink-0 sm:px-4 sm:py-3 xl:px-5">
+                    <div>
+                        <h2 class="text-sm font-black text-[var(--text-1)] sm:text-base">Inbox</h2>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button @click="pullInbox().then(refreshInboxList)" :disabled="isLoading"
                                 class="rounded-xl border border-[var(--border)] px-2 py-1 text-[9px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-400 transition sm:px-2.5 sm:text-[10px]">
                             Pull
                         </button>
-                        <span class="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-2)] sm:px-2.5 sm:text-[10px]">{{ conversations.length }}</span>
+                        <span class="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-2)] sm:px-2.5 sm:text-[10px]">{{ filteredConversations.length }}/{{ conversations.length }}</span>
                     </div>
                 </div>
 
-                <p class="px-3 py-2 text-[9px] text-[var(--text-2)] flex-shrink-0 sm:px-4 sm:text-[10px] xl:px-5">{{ inboxSyncText }}</p>
+                <p class="px-3 py-1.5 text-[9px] text-[var(--text-2)] flex-shrink-0 sm:px-4 sm:text-[10px] xl:px-5">{{ inboxSyncText }}</p>
 
-                <div class="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
-                    <button v-for="c in conversations" :key="c.conversationId"
+                <div class="grid gap-1.5 border-b border-[var(--border)] px-3 pb-2.5 sm:px-4 xl:px-5">
+                    <input
+                        v-model="conversationSearch"
+                        type="text"
+                        placeholder="Cari nama, nomor, alias, preview..."
+                        class="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[11px] text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60"
+                    />
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="filter in [
+                                { value: 'all', label: 'Semua' },
+                                { value: 'unread', label: 'Belum Dibaca' },
+                                { value: 'mine', label: 'Milik Saya' },
+                                { value: 'group', label: 'Grup' },
+                            ]"
+                            :key="filter.value"
+                            @click="conversationFilter = filter.value"
+                            class="rounded-full border px-2 py-1 text-[9px] font-bold transition"
+                            :class="conversationFilter === filter.value
+                                ? 'border-sky-400/50 bg-sky-500/12 text-sky-600'
+                                : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)] hover:border-sky-400/40 hover:text-sky-500'"
+                        >
+                            {{ filter.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <div ref="sidebarListEl" @scroll.passive="maybeExpandConversationWindow" class="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
+                    <button v-for="c in renderedConversations" :key="c.conversationId"
                             @click="selectConversation(c.conversationId)"
-                            class="group w-full px-2.5 py-2.5 text-left transition sm:px-3 sm:py-3 xl:px-4 xl:py-3.5"
-                            :class="activeConvoId === c.conversationId ? 'bg-sky-500/10 border-l-2 border-sky-400' : 'hover:bg-[var(--surface-2)] border-l-2 border-transparent'">
-                        <div class="flex items-start gap-2 sm:gap-3">
-                            <div class="mt-0.5 h-8 w-8 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-9 sm:w-9 xl:h-10 xl:w-10">
+                            @mouseenter="prefetchConversation(c.conversationId)"
+                            @focus="prefetchConversation(c.conversationId)"
+                            @touchstart.passive="prefetchConversation(c.conversationId)"
+                            class="group w-full px-2 py-1.5 text-left transition-all duration-200 sm:px-2.5 sm:py-1.5 xl:px-3 xl:py-2"
+                            :class="[
+                                activeConvoId === c.conversationId ? 'conversation-active bg-sky-500/10 border-l-2 border-sky-400' : 'hover:bg-[var(--surface-2)] border-l-2 border-transparent',
+                                isConversationRecentlyUpdated(c.conversationId) ? 'conversation-fresh' : '',
+                            ]">
+                        <div class="flex items-start gap-2 sm:gap-2.5">
+                            <div class="mt-0.5 h-7 w-7 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-7.5 sm:w-7.5 xl:h-8 xl:w-8">
                                 <img
                                     v-if="c.profilePhotoUrl"
                                     :src="c.profilePhotoUrl"
@@ -1465,7 +2395,7 @@ onUnmounted(() => {
                                     referrerpolicy="no-referrer"
                                     @error="onProfileImageError(c.conversationId)"
                                 />
-                                <div v-else class="flex h-full w-full items-center justify-center text-[10px] font-black text-white sm:text-[11px] xl:text-xs"
+                                <div v-else class="flex h-full w-full items-center justify-center text-[9px] font-black text-white sm:text-[10px] xl:text-[11px]"
                                      :class="avatarToneClassFor(c.conversationId || c.remoteNumber)">
                                     {{ initialsFromName(c.displayTitle) }}
                                 </div>
@@ -1473,25 +2403,45 @@ onUnmounted(() => {
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="truncate text-xs font-bold text-[var(--text-1)] sm:text-[13px] xl:text-sm">
+                                    <p class="truncate text-[10px] font-bold text-[var(--text-1)] sm:text-[11px] xl:text-[12px]">
                                         <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle }}
                                     </p>
                                     <!-- Unread badge -->
-                                    <span v-if="c.unreadCount > 0" class="flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.unreadCount > 0" class="unread-pill flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[8px] font-black text-white sm:px-2 sm:text-[9px]">
                                         {{ c.unreadCount }}
                                     </span>
                                 </div>
 
-                                <p class="mt-0.5 text-[9px] text-[var(--text-2)] font-mono sm:text-[10px]">{{ primaryContactNumber(c.remoteNumber) }}</p>
-                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 text-[9px] text-[var(--text-2)] sm:text-[10px]">
+                                <p class="mt-0.5 text-[8px] text-[var(--text-2)] font-mono sm:text-[8px]">{{ primaryContactNumber(c.remoteNumber) }}</p>
+                                <p class="mt-0.5 line-clamp-1 text-[8px] text-[var(--text-2)] sm:text-[9px]">
+                                    {{ conversationPreviewText(c) }}
+                                </p>
+                                <div v-if="inboxPreviewMedia(c)" class="mt-1.5 flex items-center gap-2">
+                                    <button v-if="hasInboxVisualPreview(c)"
+                                            @click.stop="openMediaViewer(inboxPreviewMedia(c).url, { alt: `Preview ${inboxPreviewLabel(c)}`, fileName: inboxPreviewMedia(c).fileName })"
+                                            class="overflow-hidden rounded-xl border border-slate-200/80 bg-white/80 transition hover:border-sky-300/70">
+                                        <img :src="inboxPreviewMedia(c).url"
+                                             :alt="`Preview ${inboxPreviewLabel(c)}`"
+                                             loading="lazy"
+                                             decoding="async"
+                                             class="h-8 w-8 object-cover" />
+                                    </button>
+                                    <div v-else class="inline-flex items-center rounded-full border border-slate-200 bg-white/85 px-2 py-1 text-[8px] font-bold text-slate-500">
+                                        {{ inboxPreviewLabel(c) }}
+                                    </div>
+                                    <p class="truncate text-[8px] text-[var(--text-2)]">
+                                        {{ inboxPreviewMedia(c).fileName || `Lampiran ${inboxPreviewLabel(c)}` }}
+                                    </p>
+                                </div>
+                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 text-[7px] text-[var(--text-2)] sm:text-[8px]">
                                     Nama Group: <span class="font-semibold">{{ c.groupName }}</span>
                                 </p>
-                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 text-[9px] text-[var(--text-2)] sm:text-[10px]">
+                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 text-[7px] text-[var(--text-2)] sm:text-[8px]">
                                     Nama WA: <span class="font-semibold">{{ c.remoteName }}</span>
                                 </p>
 
-                                <div class="mt-1.5 flex flex-wrap items-center gap-1">
-                                    <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
+                                <div class="mt-1 flex flex-wrap items-center gap-1">
+                                    <span class="rounded-full px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
                                           :class="{
                                               'bg-emerald-500/15 text-emerald-600': c.status === 'open',
                                               'bg-amber-500/15 text-amber-600': c.status === 'pending',
@@ -1499,34 +2449,34 @@ onUnmounted(() => {
                                           }">
                                         {{ conversationStatusLabel(c.status) }}
                                     </span>
-                                    <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px]"
+                                    <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
                                           :class="markToneClass(c.customerMark.tone)">
                                         {{ c.customerMark.label }}
                                     </span>
-                                    <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 sm:px-2 sm:text-[9px]">
                                         aktif kamu
                                     </span>
-                                    <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600 sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[8px] font-semibold text-blue-600 sm:px-2 sm:text-[9px]">
                                         {{ c.owner.alias || c.owner.name }}
                                     </span>
-                                    <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[9px] font-bold text-violet-600 sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[8px] font-bold text-violet-600 sm:px-2 sm:text-[9px]">
                                         baru takeover
                                     </span>
-                                    <span v-if="c.ownerPresence === 'active'" class="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.ownerPresence === 'active'" class="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[8px] font-bold text-emerald-600 sm:px-2 sm:text-[9px]">
                                         aktif sekarang
                                     </span>
-                                    <span v-else-if="c.ownerPresence === 'standby'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 sm:px-2 sm:text-[10px]">
+                                    <span v-else-if="c.ownerPresence === 'standby'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 sm:px-2 sm:text-[9px]">
                                         standby
                                     </span>
-                                    <span v-else-if="c.ownerPresence === 'idle'" class="rounded-full bg-slate-500/12 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 sm:px-2 sm:text-[10px]">
+                                    <span v-else-if="c.ownerPresence === 'idle'" class="rounded-full bg-slate-500/12 px-1.5 py-0.5 text-[8px] font-bold text-slate-500 sm:px-2 sm:text-[9px]">
                                         idle
                                     </span>
-                                    <span v-if="c.pendingHandover" class="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-600 sm:px-2 sm:text-[10px]">
+                                    <span v-if="c.pendingHandover" class="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[8px] font-bold text-orange-600 sm:px-2 sm:text-[9px]">
                                         handover ⏳
                                     </span>
                                 </div>
 
-                                <p class="mt-1 text-[9px] text-[var(--text-2)] sm:mt-1.5 sm:text-[10px]">
+                                <p class="mt-1 text-[7px] text-[var(--text-2)] sm:mt-1 sm:text-[8px]">
                                     {{ c.lastActivityAt || '—' }}
                                     <span v-if="c.claimedAt" class="ml-1 text-[var(--text-2)]/80">· diklaim {{ c.claimedAt }}</span>
                                 </p>
@@ -1534,9 +2484,16 @@ onUnmounted(() => {
                         </div>
                     </button>
 
-                    <div v-if="conversations.length === 0" class="px-5 py-10 text-center">
+                    <div v-if="filteredConversations.length === 0" class="px-5 py-10 text-center">
                         <p class="text-sm text-[var(--text-2)]">Belum ada percakapan.</p>
                         <p class="mt-1 text-xs text-[var(--text-2)]">Pesan akan muncul saat runtime mengirim webhook atau pull inbox berhasil.</p>
+                    </div>
+
+                    <div v-else-if="renderedConversations.length < filteredConversations.length" class="px-4 py-4 text-center">
+                        <button @click="visibleConversationCount = Math.min(filteredConversations.length, visibleConversationCount + 30)"
+                                class="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[10px] font-bold text-[var(--text-2)] transition hover:border-sky-400/40 hover:text-sky-500">
+                            Muat {{ Math.min(30, filteredConversations.length - renderedConversations.length) }} chat lagi
+                        </button>
                     </div>
                 </div>
 
@@ -1747,6 +2704,12 @@ onUnmounted(() => {
                         </div>
                     </div>
 
+                    <div v-else-if="threadLoadingVisible" class="space-y-3 py-4 sm:space-y-4">
+                        <div v-for="placeholder in 4" :key="`thread-skeleton-${placeholder}`" class="flex" :class="placeholder % 2 === 0 ? 'justify-end' : 'justify-start'">
+                            <div class="thread-skeleton w-[72%] rounded-3xl px-4 py-4 sm:w-[58%]"></div>
+                        </div>
+                    </div>
+
                     <div v-else-if="conversationMessages.length === 0" class="grid min-h-[280px] place-items-center text-center text-sm text-[var(--text-2)]">
                         <div>
                             <p class="text-4xl mb-3">📭</p>
@@ -1779,16 +2742,57 @@ onUnmounted(() => {
                                     <span class="whitespace-nowrap">{{ msg.sentAt }}</span>
                                 </div>
 
-                                <div v-if="msg.hasVisualMedia" class="space-y-2">
+                                <div v-if="isImageMessage(msg) || isStickerMessage(msg)" class="space-y-2">
                                     <img
                                         :src="msg.mediaUrl"
                                         :alt="msg.mediaKind === 'sticker' ? 'Sticker WhatsApp' : 'Media WhatsApp'"
+                                        loading="lazy"
+                                        decoding="async"
                                         class="max-h-80 w-auto rounded-xl border border-slate-200/80 object-cover shadow-sm"
                                         :class="msg.mediaKind === 'sticker' ? 'h-28 w-28 object-contain border-0 bg-transparent shadow-none' : ''"
+                                        @click="openMediaViewer(msg.mediaUrl, { alt: msg.mediaKind === 'sticker' ? 'Sticker WhatsApp' : 'Media WhatsApp', fileName: extractMessageFileName(msg) })"
                                     />
                                     <p v-if="msg.mediaCaption" class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.mediaCaption }}</p>
                                 </div>
-                                <p v-else class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.text || (msg.mediaKind ? `[${msg.mediaKind}]` : '') || '[pesan kosong]' }}</p>
+                                <div v-else-if="isVideoMessage(msg)" class="space-y-2">
+                                    <video :src="msg.mediaUrl" controls preload="metadata" class="max-h-80 w-full rounded-xl border border-slate-200/80 bg-slate-900 shadow-sm"></video>
+                                    <p v-if="msg.mediaCaption" class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.mediaCaption }}</p>
+                                </div>
+                                <div v-else-if="isAudioMessage(msg)" class="space-y-2">
+                                    <div class="rounded-2xl border border-slate-200/80 bg-white/80 p-3">
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Voice / Audio</p>
+                                        <audio :src="msg.mediaUrl" controls preload="metadata" class="mt-2 w-full"></audio>
+                                    </div>
+                                    <p v-if="msg.mediaCaption" class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.mediaCaption }}</p>
+                                </div>
+                                <div v-else class="space-y-1.5">
+                                    <p class="text-xs leading-relaxed whitespace-pre-wrap sm:text-sm">{{ msg.text || messageContentFallback(msg) }}</p>
+                                    <div v-if="msg.mediaUrl && msg.mediaKind === 'document'" class="rounded-2xl border border-slate-200/80 bg-white/85 p-3">
+                                        <p class="truncate text-sm font-black text-slate-800">{{ extractMessageFileName(msg) }}</p>
+                                        <p class="mt-1 text-[11px] text-slate-500">{{ documentMetaText(msg) }}</p>
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            <a
+                                                :href="msg.mediaUrl"
+                                                :download="extractMessageFileName(msg)"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center rounded-lg border border-sky-300/60 bg-sky-50/70 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100/80"
+                                            >
+                                                Buka / Unduh Dokumen
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <a
+                                        v-if="msg.mediaUrl && msg.mediaKind && msg.mediaKind !== 'document'"
+                                        :href="msg.mediaUrl"
+                                        :download="msg.metadata?.media?.fileName || ''"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center rounded-lg border border-sky-300/60 bg-sky-50/60 px-2 py-1 text-[10px] font-bold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100/70"
+                                    >
+                                        Unduh {{ messageTypeLabel(msg.mediaKind, msg) }}
+                                    </a>
+                                </div>
 
                                 <div class="mt-1.5 flex items-center justify-between gap-2 text-[10px]"
                                      :class="bubbleFooterClass(msg)">
@@ -1797,6 +2801,11 @@ onUnmounted(() => {
                                         <button v-if="isAdmin && msg.id" @click="deleteMessageAction(msg.id)"
                                             class="text-rose-500/80 hover:text-rose-500 transition" title="Hapus pesan (Admin/Superadmin)">
                                             ✕
+                                        </button>
+                                        <button v-if="msg.direction === 'outbound' && msg.status === 'failed'" @click="retryMessage(msg)"
+                                            class="rounded-full border border-amber-300/70 bg-amber-50/90 px-2 py-0.5 text-[9px] font-black text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
+                                            title="Kirim ulang pesan ini">
+                                            Retry
                                         </button>
                                         <span :class="outgoingStatusClass(msg)">
                                             <span v-if="msg.direction === 'outbound' && outgoingTickIcon(msg.status)" class="mr-1 font-black" :class="outgoingTickClass(msg.status)">
@@ -1814,25 +2823,82 @@ onUnmounted(() => {
 
                 <!-- Reply Box -->
                 <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
+                    <input
+                        ref="mediaInputRef"
+                        type="file"
+                        class="hidden"
+                        accept="image/*,video/*,audio/*,.pdf,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.csv,.txt,.json,.xml,.webp,.heic,.heif"
+                        @change="onMediaFileChange"
+                    />
                     <div class="flex flex-col gap-2 sm:gap-3 xl:flex-row">
                         <textarea v-model="replyText"
+                                  ref="replyTextareaRef"
                                   rows="3"
                                   :disabled="!activeConvo || !canReply"
                                   :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : `Balas ke ${activeConvo?.displayTitle}...` "
-                                  class="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-sm"
-                                  @keydown.ctrl.enter="replyToConversation" />
+                                  class="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[11px] text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-xs xl:text-sm"
+                                  @keydown.ctrl.enter="replyToConversation"
+                                  @keydown="handleReplyKeydown" />
 
                         <div class="flex flex-col gap-2 xl:w-auto">
+                            <div class="flex items-center gap-2">
+                                <button @click="pickMediaFile"
+                                        :disabled="replyState === 'sending' || !activeConvo || !canReply"
+                                        class="rounded-xl border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--text-2)] transition hover:border-sky-400/50 hover:text-sky-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    + Media
+                                </button>
+                                <button v-if="mediaAttachment" @click="clearMediaAttachment"
+                                        :disabled="replyState === 'sending'"
+                                        class="rounded-xl border border-rose-300/60 px-3 py-2 text-[10px] font-bold text-rose-500 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    Hapus
+                                </button>
+                            </div>
+
+                            <div v-if="mediaAttachment" class="max-w-[260px] rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-[10px] text-[var(--text-2)]">
+                                <div v-if="isPreviewableAttachment && mediaAttachment.kind === 'image'" class="overflow-hidden rounded-xl border border-slate-200/80 bg-white/80">
+                                    <img :src="attachmentPreviewUrl" alt="Preview lampiran" class="max-h-32 w-full object-cover" />
+                                </div>
+                                <div v-else-if="isPreviewableAttachment && mediaAttachment.kind === 'sticker'" class="flex justify-center rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                                    <img :src="attachmentPreviewUrl" alt="Preview stiker" class="h-20 w-20 object-contain" />
+                                </div>
+                                <div v-else-if="isPreviewableAttachment && mediaAttachment.kind === 'video'" class="overflow-hidden rounded-xl border border-slate-200/80 bg-slate-950">
+                                    <video :src="attachmentPreviewUrl" class="max-h-32 w-full object-cover" muted playsinline></video>
+                                </div>
+                                <div v-else-if="isPreviewableAttachment && mediaAttachment.kind === 'audio'" class="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                                    <audio :src="attachmentPreviewUrl" controls preload="metadata" class="w-full"></audio>
+                                </div>
+
+                                <p class="mt-2 truncate font-semibold text-[var(--text-1)]">
+                                    {{ mediaAttachment.name }}
+                                </p>
+                                <p class="mt-0.5">
+                                    {{ mediaAttachment.kind }}<span v-if="humanFileSize(mediaAttachment.size)"> · {{ humanFileSize(mediaAttachment.size) }}</span>
+                                </p>
+                                <p class="mt-1 text-[9px] text-[var(--text-2)]/85">
+                                    Batas kirim saat ini {{ humanFileSize(MAX_MEDIA_FILE_BYTES) }}
+                                </p>
+                            </div>
+
+                            <p class="text-center text-[9px] text-[var(--text-2)]">
+                                {{ activeConvo ? 'Enter kirim • Shift+Enter baris baru • J/K pindah chat • Ctrl+K cari' : 'Pilih percakapan untuk mulai membalas' }}
+                            </p>
+
+                            <div v-if="replyState === 'sending' && mediaAttachment" class="w-full max-w-[260px] rounded-full bg-slate-200/80">
+                                <div class="h-1.5 rounded-full bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400 transition-all duration-200" :style="{ width: `${Math.max(4, replyProgress)}%` }"></div>
+                            </div>
+                            <p v-if="replyState === 'sending' && mediaAttachment" class="text-center text-[9px] font-semibold text-[var(--text-2)]">
+                                Upload media {{ replyProgress }}%
+                            </p>
+
                             <button @click="replyToConversation"
-                                    :disabled="replyState === 'sending' || !activeConvo || !canReply"
+                                    :disabled="replyState === 'sending' || !activeConvo || !canReply || (!replyText.trim() && !mediaAttachment)"
                                     class="send-btn flex-1 min-w-[88px] rounded-2xl px-4 py-2.5 text-xs font-black text-white shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed sm:min-w-[110px] sm:px-5 sm:py-3 sm:text-sm"
                                     :class="replyState === 'sending' ? 'send-btn-sending' : ''">
                                 <span class="inline-flex items-center justify-center gap-1.5">
                                     <span v-if="replyState === 'sending'" class="send-dot-loader" aria-hidden="true"></span>
-                                    <span>{{ replyState === 'sending' ? 'Kirim cepat' : replyState === 'sent' ? '✓ Masuk antrean' : replyState === 'error' ? '✕ Gagal' : '↑ Kirim' }}</span>
+                                    <span>{{ replyState === 'sending' ? 'Kirim cepat' : replyState === 'sent' ? '✓ Masuk antrean' : replyState === 'error' ? '✕ Gagal' : (mediaAttachment ? '↑ Kirim Media' : '↑ Kirim') }}</span>
                                 </span>
                             </button>
-                            <p class="text-center text-[9px] text-[var(--text-2)]">Ctrl+Enter</p>
                         </div>
                     </div>
                 </div>
@@ -1842,7 +2908,7 @@ onUnmounted(() => {
 
 
         <!-- ░░ Tiket: Pengaduan & Konsultasi ░░ -->
-        <section v-if="!isOperator" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">
+        <section v-if="isSuperAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
                 <h2 class="text-lg font-black text-[var(--text-1)]">Tiket Masuk <span class="ml-2 text-sm font-normal text-[var(--text-2)]">Pengaduan &amp; Konsultasi</span></h2>
                 <div class="flex flex-wrap items-center gap-2">
@@ -1993,7 +3059,7 @@ onUnmounted(() => {
         </section>
 
         <!-- ░░ Send Direct + Device (Admin/Operator) ░░ -->
-        <section class="mt-6 grid gap-6 lg:grid-cols-2">
+        <section v-if="!operatorLiteMode" class="mt-6 grid gap-6 lg:grid-cols-2">
             <!-- Quick Send -->
             <article class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
                 <h2 class="mb-4 text-lg font-black text-[var(--text-1)]">Kirim Pesan Langsung</h2>
@@ -2058,7 +3124,7 @@ onUnmounted(() => {
             </article>
 
             <!-- Device Status + QR -->
-            <article v-else class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+            <article v-else-if="isSuperAdmin" class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-black text-[var(--text-1)]">Status Device WA</h2>
                     <div class="flex gap-2">
@@ -2150,7 +3216,7 @@ onUnmounted(() => {
         </section>
 
         <!-- ░░ Activity Log ░░ -->
-        <section v-if="isAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+        <section v-if="isSuperAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-black text-[var(--text-1)]">Activity Log</h2>
                 <button @click="requestLog = []" class="text-xs text-[var(--text-2)] hover:text-rose-500 transition">Bersihkan</button>
@@ -2169,7 +3235,7 @@ onUnmounted(() => {
         </section>
 
         <!-- ░░ Admin: History Monitor ░░ -->
-        <section v-if="isAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
+        <section v-if="isSuperAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-black text-[var(--text-1)]">History Monitor <span class="text-sm font-normal text-[var(--text-2)]">(admin only)</span></h2>
                 <button @click="refreshHistory" class="text-xs text-[var(--text-2)] border border-[var(--border)] rounded-xl px-3 py-1.5 hover:border-sky-400/50 transition">Muat ulang</button>
@@ -2187,6 +3253,23 @@ onUnmounted(() => {
 
         <!-- ░░ Handover Request Modal ░░ -->
         <Teleport to="body">
+            <div v-if="mediaViewerOpen"
+                 class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/78 px-4 py-6 backdrop-blur-sm"
+                 @click.self="mediaViewer = null">
+                <div class="relative max-h-full max-w-5xl">
+                    <button @click="mediaViewer = null"
+                            class="absolute right-3 top-3 z-10 rounded-full border border-white/20 bg-slate-900/70 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-slate-800">
+                        Tutup
+                    </button>
+                    <img :src="mediaViewer?.src"
+                         :alt="mediaViewer?.alt || 'Media WhatsApp'"
+                         class="max-h-[82vh] max-w-[92vw] rounded-3xl border border-white/10 bg-slate-950 object-contain shadow-[0_20px_60px_rgba(15,23,42,0.45)]" />
+                    <div v-if="mediaViewer?.fileName" class="mt-3 text-center text-xs font-semibold text-slate-200">
+                        {{ mediaViewer.fileName }}
+                    </div>
+                </div>
+            </div>
+
             <div v-if="showHandoverModal"
                  class="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm"
                  @click.self="showHandoverModal = false">
@@ -2218,9 +3301,13 @@ onUnmounted(() => {
 <style scoped>
 .bubble-outbound {
     position: relative;
-    background: #d9fdd3;
-    border: 1px solid #b7ebb0;
-    box-shadow: 0 1px 0 rgba(11, 20, 26, 0.08), 0 1px 2px rgba(11, 20, 26, 0.08);
+    background:
+        linear-gradient(135deg, rgba(207, 250, 254, 0.92), rgba(220, 252, 231, 0.96)),
+        #d9fdd3;
+    border: 1px solid rgba(125, 211, 252, 0.5);
+    box-shadow:
+        0 1px 0 rgba(11, 20, 26, 0.08),
+        0 6px 18px rgba(14, 165, 233, 0.08);
 }
 
 .bubble-outbound::after {
@@ -2238,9 +3325,13 @@ onUnmounted(() => {
 
 .bubble-inbound {
     position: relative;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 0 rgba(11, 20, 26, 0.08), 0 1px 2px rgba(11, 20, 26, 0.08);
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.95)),
+        #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    box-shadow:
+        0 1px 0 rgba(11, 20, 26, 0.08),
+        0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
 .bubble-inbound::before {
@@ -2270,19 +3361,73 @@ onUnmounted(() => {
     animation: bubblePopIn 0.2s ease-out;
 }
 
+.conversation-active {
+    box-shadow:
+        inset 0 1px 0 rgba(125, 211, 252, 0.12),
+        inset 0 -1px 0 rgba(125, 211, 252, 0.08),
+        0 10px 24px rgba(14, 165, 233, 0.06);
+}
+
+.conversation-fresh {
+    animation: conversationFreshGlow 2.2s ease-out;
+}
+
+.unread-pill {
+    box-shadow: 0 10px 24px rgba(244, 63, 94, 0.28);
+    animation: unreadPulse 1.8s ease-in-out infinite;
+}
+
+.thread-skeleton {
+    position: relative;
+    overflow: hidden;
+    min-height: 86px;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.9)),
+        #fff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.thread-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+    animation: skeletonSweep 1.25s ease-in-out infinite;
+}
+
 .send-btn {
     background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
     transform: translateZ(0);
+    box-shadow: 0 14px 34px rgba(6, 182, 212, 0.24);
 }
 
 .thread-surface {
-    background-color: #efeae2;
+    background-color: #eef3f8;
     background-image:
-        radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.55) 0, rgba(255, 255, 255, 0) 40%),
-        radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.35) 0, rgba(255, 255, 255, 0) 38%),
-        linear-gradient(0deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-    background-size: auto, auto, 24px 24px, 24px 24px;
+        radial-gradient(circle at 15% 12%, rgba(14, 165, 233, 0.16) 0, rgba(14, 165, 233, 0) 30%),
+        radial-gradient(circle at 85% 10%, rgba(34, 197, 94, 0.13) 0, rgba(34, 197, 94, 0) 32%),
+        radial-gradient(circle at 70% 70%, rgba(15, 23, 42, 0.05) 0, rgba(15, 23, 42, 0) 36%),
+        linear-gradient(0deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.025) 1px, transparent 1px);
+    background-size: auto, auto, auto, 24px 24px, 24px 24px;
+}
+
+:deep(::-webkit-scrollbar) {
+    width: 10px;
+    height: 10px;
+}
+
+:deep(::-webkit-scrollbar-thumb) {
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(14, 165, 233, 0.45), rgba(15, 23, 42, 0.28));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+:deep(::-webkit-scrollbar-track) {
+    background: transparent;
 }
 
 .avatar-tone-1 {
@@ -2385,6 +3530,33 @@ onUnmounted(() => {
     }
     50% {
         filter: saturate(1.05) brightness(1.08);
+    }
+}
+
+@keyframes skeletonSweep {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes unreadPulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.04);
+    }
+}
+
+@keyframes conversationFreshGlow {
+    0% {
+        background-color: rgba(186, 230, 253, 0.38);
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: none;
     }
 }
 

@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
 /**
  * WaCarakaMenu
  *
@@ -15,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  *   - input:  ask for input (prompt_text), then process response_query with user input
  *   - prompt: show a sub-menu (response_text = list of sub-options)
  */
-class WaCarakaMenu extends Model
+class WaCarakaMenu extends WaCarakaModel
 {
     protected $fillable = [
         'command',

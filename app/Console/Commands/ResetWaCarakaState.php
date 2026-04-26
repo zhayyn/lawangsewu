@@ -4,10 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\WaCarakaConversation;
 use App\Models\WaCarakaMessage;
+use App\Support\WaCarakaDatabase;
 use App\Services\WaCarakaService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ResetWaCarakaState extends Command
 {
@@ -72,7 +72,7 @@ class ResetWaCarakaState extends Command
 
     private function softReset(): void
     {
-        if (!Schema::hasTable('wa_caraka_messages') || !Schema::hasTable('wa_caraka_conversations')) {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_messages') || !WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
             $this->warn('Tabel WA Caraka belum lengkap. Soft reset dilewati.');
             return;
         }
@@ -99,7 +99,7 @@ class ResetWaCarakaState extends Command
 
     private function hardReset(): void
     {
-        DB::transaction(function () {
+        WaCarakaDatabase::transaction(function () {
             $tables = [
                 'wa_caraka_handovers',
                 'wa_caraka_conversation_marks',
@@ -109,8 +109,8 @@ class ResetWaCarakaState extends Command
             ];
 
             foreach ($tables as $table) {
-                if (Schema::hasTable($table)) {
-                    DB::table($table)->delete();
+                if (WaCarakaDatabase::hasTable($table)) {
+                    WaCarakaDatabase::table($table)->delete();
                 }
             }
         });
@@ -120,7 +120,7 @@ class ResetWaCarakaState extends Command
 
     private function showCurrentStats(): void
     {
-        if (!Schema::hasTable('wa_caraka_messages') || !Schema::hasTable('wa_caraka_conversations')) {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_messages') || !WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
             return;
         }
 

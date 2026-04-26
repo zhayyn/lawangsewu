@@ -9,6 +9,7 @@ use App\Models\SippCache;
 use App\Models\WaCarakaConversation;
 use App\Models\WaCarakaLog;
 use App\Models\WaCarakaMessage;
+use App\Support\WaCarakaDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
@@ -48,7 +49,7 @@ class SystemMonitorService
                 ],
                 'application' => [
                     'cctv_active' => Schema::hasTable('cctv_cameras') ? CctvCamera::query()->active()->count() : null,
-                    'wa_today' => Schema::hasTable('wa_caraka_logs') ? WaCarakaLog::query()->whereDate('created_at', today())->count() : null,
+                    'wa_today' => WaCarakaDatabase::hasTable('wa_caraka_logs') ? WaCarakaLog::query()->whereDate('created_at', today())->count() : null,
                     'ptsp_waiting' => Schema::hasTable('ptsp_queue_tickets') ? PtspQueueTicket::query()->today()->where('status', 'waiting')->count() : null,
                     'sidang_waiting' => Schema::hasTable('sidang_queue_tickets') ? SidangQueueTicket::query()->today()->where('status', 'waiting')->count() : null,
                     'sipp_cache_active' => Schema::hasTable('sipp_caches') ? SippCache::query()->active()->count() : null,
@@ -169,11 +170,11 @@ class SystemMonitorService
         $archiveSizeMb = $this->bytesToMb($this->directorySize($archivesPath));
 
         // Baris saat ini di database
-        $totalMessages    = Schema::hasTable('wa_caraka_messages') ? WaCarakaMessage::count() : null;
-        $totalLogs        = Schema::hasTable('wa_caraka_logs') ? WaCarakaLog::count() : null;
-        $totalConvos      = Schema::hasTable('wa_caraka_conversations') ? WaCarakaConversation::count() : null;
-        $todayMessages    = Schema::hasTable('wa_caraka_messages') ? WaCarakaMessage::whereDate('created_at', today())->count() : null;
-        $unreplied        = Schema::hasTable('wa_caraka_messages') ? WaCarakaMessage::where('direction', 'inbound')->whereNull('replied_at')->count() : null;
+        $totalMessages    = WaCarakaDatabase::hasTable('wa_caraka_messages') ? WaCarakaMessage::count() : null;
+        $totalLogs        = WaCarakaDatabase::hasTable('wa_caraka_logs') ? WaCarakaLog::count() : null;
+        $totalConvos      = WaCarakaDatabase::hasTable('wa_caraka_conversations') ? WaCarakaConversation::count() : null;
+        $todayMessages    = WaCarakaDatabase::hasTable('wa_caraka_messages') ? WaCarakaMessage::whereDate('created_at', today())->count() : null;
+        $unreplied        = WaCarakaDatabase::hasTable('wa_caraka_messages') ? WaCarakaMessage::where('direction', 'inbound')->whereNull('replied_at')->count() : null;
 
         // Estimasi ukuran baris (kasar, bukan ukuran disk sesungguhnya)
         $estimatedRows = ($totalMessages ?? 0) + ($totalLogs ?? 0);

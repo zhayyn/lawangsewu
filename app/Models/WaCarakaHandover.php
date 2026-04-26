@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -16,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   - Admin force takeover → force_approved = true, status: approved
  *   - Requestor cancels → status: cancelled
  */
-class WaCarakaHandover extends Model
+class WaCarakaHandover extends WaCarakaModel
 {
     protected $fillable = [
         'conversation_id',

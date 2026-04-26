@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\WaCarakaTicket;
+use App\Support\WaCarakaDatabase;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * WaCarakaTicketService
@@ -21,7 +21,7 @@ class WaCarakaTicketService
      */
     public function listTickets(?string $type = null, ?string $status = null, int $limit = 20): array
     {
-        if (!Schema::hasTable('wa_caraka_tickets')) {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_tickets')) {
             return [];
         }
 

@@ -53,6 +53,7 @@ const threadLoading         = ref(false);
 const threadLoadingVisible  = ref(false);
 const activeConvo           = computed(() => conversations.value.find(c => c.conversationId === activeConvoId.value) || null);
 const threadEl              = ref(null);
+const particleCanvasRef     = ref(null);
 const sidebarListEl         = ref(null);
 const replyTextareaRef      = ref(null);
 const mediaViewer           = ref(null);
@@ -96,6 +97,16 @@ const handoverToggling = ref(false);
 const statusText = ref('Memeriksa koneksi...');
 const statusTone = ref('warn');
 
+// Dialog Konfirmasi
+const confirmModal = ref({ isOpen: false, title: '', message: '', resolve: null });
+const openConfirmModal = (title, message) => {
+    return new Promise((resolve) => confirmModal.value = { isOpen: true, title, message, resolve });
+};
+const resolveConfirmModal = (val) => {
+    if (confirmModal.value.resolve) confirmModal.value.resolve(val);
+    confirmModal.value.isOpen = false;
+};
+
 // Tickets
 const tickets           = ref(props.recentTickets ?? []);
 const latestTicketStats = ref({ ...props.ticketStats });
@@ -115,6 +126,158 @@ const conversationFetchLimit = computed(() => operatorLiteMode.value ? 45 : 70);
 const isConnected  = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
 const hasRealtime = computed(() => typeof window !== 'undefined' && Boolean(window.Echo));
 const myId = computed(() => props.authUser?.id);
+
+// Deteksi dark mode dari DOM (sinkron dengan LawangsewuLayout)
+const isDark = ref(typeof window !== 'undefined' && localStorage.getItem('lawangsewu-theme') === 'dark');
+
+const threadSurfaceDarkStyle = computed(() => isDark.value ? {
+    backgroundColor: '#0b1320',
+    backgroundImage: [
+        'radial-gradient(ellipse at 20% 0%, rgba(56,139,253,0.18) 0%, transparent 50%)',
+        'radial-gradient(ellipse at 80% 100%, rgba(111,66,193,0.12) 0%, transparent 50%)',
+    ].join(', '),
+} : {});
+
+// ─── Network Constellation Particle System ───────────
+let particleAnimFrame  = null;
+let particleCtx        = null;
+let particleCanvas_    = null;    // cache canvas ref untuk RAF
+let _lastFrameTime     = 0;
+const NET_COUNT        = 38;      // jumlah node — cukup untuk efek, ringan
+const NET_LINK_DIST    = 130;     // jarak max antar node untuk ditarik garis
+const NET_FPS_CAP      = 30;      // frame per detik maksimal
+const NET_FRAME_MS     = 1000 / NET_FPS_CAP;
+let netNodes           = [];
+
+// Palet warna node: biru & hijau-teal seperti di gambar referensi
+const NET_NODE_COLORS = [
+    { r: 59,  g: 130, b: 246, w: 6 },  // blue-500
+    { r: 125, g: 211, b: 252, w: 3 },  // sky-300
+    { r: 34,  g: 197, b: 94,  w: 2 },  // green-500 (aksen)
+    { r: 56,  g: 189, b: 248, w: 4 },  // sky-400
+];
+
+const pickNodeColor = () => {
+    const totalW = NET_NODE_COLORS.reduce((s, c) => s + c.w, 0);
+    let rnd = Math.random() * totalW;
+    for (const c of NET_NODE_COLORS) { rnd -= c.w; if (rnd <= 0) return c; }
+    return NET_NODE_COLORS[0];
+};
+
+const createNetNode = (canvas) => {
+    const color = pickNodeColor();
+    return {
+        x:      Math.random() * canvas.width,
+        y:      Math.random() * canvas.height,
+        r:      Math.random() * 1.6 + 0.7,
+        vx:     (Math.random() - 0.5) * 0.28,
+        vy:     (Math.random() - 0.5) * 0.28,
+        color,
+        opacity: Math.random() * 0.55 + 0.35,
+    };
+};
+
+const drawNetwork = (ts) => {
+    particleAnimFrame = requestAnimationFrame(drawNetwork);
+
+    // Frame-rate cap
+    if (ts - _lastFrameTime < NET_FRAME_MS) return;
+    _lastFrameTime = ts;
+
+    const canvas = particleCanvas_;
+    const ctx    = particleCtx;
+    if (!canvas || !ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Gerak + wrap
+    for (const n of netNodes) {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < -10) n.x = W + 10;
+        if (n.x > W + 10) n.x = -10;
+        if (n.y < -10) n.y = H + 10;
+        if (n.y > H + 10) n.y = -10;
+    }
+
+    // Gambar garis koneksi
+    for (let i = 0; i < netNodes.length; i++) {
+        const a = netNodes[i];
+        for (let j = i + 1; j < netNodes.length; j++) {
+            const b    = netNodes[j];
+            const dx   = a.x - b.x;
+            const dy   = a.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > NET_LINK_DIST) continue;
+
+            // Opacity garis: makin dekat makin terang, max 0.28
+            const lineOpacity = (1 - dist / NET_LINK_DIST) * 0.28;
+            const { r, g, b: bc } = a.color;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = `rgba(${r},${g},${bc},${lineOpacity})`;
+            ctx.lineWidth   = 0.7;
+            ctx.stroke();
+        }
+    }
+
+    // Gambar node (titik)
+    for (const n of netNodes) {
+        const { r, g, b: bc } = n.color;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${bc},${n.opacity})`;
+        ctx.fill();
+
+        // Glow ring kecil di sekitar node
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r * 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${bc},0.06)`;
+        ctx.fill();
+    }
+};
+
+const startParticles = () => {
+    const canvas = particleCanvasRef.value;
+    if (!canvas || !isDark.value) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    // DPR-aware sizing (tajam di retina, tapi cap di 1.5x agar ringan)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const W   = parent.offsetWidth  || 800;
+    const H   = parent.offsetHeight || 500;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = `${W}px`;
+    canvas.style.height = `${H}px`;
+
+    particleCtx   = canvas.getContext('2d');
+    particleCtx.scale(dpr, dpr);
+    particleCanvas_ = { width: W, height: H };   // pakai ukuran CSS (sudah di-scale)
+
+    netNodes = Array.from({ length: NET_COUNT }, () => createNetNode(particleCanvas_));
+
+    if (particleAnimFrame) cancelAnimationFrame(particleAnimFrame);
+    _lastFrameTime = 0;
+    particleAnimFrame = requestAnimationFrame(drawNetwork);
+};
+
+const stopParticles = () => {
+    if (particleAnimFrame) { cancelAnimationFrame(particleAnimFrame); particleAnimFrame = null; }
+    if (particleCtx && particleCanvasRef.value) {
+        particleCtx.clearRect(0, 0, particleCanvasRef.value.width, particleCanvasRef.value.height);
+    }
+    particleCtx     = null;
+    particleCanvas_ = null;
+    netNodes        = [];
+};
+
+
 
 // Ownership (display-only — everyone can reply)
 const iMineConvo = computed(() => activeConvo.value?.owner?.id === myId.value);
@@ -143,6 +306,96 @@ const operatorStatsUpdatedAtText = computed(() => {
         hour: '2-digit',
         minute: '2-digit',
     }) + ' WIB';
+});
+
+const contextMenu = ref({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    convo: null,
+});
+
+const openContextMenu = (event, convo) => {
+    contextMenu.value = {
+        isOpen: true,
+        x: event.clientX,
+        y: event.clientY,
+        convo: convo,
+    };
+};
+
+const closeContextMenu = () => {
+    contextMenu.value.isOpen = false;
+};
+
+const handleContextMenuDelete = async () => {
+    const convoId = contextMenu.value.convo?.conversationId;
+    closeContextMenu();
+    if (!convoId) return;
+    
+    if (!(await openConfirmModal('Konfirmasi Hapus', 'Hapus seluruh sesi percakapan ' + convoId + ' secara permanen?'))) return;
+    
+    try {
+        const d = await callApi('clear-conversation', {
+            method: 'post',
+            data: { conversation_id: convoId },
+        });
+        appendLog('Sesi percakapan dihapus via klik kanan', d);
+        if (activeConvoId.value === convoId) {
+            activeConvoId.value = '';
+            conversationMessages.value = [];
+        }
+        await refreshAll();
+    } catch (err) {
+        appendLog('Gagal menghapus sesi percakapan', { error: err?.error });
+        alert(err?.error || 'Gagal menghapus percakapan');
+    }
+};
+
+const handleContextMenuMark = () => {
+    const convoId = contextMenu.value.convo?.conversationId;
+    closeContextMenu();
+    if (!convoId) return;
+    activeConvoId.value = convoId;
+    markEditorOpen.value = true;
+};
+
+onMounted(() => {
+    window.addEventListener('click', closeContextMenu);
+    window.addEventListener('scroll', closeContextMenu, { passive: true });
+
+    // Watch DOM for theme-dark class changes (sinkron dengan toggle di LawangsewuLayout)
+    if (typeof MutationObserver !== 'undefined') {
+        const themeObserver = new MutationObserver(() => {
+            const nowDark = Boolean(document.querySelector('.theme-dark'));
+            if (isDark.value !== nowDark) {
+                isDark.value = nowDark;
+                if (nowDark) {
+                    nextTick(() => startParticles());
+                } else {
+                    stopParticles();
+                }
+            }
+        });
+        themeObserver.observe(document.body.parentElement || document.body, {
+            attributes: true, attributeFilter: ['class'], subtree: true,
+        });
+        window._wacarakaThemeObserver = themeObserver;
+    }
+
+    // Mulai partikel jika dark mode aktif saat mount
+    if (isDark.value) {
+        nextTick(() => startParticles());
+    }
+});
+onUnmounted(() => {
+    window.removeEventListener('click', closeContextMenu);
+    window.removeEventListener('scroll', closeContextMenu);
+    stopParticles();
+    if (window._wacarakaThemeObserver) {
+        window._wacarakaThemeObserver.disconnect();
+        delete window._wacarakaThemeObserver;
+    }
 });
 
 const filteredConversations = computed(() => {
@@ -844,12 +1097,24 @@ const mergeConversation = (incoming) => {
     if (idx === -1) {
         conversations.value.unshift(normalized);
     } else {
-        const merged = {
-            ...conversations.value[idx],
+        const existing = conversations.value[idx];
+        // Gabungkan dengan hati-hati: jangan timpa field penting dengan null/undefined
+        // dari data parsial (misal: pesan realtime yang tidak membawa semua field).
+        const safeMerge = {
+            ...existing,
             ...normalized,
+            // Jaga field-field display kritis agar tidak hilang saat update parsial
+            customerMark: normalized.customerMark ?? existing.customerMark ?? null,
+            remoteName:   normalized.remoteName   || existing.remoteName   || '',
+            remoteNumber: normalized.remoteNumber || existing.remoteNumber || '',
+            groupName:    normalized.groupName    || existing.groupName    || null,
+            profilePhotoUrl: normalized.profilePhotoUrl || existing.profilePhotoUrl || null,
+            owner:        normalized.owner        ?? existing.owner        ?? null,
+            ownerPresence: normalized.ownerPresence || existing.ownerPresence || null,
+            pendingHandover: normalized.pendingHandover ?? existing.pendingHandover ?? null,
         };
         conversations.value.splice(idx, 1);
-        conversations.value.unshift(normalizeConversation(merged));
+        conversations.value.unshift(normalizeConversation(safeMerge));
     }
 
     conversations.value = sortConversations(conversations.value);
@@ -1545,8 +1810,9 @@ const refreshInboxList = async (preserveActive = true) => {
             activeConvoId.value = preferredConvoId;
         }
 
+        // Prefetch lebih agresif agar konversasi sudah siap saat operator klik
         conversations.value
-            .slice(0, operatorLiteMode.value ? 2 : 4)
+            .slice(0, operatorLiteMode.value ? 6 : 10)
             .forEach((conversation) => prefetchConversation(conversation.conversationId));
     } catch {
         /* silent */
@@ -1730,10 +1996,10 @@ const scheduleNextRefresh = () => {
     if (!autoRefresh.value) return;
     if (pollRef.value) clearTimeout(pollRef.value);
     
-    // Operator mode is lighter and refreshes less aggressively.
+    // Karena Reverb (WebSocket) sudah aktif, polling HTTP bisa dibuat sangat santai (setiap 60 - 90 detik) agar UI lebih smooth dan tidak flicker.
     const delay = isConnected.value
-        ? (operatorLiteMode.value ? 15000 : 10000)
-        : (operatorLiteMode.value ? 45000 : 30000);
+        ? (operatorLiteMode.value ? 90000 : 60000)
+        : (operatorLiteMode.value ? 120000 : 90000);
     pollRef.value = setTimeout(refreshAll, delay);
 };
 
@@ -1754,7 +2020,7 @@ const runAction = async (action, title) => {
 
 const softResetStateAction = async () => {
     if (isBusy.value) return;
-    if (!window.confirm('Reset state inbox?\n\nSemua percakapan "pending" akan ditandai selesai dan status dikembalikan ke "open". Data pesan tidak dihapus.')) return;
+    if (!(await openConfirmModal('Reset State', 'Semua percakapan "pending" akan ditandai selesai dan status dikembalikan ke "open". Data pesan tidak dihapus.'))) return;
     isBusy.value = true;
     try {
         const d = await callApi('reset-state', { method: 'post' });
@@ -1785,7 +2051,7 @@ const syncContactsAction = async () => {
 
 const clearConversationAction = async () => {
     if (isBusy.value || !activeConvoId.value) return;
-    if (!window.confirm('Hapus sesi percakapan ini dari inbox lokal?\n\nPesan, mark, dan handover untuk percakapan ini akan dihapus permanen.')) return;
+    if (!(await openConfirmModal('Hapus Sesi', 'Hapus sesi percakapan ini dari inbox lokal?\n\nPesan, mark, dan handover untuk percakapan ini akan dihapus permanen.'))) return;
 
     isBusy.value = true;
     try {
@@ -1833,12 +2099,16 @@ const selectConversation = async (convoId) => {
     activeConvoId.value = convoId;
     markEditorOpen.value = false;
     applyConversationReadState(convoId);
-    if (!hydrateConversationFromCache(convoId)) {
+    const hasCache = hydrateConversationFromCache(convoId);
+    if (!hasCache) {
         conversationMessages.value = [];
     }
     if (typeof window !== 'undefined') {
         localStorage.setItem('wacaraka.activeConversationId', convoId);
     }
+    // Langsung fetch tanpa tunggu watcher — eliminasi 1 async tick delay
+    _lastSelectFetchedConvoId = convoId;
+    refreshConvoMessages(convoId, { background: hasCache });
 };
 
 const replyToConversation = async () => {
@@ -2028,7 +2298,7 @@ const closeConvo = async () => {
 };
 
 const deleteMessageAction = async (messageId) => {
-    if (!messageId || !confirm('Yakin ingin menghapus pesan ini? Hapus data bersifat permanen.')) return;
+    if (!messageId || !(await openConfirmModal('Hapus Pesan', 'Yakin ingin menghapus pesan ini? Hapus data bersifat permanen.'))) return;
     try {
         await callApi('delete-message', { method: 'post', data: { message_id: messageId } });
         appendLog('Pesan dihapus');
@@ -2150,11 +2420,8 @@ const connectRealtime = () => {
             }
             mergeConversation(messageToConversationPatch(event.message));
             noteConversationActivity(event?.message?.conversationId);
-            if (operatorLiteMode.value) {
-                scheduleInboxRefresh(1200);
-            } else {
-                refreshInboxList();
-            }
+            // Gunakan debounce untuk semua mode agar tidak flicker saat banyak pesan masuk berurutan
+            scheduleInboxRefresh(operatorLiteMode.value ? 1200 : 1500);
             refreshStatsIfNeeded();
         })
         .listen('.wa-caraka.message.synced', (event) => {
@@ -2186,6 +2453,10 @@ const setAutoRefresh = (val) => {
 };
 
 // Watch active convo — refresh messages on change
+// Track konversasi yang sudah di-fetch langsung dari selectConversation
+// agar watcher tidak double-fetch untuk konversasi yang sama.
+let _lastSelectFetchedConvoId = '';
+
 watch(activeConvoId, (id) => {
     if (id) {
         activeThreadRequestId.value = ++nextThreadRequestId;
@@ -2194,7 +2465,12 @@ watch(activeConvoId, (id) => {
         if (!hasCache) {
             conversationMessages.value = [];
         }
-        refreshConvoMessages(id, { background: hasCache });
+        // Skip jika selectConversation sudah langsung trigger fetch untuk id ini
+        if (_lastSelectFetchedConvoId === id) {
+            _lastSelectFetchedConvoId = '';
+        } else {
+            refreshConvoMessages(id, { background: hasCache });
+        }
     } else {
         activeThreadRequestId.value = ++nextThreadRequestId;
         setThreadLoadingState(false);
@@ -2377,6 +2653,7 @@ onUnmounted(() => {
                 <div ref="sidebarListEl" @scroll.passive="maybeExpandConversationWindow" class="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
                     <button v-for="c in renderedConversations" :key="c.conversationId"
                             @click="selectConversation(c.conversationId)"
+                            @contextmenu.prevent="openContextMenu($event, c)"
                             @mouseenter="prefetchConversation(c.conversationId)"
                             @focus="prefetchConversation(c.conversationId)"
                             @touchstart.passive="prefetchConversation(c.conversationId)"
@@ -2605,7 +2882,7 @@ onUnmounted(() => {
                                 🏷 Atur Alias
                             </button>
 
-                            <button v-if="isSuperAdmin" @click="clearConversationAction"
+                            <button v-if="isAdmin" @click="clearConversationAction"
                                     class="rounded-xl border border-rose-300 bg-rose-50 px-2 py-1.5 text-[10px] text-rose-700 hover:bg-rose-100 transition sm:px-3 sm:text-xs">
                                 🗑 Hapus Sesi
                             </button>
@@ -2669,8 +2946,16 @@ onUnmounted(() => {
                 <!-- Thread Messages -->
                  <div ref="threadEl"
                      class="flex-1 overflow-y-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--shadow)] scroll-smooth sm:p-4 xl:rounded-[2rem] xl:p-5"
-                     :class="activeConvo && !customBackgroundStyle ? 'thread-surface' : ''"
-                     :style="[threadViewportStyle, activeConvo && customBackgroundStyle ? customBackgroundStyle : {}]">
+                     :class="[activeConvo && !customBackgroundStyle ? 'thread-surface' : '', isDark && activeConvo && !customBackgroundStyle ? 'thread-surface-dark' : '']"
+                     :style="[threadViewportStyle, activeConvo && !customBackgroundStyle ? threadSurfaceDarkStyle : {}, activeConvo && customBackgroundStyle ? customBackgroundStyle : {}]">
+
+                    <!-- Particle Canvas (dark mode only) -->
+                    <canvas
+                        v-if="isDark && activeConvo && !customBackgroundStyle"
+                        ref="particleCanvasRef"
+                        class="particle-canvas"
+                        aria-hidden="true"
+                    />
 
                     <div class="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 sm:mb-4 sm:gap-3 sm:py-2.5">
                         <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)] sm:text-[10px]">Tampilan Chat</p>
@@ -2806,6 +3091,11 @@ onUnmounted(() => {
                                             class="rounded-full border border-amber-300/70 bg-amber-50/90 px-2 py-0.5 text-[9px] font-black text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
                                             title="Kirim ulang pesan ini">
                                             Retry
+                                        </button>
+                                        <button v-if="msg.direction === 'outbound' && msg.status === 'failed' && msg.id" @click="deleteMessageAction(msg.id)"
+                                            class="rounded-full border border-rose-300/70 bg-rose-50/90 px-2 py-0.5 text-[9px] font-black text-rose-700 transition hover:border-rose-400 hover:bg-rose-100"
+                                            title="Hapus pesan yang gagal ini">
+                                            Hapus
                                         </button>
                                         <span :class="outgoingStatusClass(msg)">
                                             <span v-if="msg.direction === 'outbound' && outgoingTickIcon(msg.status)" class="mr-1 font-black" :class="outgoingTickClass(msg.status)">
@@ -3295,10 +3585,94 @@ onUnmounted(() => {
             </div>
         </Teleport>
 
+        <!-- Context Menu untuk Klik Kanan di Sidebar -->
+        <Teleport to="body">
+            <div v-if="contextMenu.isOpen"
+                 class="fixed z-[9999] bg-white rounded-xl shadow-xl shadow-slate-900/10 ring-1 ring-slate-200 w-52 overflow-hidden transform-gpu origin-top-left transition-all duration-150"
+                 :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+                 @click.stop>
+                <div class="px-3 py-2 bg-slate-50 border-b border-slate-100">
+                    <p class="text-[10px] font-bold text-slate-500 truncate">{{ contextMenu.convo?.displayTitle }}</p>
+                </div>
+                <div class="py-1 flex flex-col">
+                    <button @click="handleContextMenuMark" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-violet-600 hover:bg-violet-50 transition">
+                        <span class="mr-2">🏷</span> Atur Alias
+                    </button>
+                    <button @click="handleContextMenuDelete" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">
+                        <span class="mr-2">🗑</span> Hapus Percakapan
+                    </button>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Confirm Modal Elegan -->
+        <Teleport to="body">
+            <div v-if="confirmModal.isOpen" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm" @click.self="resolveConfirmModal(false)">
+                <div class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/5 transform transition-all scale-100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-500">
+                            <span class="text-xl">⚠️</span>
+                        </div>
+                        <h3 class="text-lg font-black text-slate-800">{{ confirmModal.title }}</h3>
+                    </div>
+                    <p class="mb-6 whitespace-pre-wrap text-sm font-medium text-slate-600 leading-relaxed">{{ confirmModal.message }}</p>
+                    <div class="flex justify-end gap-3">
+                        <button @click="resolveConfirmModal(false)" class="rounded-xl px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 transition focus:outline-none">
+                            Batal
+                        </button>
+                        <button @click="resolveConfirmModal(true)" class="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-500/20 hover:bg-rose-600 transition focus:outline-none">
+                            Ya, Lanjutkan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Footer kecil -->
+        <footer class="mt-4 mb-2 flex justify-center">
+            <a
+                href="http://192.168.88.33/"
+                target="_blank"
+                rel="noopener"
+                class="wa-footer-link group inline-flex flex-col items-center gap-0.5 select-none"
+                title="Lawangsewu — PA Semarang"
+            >
+                <span class="wa-footer-top flex items-center gap-1.5">
+                    <span class="wa-footer-text">developed with</span>
+                    <!-- Heart icon -->
+                    <svg class="wa-footer-heart" viewBox="0 0 20 18" fill="currentColor" aria-hidden="true">
+                        <path d="M10 17.27L8.73 16.14C3.9 11.81 0.75 9.04 0.75 5.62C0.75 2.85 2.98 0.62 5.75 0.62C7.31 0.62 8.81 1.35 10 2.55C11.19 1.35 12.69 0.62 14.25 0.62C17.02 0.62 19.25 2.85 19.25 5.62C19.25 9.04 16.1 11.81 11.27 16.15L10 17.27Z"/>
+                    </svg>
+                    <span class="wa-footer-brand">
+                        dbprakom<sup class="wa-footer-tm">™</sup>
+                    </span>
+                </span>
+                <span class="wa-footer-bottom">
+                    WA-Caraka&nbsp;<span class="wa-footer-copy">©</span>&nbsp;2026
+                </span>
+            </a>
+        </footer>
     </LawangsewuLayout>
 </template>
 
 <style scoped>
+/* ─── Particle Canvas ─────────────────────────────── */
+.particle-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+}
+
+.thread-surface-dark > *:not(.particle-canvas) {
+    position: relative;
+    z-index: 1;
+}
+
+/* ─── Light mode bubbles ───────────────────────────── */
 .bubble-outbound {
     position: relative;
     background:
@@ -3347,6 +3721,49 @@ onUnmounted(() => {
     clip-path: polygon(100% 0, 0 20%, 100% 100%);
 }
 
+/* ─── Dark mode bubble overrides ───────────────────── */
+/* Outbound (pesan keluar) di dark mode: navy hijau gelap */
+.thread-surface-dark .bubble-outbound {
+    background:
+        linear-gradient(135deg, rgba(4, 54, 55, 0.96), rgba(7, 72, 60, 0.98)),
+        #054640;
+    border: 1px solid rgba(56, 211, 159, 0.22);
+    box-shadow:
+        0 1px 0 rgba(0, 0, 0, 0.3),
+        0 6px 18px rgba(0, 0, 0, 0.2);
+    color: #e8fff5;
+}
+
+.thread-surface-dark .bubble-outbound::after {
+    background: #054640;
+    border-right-color: rgba(56, 211, 159, 0.22);
+    border-top-color: rgba(56, 211, 159, 0.22);
+}
+
+/* Inbound (pesan masuk) di dark mode: kaca gelap */
+.thread-surface-dark .bubble-inbound {
+    background:
+        linear-gradient(145deg, rgba(22, 30, 48, 0.97), rgba(17, 24, 40, 0.99)),
+        #161e30;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 1px 0 rgba(0, 0, 0, 0.25),
+        0 8px 22px rgba(0, 0, 0, 0.18);
+    color: #f0f4ff;
+}
+
+.thread-surface-dark .bubble-inbound::before {
+    background: #161e30;
+    border-left-color: rgba(255, 255, 255, 0.08);
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Override text-slate-900 yang hardcoded di bubbleCardClass */
+.thread-surface-dark .bubble-outbound.text-slate-900,
+.thread-surface-dark .bubble-inbound.text-slate-900 {
+    color: inherit !important;
+}
+
 .bubble-sending {
     filter: saturate(0.88) brightness(0.96);
 }
@@ -3355,6 +3772,12 @@ onUnmounted(() => {
     background: #ffe4e6;
     border-color: #fecdd3;
     box-shadow: 0 1px 0 rgba(225, 29, 72, 0.08), 0 1px 2px rgba(225, 29, 72, 0.12);
+}
+
+/* Dark mode: bubble failed */
+.thread-surface-dark .bubble-failed {
+    background: rgba(127, 29, 29, 0.6);
+    border-color: rgba(248, 113, 113, 0.35);
 }
 
 .bubble-pop-in {
@@ -3403,15 +3826,129 @@ onUnmounted(() => {
     box-shadow: 0 14px 34px rgba(6, 182, 212, 0.24);
 }
 
+/* Light mode: background percakapan putih bersih (mirip WhatsApp Web) */
 .thread-surface {
-    background-color: #eef3f8;
-    background-image:
-        radial-gradient(circle at 15% 12%, rgba(14, 165, 233, 0.16) 0, rgba(14, 165, 233, 0) 30%),
-        radial-gradient(circle at 85% 10%, rgba(34, 197, 94, 0.13) 0, rgba(34, 197, 94, 0) 32%),
-        radial-gradient(circle at 70% 70%, rgba(15, 23, 42, 0.05) 0, rgba(15, 23, 42, 0) 36%),
-        linear-gradient(0deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 23, 42, 0.025) 1px, transparent 1px);
-    background-size: auto, auto, auto, 24px 24px, 24px 24px;
+    background-color: #ffffff;
+    background-image: none;
+}
+
+/* Dark mode: thread harus position:relative untuk particle canvas */
+.thread-surface-dark {
+    position: relative !important;
+}
+
+/* Dark mode: warna teks dalam bubble (meta, timestamp, tick, sender) */
+.thread-surface-dark .bubble-outbound .text-slate-600,
+.thread-surface-dark .bubble-outbound .text-slate-500,
+.thread-surface-dark .bubble-outbound .text-sky-600 {
+    color: rgba(134, 239, 172, 0.85) !important;
+}
+
+.thread-surface-dark .bubble-inbound .text-slate-500,
+.thread-surface-dark .bubble-inbound .text-slate-600 {
+    color: rgba(148, 163, 184, 0.9) !important;
+}
+
+/* Sender name (member-color) di dark mode: lebih terang */
+.thread-surface-dark .member-color-self { color: #4ade80; }
+.thread-surface-dark .member-color-1    { color: #60a5fa; }
+.thread-surface-dark .member-color-2    { color: #e879f9; }
+.thread-surface-dark .member-color-3    { color: #34d399; }
+.thread-surface-dark .member-color-4    { color: #fb923c; }
+.thread-surface-dark .member-color-5    { color: #a78bfa; }
+.thread-surface-dark .member-color-6    { color: #f472b6; }
+.thread-surface-dark .member-color-7    { color: #818cf8; }
+.thread-surface-dark .member-color-8    { color: #2dd4bf; }
+
+/* ─── Footer ─────────────────────────────────────────── */
+.wa-footer-link {
+    text-decoration: none;
+    opacity: 0.52;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.wa-footer-link:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+
+.wa-footer-top {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.wa-footer-text {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    text-transform: lowercase;
+}
+
+.wa-footer-heart {
+    width: 10px;
+    height: 10px;
+    color: #f43f5e;
+    flex-shrink: 0;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.wa-footer-link:hover .wa-footer-heart {
+    transform: scale(1.35);
+    color: #fb7185;
+    filter: drop-shadow(0 0 4px rgba(244, 63, 94, 0.55));
+}
+
+.wa-footer-brand {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--text-2);
+    text-transform: lowercase;
+}
+
+.wa-footer-tm {
+    font-size: 6px;
+    font-weight: 700;
+    vertical-align: super;
+    line-height: 1;
+    letter-spacing: 0;
+    opacity: 0.75;
+}
+
+.wa-footer-bottom {
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    position: relative;
+}
+
+.wa-footer-bottom::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transition: transform 0.3s ease;
+    transform-origin: center;
+}
+
+.wa-footer-link:hover .wa-footer-bottom::after {
+    transform: translateX(-50%) scaleX(1);
+}
+
+.wa-footer-copy {
+    font-size: 8px;
+    opacity: 0.7;
 }
 
 :deep(::-webkit-scrollbar) {

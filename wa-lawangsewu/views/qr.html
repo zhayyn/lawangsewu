@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <meta name="description" content="Whatsapp API Untuk kebutuhan internal layanan informasi Pengadilan Agama Semarang" />
+        <meta name="author" content="Mohammad Roy Irawan" />
+        <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+        <title>WA API PA Semarang | Scan QR-Code</title>
+        <style>
+            body {
+                margin: auto;
+                padding: 50px;
+                font-family: Roboto;
+            }
+            .center {
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            div {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            p {
+                text-align: center;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <img width="276" id="qrcode" src="assets/img/scan-qr-code-5.gif" alt="Harap tunggu..." title="Harap tunggu..." class="center" />
+        </div>
+        <p id="pesan">Harap tunggu...</p>
+    </body>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script type="text/javascript">
+        var socket = io({path: "/socket/", transports: ["websocket"]});
+        const urlParams = new URLSearchParams(window.location.search);
+        const session = urlParams.get('session');
+        socket.on(`${session}_qr`, (qr) => {
+            $("#qrcode").attr("src", qr);
+            $("#qrcode").attr("alt","Silakan scan qrcode...");
+            $("#qrcode").attr("title","Silakan scan qrcode...");
+            $("#pesan").text("Silakan scan qrcode...");
+        })
+        socket.on(`${session}_ready`, (msg) =>{
+            $("#qrcode").attr("src", "assets/img/ready-3.gif");
+            $("#qrcode").attr("alt",msg);
+            $("#qrcode").attr("title",msg);
+            $("#pesan").text(msg);
+        })
+    </script>
+</html>

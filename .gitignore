@@ -58,3 +58,12 @@ wa-runtime/server.log
 wa-runtime/*.log
 wa-runtime/logs/
 wa-runtime/.cache/
+
+# WA Engine & Bridge (sessions dan env sensitif)
+wa-lawangsewu/sessions/
+wa-lawangsewu/node_modules/
+wa-lawangsewu/.env
+wa-lawangsewu/*.log
+wa-bridge/node_modules/
+wa-bridge/.env
+wa-bridge/*.log

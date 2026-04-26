@@ -1901,7 +1901,16 @@ const replyToConversation = async () => {
     } catch (err) {
         markTempMessageStatus(tempId, 'failed');
         replyState.value = 'error';
-        appendLog('Balasan gagal', { error: err?.error });
+        
+        const errorMsg = err?.error || err?.message || 'Terjadi kesalahan sistem.';
+        appendLog('Balasan gagal', { error: errorMsg });
+        alert(`Gagal mengirim pesan: ${errorMsg}`);
+        
+        // Restore input jika gagal agar ketikan user tidak hilang
+        if (!replyText.value && text) replyText.value = text;
+        if (!mediaAttachment.value && media) mediaAttachment.value = media;
+        nextTick(() => composerRows());
+        
         scheduleReplyStateReset(2200);
     }
 };

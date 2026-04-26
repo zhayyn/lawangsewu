@@ -38,7 +38,7 @@ const RUNTIME_URL   = process.env.RUNTIME_URL   || 'http://127.0.0.1:8088';
 const RUNTIME_TOKEN = process.env.RUNTIME_TOKEN || 'e1191a9cf5e26c2f8e68d45ca66a4908';
 const SESSION_ID    = process.env.SESSION_ID    || 'QG9nI8-I_DELZWCKLxcmz';
 const BRIDGE_TOKEN  = process.env.BRIDGE_TOKEN  || 'lawangsewu2026';
-const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'https://lawangsewu.pa-semarang.go.id/wa-caraka/webhook/inbound';
+const LARAVEL_WEBHOOK_URL = process.env.LARAVEL_WEBHOOK_URL || 'https://lawangsewu.pa-semarang.go.id/api/wa-caraka/webhook/inbound';
 const LID_MAP_FILE = process.env.LID_MAP_FILE || path.join(__dirname, 'lid-pn-map.json');
 const INLINE_MEDIA_MAX_BYTES = parseInt(process.env.INLINE_MEDIA_MAX_BYTES || '2097152', 10);
 const INTERNAL_MEDIA_TTL_MS = parseInt(process.env.INTERNAL_MEDIA_TTL_MS || '900000', 10);
@@ -1061,7 +1061,7 @@ app.post('/internal/hook', (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-server.listen(BRIDGE_PORT, '127.0.0.1', () => {
+server.listen(BRIDGE_PORT, '0.0.0.0', () => {
     loadMappings();
     setInterval(persistMappings, 10_000);
     setInterval(purgeExpiredInternalMedia, 60_000);

@@ -18,14 +18,16 @@ class SecureWaWebhook
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $expectedToken = config('wa_caraka.token', env('LW_WA_V2_TOKEN', ''));
+        // 'webhook_token' (WA_WEBHOOK_TOKEN) adalah token khusus untuk inbound webhook dari wa-bridge.
+        // Ini BERBEDA dari 'token' (LW_WA_V2_TOKEN) yang dipakai untuk auth ke runtime.
+        $expectedToken = config('wa_caraka.webhook_token', env('WA_WEBHOOK_TOKEN', ''));
 
-        // Jika token tidak dikonfigurasi, izinkan (dev mode)
+        // Jika token tidak dikonfigurasi, izinkan (dev mode / webhook tanpa auth)
         if ($expectedToken === '') {
             return $next($request);
         }
 
-        $receivedToken = $request->header('X-WA-V2-Token', '');
+        $receivedToken = $request->header('X-WA-V2-Token', $request->header('Authorization', ''));
 
         if (! hash_equals($expectedToken, $receivedToken)) {
             Log::warning('[SecureWaWebhook] Token mismatch', [

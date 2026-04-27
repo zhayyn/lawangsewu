@@ -28,8 +28,17 @@ class ChatController extends Controller
             ->reverse()
             ->values()
             ->map(function (ChatMessage $message) {
+                // withDefault() tidak berlaku saat eager loading dengan column constraint.
+                // Normalisasi di sini agar user tidak pernah null di JSON.
+                $user = $message->user;
                 return [
                     ...$message->toArray(),
+                    'user' => [
+                        'id'     => $user?->id ?? null,
+                        'name'   => $user?->name ?? 'Operator',
+                        'alias'  => $user?->alias ?? null,
+                        'avatar' => $user?->avatar ?? null,
+                    ],
                     'metadata' => [
                         ...($message->metadata ?? []),
                         'attachment' => ChatAttachment::present($message->metadata['attachment'] ?? null, $message),

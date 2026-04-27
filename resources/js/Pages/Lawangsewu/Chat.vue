@@ -657,14 +657,14 @@ watch(() => props.initialMessages, (newMessages) => {
                                     :message="{
                                         ...msg,
                                         user_id: msg.user_id,
-                                        alias: msg.user.alias || msg.user.name,
-                                        realName: msg.user.name,
-                                        avatar: msg.user.avatar,
+                                        alias: msg.user?.alias || msg.user?.name || 'Operator',
+                                        realName: msg.user?.name || 'Operator',
+                                        avatar: msg.user?.avatar || null,
                                         body: msg.content,
                                         attachment: msg.metadata?.attachment || msg.attachment || null,
                                         time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                     }"
-                                    :own="msg.user_id === user.id"
+                                    :own="msg.user_id === user?.id"
                                 />
                                 <div v-if="isSuperAdmin" class="flex" :class="msg.user_id === user.id ? 'justify-end' : 'justify-start'">
                                     <button
@@ -838,7 +838,7 @@ watch(() => props.initialMessages, (newMessages) => {
                         <div class="flex items-center gap-4 mb-5">
                             <img v-if="user.avatar" :src="user.avatar" class="h-12 w-12 rounded-2xl border-2 border-blue-500/20 shadow-lg shadow-blue-500/10">
                             <div v-else class="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black">
-                                {{ (user.alias || user.name)[0].toUpperCase() }}
+                                {{ ((user.alias || user.name || '?')[0] || '?').toUpperCase() }}
                             </div>
                             <div class="min-w-0">
                                 <p class="text-sm font-black text-[var(--text-1)] truncate capitalize">{{ user.alias || user.name }}</p>
@@ -858,7 +858,7 @@ watch(() => props.initialMessages, (newMessages) => {
                                 <div class="relative">
                                     <img v-if="u.avatar" :src="u.avatar" class="h-8 w-8 rounded-lg object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all">
                                     <div v-else class="h-8 w-8 rounded-lg bg-[var(--surface-3)] text-[var(--text-3)] font-black text-[10px] flex items-center justify-center">
-                                        {{ (u.alias || u.name)[0].toUpperCase() }}
+                                        {{ ((u.alias || u.name || '?')[0] || '?').toUpperCase() }}
                                     </div>
                                     <div class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-1)] bg-emerald-500 shadow-sm"></div>
                                 </div>

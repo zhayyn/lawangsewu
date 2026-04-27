@@ -58,7 +58,7 @@ const sidebarListEl         = ref(null);
 const replyTextareaRef      = ref(null);
 const mediaViewer           = ref(null);
 const threadZoom            = ref(100);
-const threadVisibleCount    = ref(12);
+const threadVisibleCount    = ref(24); // Fixed at 24 — tidak perlu dikontrol user
 const markEditorOpen        = ref(false);
 const markState             = ref('idle');
 const markDraftDirty        = ref(false);
@@ -124,7 +124,12 @@ const isOperator   = computed(() => props.authUser?.role === 'operator');
 const operatorLiteMode = computed(() => isOperator.value && !isAdmin.value && !isSuperAdmin.value);
 const conversationFetchLimit = computed(() => operatorLiteMode.value ? 45 : 70);
 const isConnected  = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
-const hasRealtime = computed(() => typeof window !== 'undefined' && Boolean(window.Echo));
+const hasRealtime = computed(() => {
+    if (typeof window === 'undefined') return false;
+    // Echo object harus ada DAN WebSocket benar-benar connected
+    // (bukan hanya object dibuat — bisa exist meski koneksi gagal)
+    return Boolean(window.Echo) && Boolean(window.__reverbState?.connected);
+});
 const myId = computed(() => props.authUser?.id);
 
 // Deteksi dark mode dari DOM (sinkron dengan LawangsewuLayout)
@@ -1995,11 +2000,16 @@ const scheduleInboxRefresh = (delay = 900) => {
 const scheduleNextRefresh = () => {
     if (!autoRefresh.value) return;
     if (pollRef.value) clearTimeout(pollRef.value);
-    
-    // Karena Reverb (WebSocket) sudah aktif, polling HTTP bisa dibuat sangat santai (setiap 60 - 90 detik) agar UI lebih smooth dan tidak flicker.
-    const delay = isConnected.value
-        ? (operatorLiteMode.value ? 90000 : 60000)
-        : (operatorLiteMode.value ? 120000 : 90000);
+
+    // Gunakan __reverbState.connected (actual WS state) bukan isConnected (WA runtime)
+    // untuk menentukan apakah realtime benar-benar aktif.
+    const wsActive = typeof window !== 'undefined' && Boolean(window.__reverbState?.connected);
+
+    // Jika realtime aktif: poll jarang (safety net 25 detik)
+    // Jika tidak: poll agresif (8 detik) agar pesan dari HP cepat muncul
+    const delay = wsActive
+        ? (operatorLiteMode.value ? 30_000 : 25_000)
+        : (operatorLiteMode.value ? 12_000 :  8_000);
     pollRef.value = setTimeout(refreshAll, delay);
 };
 
@@ -2164,6 +2174,9 @@ const replyToConversation = async () => {
         }
         appendLog(result?.queued ? 'Balasan masuk antrean kirim' : (media ? 'Media terkirim' : 'Balasan terkirim'), { convoId: activeConvoId.value, mode: 'optimistic' });
         refreshStatsIfNeeded();
+        // Selalu refresh thread setelah kirim agar pesan real dari server
+        // menggantikan temp bubble — tidak bergantung pada Reverb
+        refreshConvoMessages(activeConvoId.value, { background: true });
         if (!hasRealtime.value) {
             refreshInboxList();
         }
@@ -2490,10 +2503,9 @@ watch(() => activeConvo.value?.customerMark, () => {
     syncMarkFormFromActive();
 }, { deep: true });
 
-watch([threadZoom, threadVisibleCount], ([zoom, count]) => {
+watch([threadZoom], ([zoom]) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('wacaraka.thread.zoom', String(zoom));
-    localStorage.setItem('wacaraka.thread.visibleCount', String(count));
 });
 
 const fetchHandoverStatus = async () => {
@@ -2528,7 +2540,7 @@ const toggleHandoverEnabled = async () => {
 onMounted(async () => {
     if (typeof window !== 'undefined') {
         setThreadZoom(localStorage.getItem('wacaraka.thread.zoom') ?? threadZoom.value);
-        setThreadVisibleCount(localStorage.getItem('wacaraka.thread.visibleCount') ?? threadVisibleCount.value);
+        // threadVisibleCount fixed at 24, tidak perlu restore dari localStorage
         activeConvoId.value = localStorage.getItem('wacaraka.activeConversationId') || '';
     }
 
@@ -2734,7 +2746,7 @@ onUnmounted(() => {
                                         aktif kamu
                                     </span>
                                     <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[8px] font-semibold text-blue-600 sm:px-2 sm:text-[9px]">
-                                        {{ c.owner.alias || c.owner.name }}
+                                        {{ c.owner?.alias || c.owner?.name }}
                                     </span>
                                     <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[8px] font-bold text-violet-600 sm:px-2 sm:text-[9px]">
                                         baru takeover
@@ -2833,7 +2845,7 @@ onUnmounted(() => {
                                 </span>
                                 <!-- Owner -->
                                 <span v-if="activeConvo.owner" class="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 sm:px-2.5 sm:text-xs">
-                                    Ditangani: {{ activeConvo.owner.alias || activeConvo.owner.name }}
+                                    Ditangani: {{ activeConvo.owner?.alias || activeConvo.owner?.name }}
                                     <span v-if="iMineConvo" class="ml-1 text-blue-400">(kamu)</span>
                                 </span>
                                 <span v-if="activeConvo.claimedAt" class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 sm:px-2.5 sm:text-xs">
@@ -2957,30 +2969,7 @@ onUnmounted(() => {
                         aria-hidden="true"
                     />
 
-                    <div class="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] px-3 py-2 sm:mb-4 sm:gap-3 sm:py-2.5">
-                        <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--text-2)] sm:text-[10px]">Tampilan Chat</p>
-                        <div class="ml-auto flex items-center gap-2">
-                            <button @click="adjustThreadZoom(-5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition sm:text-xs">
-                                A-
-                            </button>
-                            <span class="w-[44px] text-center text-[10px] font-bold text-[var(--text-1)] sm:w-[52px] sm:text-xs">{{ threadZoom }}%</span>
-                            <button @click="adjustThreadZoom(5)" class="rounded-lg border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-500 transition sm:text-xs">
-                                A+
-                            </button>
-                        </div>
 
-                        <label class="flex items-center gap-2 text-[10px] text-[var(--text-2)] sm:text-xs">
-                            <span>Target pesan terlihat:</span>
-                            <input type="range"
-                                   min="6"
-                                   max="24"
-                                   step="1"
-                                   :value="threadVisibleCount"
-                                   @input="setThreadVisibleCount($event.target.value)"
-                                   class="w-20 accent-sky-500 sm:w-28" />
-                            <span class="w-6 text-right font-bold text-[var(--text-1)] sm:w-7">{{ threadVisibleCount }}</span>
-                        </label>
-                    </div>
 
                     <div v-if="!activeConvo" class="grid min-h-[280px] place-items-center text-center text-sm text-[var(--text-2)]">
                         <div>

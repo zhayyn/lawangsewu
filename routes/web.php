@@ -171,7 +171,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     // WA Caraka Media Download (proxied from bridge)
     // Supports: /wa-caraka/media/{token}, /wa-caraka/media/{token}.ext, /wa-caraka/media/{token}/{filename}
     Route::get('/wa-caraka/media/{path}', [WaCarakaController::class, 'downloadMedia'])
-        ->where('path', '[a-f0-9]{32,}.*')
+        ->where('path', '.+')
         ->name('lawangsewu.wacaraka.media');
 });
 

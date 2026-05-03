@@ -890,14 +890,32 @@ class WaCarakaService
 
     private function normalizePayloadMediaUrls(array $payload): array
     {
+        $rawUrl = $payload['media']['url'] ?? null;
+
+        // ── Konversi URL internal runtime (/internal/media/{token}/filename) ──
+        // URL seperti http://192.168.88.33:8790/internal/media/57fc1e0f.../Doc1.docx
+        // TIDAK bisa diakses dari browser operator — harus diproxy lewat Laravel.
         if (
-            isset($payload['media']['url'])
-            && !empty($payload['media']['url'])
+            is_string($rawUrl)
+            && !empty($rawUrl)
             && empty($payload['media']['dataUrl'])
         ) {
-            $payload['media']['dataUrl'] = $payload['media']['url'];
+            // Coba ekstrak token dari URL internal runtime
+            // Pattern: /internal/media/{hex32+}/{filename}
+            if (preg_match('#/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?#i', $rawUrl, $m)) {
+                $token    = strtolower($m[1]);
+                $filename = $m[2] ?? '';
+                $proxyPath = $filename !== '' ? $token . '/' . $filename : $token;
+                $proxyUrl = route('lawangsewu.wacaraka.media', ['path' => $proxyPath]);
+                $payload['media']['dataUrl'] = $proxyUrl;
+                $payload['media']['url']     = $proxyUrl;
+            } else {
+                // URL bukan URL internal runtime — salin apa adanya (gambar CDN, dsb)
+                $payload['media']['dataUrl'] = $rawUrl;
+            }
         }
 
+        // ── Konversi via mediaToken (cara lama, tetap didukung) ──────────────
         if (
             isset($payload['media']['mediaToken'])
             && empty($payload['media']['dataUrl'])
@@ -907,11 +925,12 @@ class WaCarakaService
                 'path' => $payload['media']['mediaToken'],
             ]);
             $payload['media']['dataUrl'] = $mediaProxyUrl;
-            $payload['media']['url'] = $mediaProxyUrl;
+            $payload['media']['url']     = $mediaProxyUrl;
         }
 
         return $payload;
     }
+
 
     private function resolvePayloadTimestamp(array $payload): ?Carbon
     {

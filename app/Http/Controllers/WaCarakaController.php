@@ -156,13 +156,47 @@ class WaCarakaController extends Controller
             abort($response->status() === 404 ? 404 : 502);
         }
 
+        // Ambil nama file dari path (misal: token/Doc1.docx → Doc1.docx)
+        // Jika tidak ada nama file eksplisit, gunakan token hex sebagai fallback
+        $fileName = basename($path);
+        if (!$fileName || $fileName === $token) {
+            $fileName = $token;
+        }
+
+        // Tentukan MIME type: prioritaskan dari runtime, lalu inferensi dari ekstensi
+        $contentType = $response->header('Content-Type', '');
+        if (!$contentType || $contentType === 'application/octet-stream') {
+            $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            $contentType = match ($ext) {
+                'docx'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'xlsx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'pptx'  => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'doc'   => 'application/msword',
+                'xls'   => 'application/vnd.ms-excel',
+                'ppt'   => 'application/vnd.ms-powerpoint',
+                'pdf'   => 'application/pdf',
+                'txt'   => 'text/plain',
+                'csv'   => 'text/csv',
+                'mp3'   => 'audio/mpeg',
+                'ogg', 'oga' => 'audio/ogg',
+                'm4a'   => 'audio/mp4',
+                'mp4'   => 'video/mp4',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'png'   => 'image/png',
+                'gif'   => 'image/gif',
+                'webp'  => 'image/webp',
+                default => 'application/octet-stream',
+            };
+        }
+
         return response($response->body(), 200, [
-            'Content-Type' => $response->header('Content-Type', 'application/octet-stream'),
-            'Content-Length' => $response->header('Content-Length'),
-            'Content-Disposition' => $response->header('Content-Disposition', 'attachment; filename="' . $token . '"'),
-            'Cache-Control' => $response->header('Cache-Control', 'private, max-age=3600'),
+            'Content-Type'        => $contentType,
+            'Content-Length'      => $response->header('Content-Length'),
+            'Content-Disposition' => 'attachment; filename="' . addslashes($fileName) . '"',
+            'Cache-Control'       => 'private, max-age=3600',
         ]);
     }
+
 
     public function reports()
     {
@@ -702,6 +736,56 @@ class WaCarakaController extends Controller
             })
             ->values();
 
+        // ── Batch-resolve profiles dari server runtime (server .33) ────────────
+        // Hanya resolve kontak yang profile-nya belum ada atau sudah expire (>23 jam)
+        $profileCacheTtl = 23 * 3600;
+        $needsResolve = $deduped->filter(function (WaCarakaConversation $c) use ($profileCacheTtl) {
+            if (!$c->profile_synced_at) return true;
+            return $c->profile_synced_at->diffInSeconds(now()) > $profileCacheTtl;
+        });
+
+        if ($needsResolve->isNotEmpty()) {
+            $jids = $needsResolve->pluck('remote_number')->filter()->values()->all();
+            try {
+                $resolved = $this->wa->resolveContactsMeta($jids);
+                $resolvedItems = collect($resolved['data']['items'] ?? []);
+
+                foreach ($needsResolve as $convo) {
+                    $item = $resolvedItems->firstWhere('jid', $convo->remote_number);
+                    if (!$item) continue;
+
+                    $updatePayload = [
+                        'profile_synced_at' => now(),
+                    ];
+
+                    // Update foto profil (bisa null jika privat)
+                    if (array_key_exists('profilePhotoUrl', $item)) {
+                        $updatePayload['profile_photo_url'] = $item['profilePhotoUrl'];
+                    }
+
+                    // Simpan nomor HP terresolve dari @lid → nomor WA nyata
+                    $resolvedJid = $item['resolvedJid'] ?? null;
+                    if ($resolvedJid && $resolvedJid !== $convo->remote_number) {
+                        $resolvedPhone = preg_replace('/@s\.whatsapp\.net$/i', '', $resolvedJid);
+                        $updatePayload['resolved_number'] = $resolvedPhone;
+                    }
+
+                    // Update display name jika belum ada atau lebih baik
+                    $displayName = $item['displayName'] ?? null;
+                    if ($displayName && (!$convo->remote_name || is_numeric($convo->remote_name))) {
+                        $updatePayload['remote_name'] = $displayName;
+                        $convo->remote_name = $displayName;
+                    }
+
+                    $convo->update($updatePayload);
+                    $convo->profile_photo_url = $updatePayload['profile_photo_url'] ?? $convo->profile_photo_url;
+                    $convo->resolved_number = $updatePayload['resolved_number'] ?? $convo->resolved_number;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[WaCaraka] Batch profile resolve failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         return $deduped->map(function (WaCarakaConversation $conversation) use ($latestMessages, $marks, $user) {
             $formatted = $this->formatConversation($conversation, $user);
             $message = $latestMessages->get($conversation->conversation_id);
@@ -730,26 +814,30 @@ class WaCarakaController extends Controller
         }
 
         return [
-            'conversationId' => $conversation->conversation_id,
-            'remoteNumber' => $conversation->remote_number,
-            'remoteName' => $conversation->remote_name,
-            'status' => $conversation->status,
-            'unreadCount' => (int) $conversation->unread_count,
-            'lastActivityAt' => $conversation->last_activity_at?->diffForHumans(),
-            'claimedAt' => $conversation->claimed_at?->diffForHumans(),
-            'ownership' => !$conversation->claimed_by ? 'unclaimed' : ($conversation->claimed_by === $user->id ? 'mine' : 'locked'),
-            'ownerPresence' => $ownerPresence,
-            'justClaimed' => (bool) $conversation->claimed_at?->gte(now()->subMinutes(3)),
-            'canReply' => true,
-            'owner' => $conversation->owner ? [
-                'id' => $conversation->owner->id,
-                'name' => $conversation->owner->name,
+            'conversationId'  => $conversation->conversation_id,
+            'remoteNumber'    => $conversation->remote_number,
+            'remoteName'      => $conversation->remote_name,
+            // Nomor HP terresolve dari @lid (null untuk nomor biasa)
+            'resolvedNumber'  => $conversation->resolved_number,
+            // Foto profil WA — sudah di-cache di DB, aman dikirim langsung
+            'profilePhotoUrl' => $conversation->profile_photo_url,
+            'status'          => $conversation->status,
+            'unreadCount'     => (int) $conversation->unread_count,
+            'lastActivityAt'  => $conversation->last_activity_at?->diffForHumans(),
+            'claimedAt'       => $conversation->claimed_at?->diffForHumans(),
+            'ownership'       => !$conversation->claimed_by ? 'unclaimed' : ($conversation->claimed_by === $user->id ? 'mine' : 'locked'),
+            'ownerPresence'   => $ownerPresence,
+            'justClaimed'     => (bool) $conversation->claimed_at?->gte(now()->subMinutes(3)),
+            'canReply'        => true,
+            'owner'           => $conversation->owner ? [
+                'id'    => $conversation->owner->id,
+                'name'  => $conversation->owner->name,
                 'alias' => $conversation->owner->alias,
             ] : null,
             'pendingHandover' => $conversation->pendingHandover ? [
-                'id' => $conversation->pendingHandover->id,
+                'id'        => $conversation->pendingHandover->id,
                 'requestor' => [
-                    'id' => $conversation->pendingHandover->requestor?->id,
+                    'id'   => $conversation->pendingHandover->requestor?->id,
                     'name' => $conversation->pendingHandover->requestor?->name,
                 ],
             ] : null,

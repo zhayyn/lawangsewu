@@ -1475,11 +1475,17 @@ const getMappedWaNumber = (value) => {
     return formatWaPhoneNumber(mapped) || String(mapped);
 };
 
-const primaryContactNumber = (value) => {
+const primaryContactNumber = (value, resolvedNumber = null) => {
+    // Jika ada nomor terresolve dari @lid (dikirim server), tampilkan langsung
+    if (resolvedNumber) {
+        return resolvedNumber;
+    }
+
     const normalized = normalizeRemoteIdentifier(value);
     if (!normalized) return '-';
     if (!isLidNumber(normalized)) return getCleanRemoteNumber(normalized);
 
+    // Fallback: cari di lidMappings lokal
     const mappedWa = getMappedWaNumber(normalized);
     return mappedWa || `LID: ${getLidBaseNumber(normalized)}`;
 };
@@ -1522,8 +1528,8 @@ const normalizeConversation = (raw = {}) => {
     const aliasLabel = String(raw.customerMark?.label || '').trim();
     const waName = String(raw.remoteName || '').trim(); // notifyName from WhatsApp
     // Non-group title priority: alias > WA display name > normalized number
-    const displayTitle = isGroup 
-        ? (raw.displayTitle || groupName || 'Grup WhatsApp') 
+    const displayTitle = isGroup
+        ? (raw.displayTitle || groupName || 'Grup WhatsApp')
         : (aliasLabel || waName || getCleanRemoteNumber(remoteNumber));
 
     return {
@@ -1532,6 +1538,9 @@ const normalizeConversation = (raw = {}) => {
         isGroup,
         groupName,
         displayTitle,
+        // resolvedNumber: nomor HP asli jika remoteNumber adalah @lid
+        resolvedNumber: raw.resolvedNumber || null,
+        profilePhotoUrl: raw.profilePhotoUrl || null,
         customerMark: raw.customerMark || null,
     };
 };
@@ -1556,9 +1565,19 @@ const normalizeMessage = (raw = {}) => {
         || 'guest',
     );
 
+    // senderDisplay: untuk pesan inbound, prioritaskan nama kontak yang sudah dikenal.
+    // Jangan tampilkan raw @lid atau @s.whatsapp.net — gunakan remoteName dari konversasi aktif.
+    const convoRemoteName = activeConvo.value?.remoteName || '';
+    const convoResolvedNumber = activeConvo.value?.resolvedNumber || '';
     const senderDisplay = raw.direction === 'outbound'
         ? (raw.operator || props.authUser?.alias || props.authUser?.name || 'Anda')
-        : (raw.senderName || metadata.participantName || metadata.senderName || metadata.pushName || (isGroup ? 'Anggota Grup' : (activeConvo.value?.remoteName || 'Kontak')));
+        : (
+            raw.senderName
+            || metadata.participantName
+            || metadata.senderName
+            || metadata.pushName
+            || (isGroup ? 'Anggota Grup' : (convoRemoteName || convoResolvedNumber || getCleanRemoteNumber(remoteNumber) || 'Kontak'))
+          );
 
     return {
         ...raw,
@@ -2306,20 +2325,6 @@ const selectConversation = async (convoId) => {
 
     // Mobile: auto-switch to thread view
     showMobileThread();
-
-    // Fetch profile picture if missing
-    if (activeConvo.value && !activeConvo.value.profilePhotoUrl) {
-        callApi('resolve-contacts', { method: 'post', data: { jids: [activeConvo.value.remoteNumber] } })
-            .then(res => {
-                if (res?.items?.[0]?.profilePhotoUrl) {
-                    mergeConversation({
-                        conversationId: activeConvoId.value,
-                        profilePhotoUrl: res.items[0].profilePhotoUrl,
-                    });
-                }
-            })
-            .catch(() => {});
-    }
 };
 
 const replyToConversation = async () => {
@@ -2941,7 +2946,7 @@ onUnmounted(() => {
                                     </span>
                                 </div>
 
-                                <p class="mt-0.5 text-[8px] text-[var(--text-2)] font-mono sm:text-[8px]">{{ primaryContactNumber(c.remoteNumber) }}</p>
+                                <p class="mt-0.5 text-[8px] text-[var(--text-2)] font-mono sm:text-[8px]">{{ primaryContactNumber(c.remoteNumber, c.resolvedNumber) }}</p>
                                 <p class="mt-0.5 line-clamp-1 text-[8px] text-[var(--text-2)] sm:text-[9px]">
                                     {{ conversationPreviewText(c) }}
                                 </p>
@@ -3067,8 +3072,9 @@ onUnmounted(() => {
                                 <span v-if="activeConvo?.isGroup" class="mr-1">👥</span>{{ activeConvo?.displayTitle || 'Pilih Percakapan' }}
                             </h2>
                             <p v-if="activeConvo?.remoteNumber" class="text-[10px] font-mono text-[var(--text-2)] sm:text-xs">
-                                {{ primaryContactNumber(activeConvo.remoteNumber) }}
-                                <span v-if="isLidNumber(activeConvo.remoteNumber) && !getMappedWaNumber(activeConvo.remoteNumber)" class="ml-1 text-[10px] text-amber-600 font-bold">(Legacy WhatsApp)</span>
+                                {{ primaryContactNumber(activeConvo.remoteNumber, activeConvo.resolvedNumber) }}
+                                <!-- Tampilkan badge Legacy hanya jika @lid DAN belum ada resolvedNumber -->
+                                <span v-if="isLidNumber(activeConvo.remoteNumber) && !activeConvo.resolvedNumber && !getMappedWaNumber(activeConvo.remoteNumber)" class="ml-1 text-[10px] text-amber-600 font-bold">(Legacy WhatsApp)</span>
                             </p>
                             <p v-if="activeConvo?.groupName && activeConvo?.isGroup" class="text-[10px] text-[var(--text-2)] sm:text-xs">
                                 Nama Group: <span class="font-semibold text-[var(--text-1)]">{{ activeConvo.groupName }}</span>
@@ -3256,9 +3262,18 @@ onUnmounted(() => {
                              class="flex"
                              :class="bubbleWrapClass(msg)">
 
-                            <div v-if="msg.direction === 'inbound'" class="mt-1 mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
-                                 :class="msg.avatarToneClass">
-                                {{ msg.senderInitials }}
+                            <!-- Avatar inbound: tampilkan foto profil jika tersedia, fallback ke inisial berwarna -->
+                            <div v-if="msg.direction === 'inbound'" class="mt-1 mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full overflow-hidden ring-1 ring-white/40 text-[10px] font-black text-white"
+                                 :class="!activeConvo?.profilePhotoUrl ? msg.avatarToneClass : ''">
+                                <img
+                                    v-if="activeConvo?.profilePhotoUrl && !msg.isGroup"
+                                    :src="activeConvo.profilePhotoUrl"
+                                    :alt="msg.senderDisplay"
+                                    class="h-full w-full object-cover"
+                                    referrerpolicy="no-referrer"
+                                    @error="onProfileImageError(activeConvo.conversationId)"
+                                />
+                                <span v-else>{{ msg.senderInitials }}</span>
                             </div>
 
                             <article class="max-w-[92%] rounded-2xl px-3 py-2.5 shadow-sm transition-all duration-200 sm:max-w-[86%] sm:px-4 sm:py-3 xl:max-w-[78%]"
@@ -3934,7 +3949,7 @@ onUnmounted(() => {
                                      'bg-amber-500/20 ring-amber-500/30': toast.type === 'warning',
                                      'bg-sky-500/20 ring-sky-500/30': toast.type === 'info',
                                  }"
-                                 style="ring-width: 2px;"
+                                 style="ring-width90- 2px;"
                             >
                                 <!-- Pulsing particles -->
                                 <div class="toast-particles absolute inset-0 rounded-full"></div>

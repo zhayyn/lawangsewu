@@ -1036,12 +1036,13 @@ const setThreadLoadingState = (value) => {
     }
 
     if (value) {
+        // Tampilkan loading lebih cepat (80ms) agar terasa responsif di jaringan lambat
         threadLoadingDelayRef = setTimeout(() => {
             if (threadLoading.value) {
                 threadLoadingVisible.value = true;
             }
             threadLoadingDelayRef = null;
-        }, 120);
+        }, 80);
         return;
     }
 
@@ -1655,6 +1656,28 @@ const documentMetaText = (msg) => {
     return parts.join(' · ') || 'File WhatsApp';
 };
 
+// Download file dengan kompatibilitas Safari iOS
+// Safari melarang atribut `download` pada URL cross-origin, jadi kita fetch dulu lalu blobkan.
+const downloadDocument = async (url, fileName) => {
+    if (!url) return;
+    try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) throw new Error('fetch failed');
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName || 'dokumen';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch {
+        // Fallback: buka di tab baru (Safari akan tampilkan opsi "Download" manual)
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};
+
 const outgoingStatusClass = (msg) => ({
     sent: 'text-sky-600',
     queued: 'text-slate-500',
@@ -1985,7 +2008,9 @@ const refreshConvoMessages = async (convoId = activeConvoId.value, options = {})
         activeThreadRequestId.value = requestId;
     }
     pendingConversationFetchIds.add(convoId);
-    if (isVisibleThread && (!background || !hydrateConversationFromCache(convoId))) {
+    // Selalu tampilkan loading saat buka konversasi, bahkan jika ada cache
+    // agar tidak langsung tampil "Belum ada pesan" sebelum data server datang
+    if (isVisibleThread) {
         setThreadLoadingState(true);
     }
     if (isVisibleThread) {
@@ -3265,15 +3290,13 @@ onUnmounted(() => {
                                         <p class="truncate text-sm font-black text-slate-800">{{ extractMessageFileName(msg) }}</p>
                                         <p class="mt-1 text-[11px] text-slate-500">{{ documentMetaText(msg) }}</p>
                                         <div class="mt-3 flex flex-wrap gap-2">
-                                            <a
-                                                :href="msg.mediaUrl"
-                                                :download="extractMessageFileName(msg)"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                            <button
+                                                type="button"
                                                 class="inline-flex items-center rounded-lg border border-sky-300/60 bg-sky-50/70 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100/80"
+                                                @click.stop="downloadDocument(msg.mediaUrl, extractMessageFileName(msg))"
                                             >
-                                                Buka / Unduh Dokumen
-                                            </a>
+                                                ⬇ Unduh Dokumen
+                                            </button>
                                         </div>
                                     </div>
                                     <a

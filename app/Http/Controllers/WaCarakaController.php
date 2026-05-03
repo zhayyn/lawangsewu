@@ -62,6 +62,13 @@ class WaCarakaController extends Controller
             ], 403);
         }
 
+        if ($action === 'clear-all-conversations' && !$user->isSuperAdmin()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'Hapus semua inbox hanya dapat dilakukan oleh superadmin.',
+            ], 403);
+        }
+
         $result = match ($action) {
             'health' => $this->wa->health(),
             'qr' => $this->wa->qr(),
@@ -104,11 +111,13 @@ class WaCarakaController extends Controller
             'reject-handover' => $this->rejectHandover($request),
             'force-handover' => $this->forceHandover($request),
             'close' => $this->closeConversation($request),
+            'reopen' => $this->reopenConversation($request),
             'mark-read' => $this->markRead($request),
             'mark-customer' => $this->markCustomer($request),
             'unmark-customer' => $this->unmarkCustomer($request),
             'delete-message' => $this->deleteMessage($request),
             'clear-conversation' => $this->clearConversation($request),
+            'clear-all-conversations' => $this->clearAllConversations(),
             'reset-state' => $this->resetState(),
             'get-handover-enabled' => ['ok' => true, 'status' => 200, 'data' => [
                 'handoverEnabled' => Cache::get('wacaraka_handover_enabled', true),
@@ -236,16 +245,12 @@ class WaCarakaController extends Controller
             return $result;
         }
 
-        // Tandai pesan inbound terakhir sebagai replied (opsional, tidak blocking)
-        $inboundMessage = WaCarakaMessage::query()
+        // Tandai SEMUA pesan inbound yang belum dibalas di percakapan ini sebagai replied
+        WaCarakaMessage::query()
             ->where('conversation_id', $validated['conversation_id'])
             ->where('direction', 'inbound')
-            ->latest('id')
-            ->first();
-
-        if ($inboundMessage && !$inboundMessage->replied_at) {
-            $inboundMessage->update(['replied_at' => now()]);
-        }
+            ->whereNull('replied_at')
+            ->update(['replied_at' => now()]);
 
         $conversation->refresh();
 
@@ -432,9 +437,43 @@ class WaCarakaController extends Controller
         $conversation = $this->findConversationOrFail($validated['conversation_id']);
         $result = $this->conversations->closeConversation($conversation, $request->user());
 
+        if ($result['ok']) {
+            // Tandai semua pesan inbound yang belum dibalas sebagai 'selesai'
+            // agar tidak masuk ke hitungan "Pesan Masuk Baru"
+            WaCarakaMessage::query()
+                ->where('conversation_id', $conversation->conversation_id)
+                ->where('direction', 'inbound')
+                ->whereNull('replied_at')
+                ->update(['replied_at' => now()]);
+
+            if ($conversation->remote_number) {
+                $macroText = "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ";
+                $this->wa->sendText(
+                    $conversation->remote_number,
+                    $macroText,
+                    $this->senderLabel($request->user()),
+                    $request->user()->id
+                );
+            }
+        }
+
         return $result['ok']
             ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
             : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal menutup percakapan.'];
+    }
+
+    private function reopenConversation(Request $request): array
+    {
+        if (!$request->user()->isSuperAdmin()) {
+            return ['ok' => false, 'status' => 403, 'error' => 'Hanya superadmin yang dapat membuka ulang percakapan secara manual.'];
+        }
+
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        
+        $this->conversations->reopenConversation($conversation);
+
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
     private function markRead(Request $request): array
@@ -521,6 +560,43 @@ class WaCarakaController extends Controller
         return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
+    /**
+     * Hapus seluruh isi inbox: semua percakapan, pesan, mark, dan handover.
+     * Juga membersihkan history di runtime WA agar pull-inbox berikutnya
+     * tidak mengisi ulang percakapan yang baru dihapus.
+     * Operasi destruktif — hanya superadmin yang diizinkan.
+     */
+    private function clearAllConversations(): array
+    {
+        if (!WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
+            return ['ok' => true, 'status' => 200, 'data' => ['ok' => true, 'deleted' => 0]];
+        }
+
+        $deleted = 0;
+
+        WaCarakaDatabase::transaction(function () use (&$deleted) {
+            WaCarakaConversationMark::query()->delete();
+            WaCarakaHandover::query()->delete();
+            WaCarakaMessage::query()->delete();
+            $deleted = WaCarakaConversation::query()->delete();
+
+            // Hapus juga sync runs agar history-sync tidak dilanjutkan
+            if (WaCarakaDatabase::hasTable('wa_caraka_sync_runs')) {
+                WaCarakaSyncRun::query()->delete();
+            }
+        });
+
+        // Coba hapus juga history di runtime WA (Node.js) — non-blocking.
+        // Jika runtime tidak support endpoint ini, diabaikan saja.
+        try {
+            $this->wa->clearHistory();
+        } catch (\Throwable) {
+            // Silent — runtime mungkin tidak support /history/clear
+        }
+
+        return ['ok' => true, 'status' => 200, 'data' => ['ok' => true, 'deleted' => $deleted]];
+    }
+
     private function resetState(): array
     {
         $now = now();
@@ -581,7 +657,10 @@ class WaCarakaController extends Controller
             ->get()
             ->keyBy('wa_caraka_conversation_id');
 
+        $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast', 'health-check', 'health_check'];
+
         $rows = WaCarakaConversation::query()
+            ->whereNotIn('remote_number', $excludeNumbers)
             ->with(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias'])
             ->orderByDesc('last_activity_at')
             ->get();

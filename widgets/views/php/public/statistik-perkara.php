@@ -8,6 +8,33 @@ $y = (int)date('Y');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Statistik Perkara</title>
+
+    <meta property="og:title" content="Statistik Komposisi Perkara - Lawangsewu">
+    <meta property="og:description" content="Visualisasi data real-time komposisi jenis perkara tahun berjalan di Pengadilan Agama Semarang.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lawangsewu.pa-semarang.go.id/statistik-perkara">
+    
+    <!-- Warning: Ensure the route is registered in routes/web.php -->
+    <meta property="og:image" content="https://lawangsewu.pa-semarang.go.id/og-image/case-statistics.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="800">
+    <meta property="og:image:height" content="400">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Statistik Komposisi Perkara - Lawangsewu">
+    <meta name="twitter:image" content="https://lawangsewu.pa-semarang.go.id/og-image/case-statistics.png">
+    
+    <?php if ($ga_id = config('services.google.analytics_id')): ?>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<?= htmlspecialchars($ga_id) ?>"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '<?= htmlspecialchars($ga_id) ?>');
+    </script>
+    <?php endif; ?>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -310,7 +337,17 @@ function renderCharts(year, totals, rows) {
             responsive: true,
             plugins: { legend: { display: false } },
             interaction: { mode: 'index', intersect: false },
-            scales: { y: { beginAtZero: true } }
+            scales: { 
+                y: { 
+                    min: 300,
+                    title: {
+                        display: true,
+                        text: 'Jumlah Perkara',
+                        font: { size: 12 },
+                        color: '#6b7280'
+                    }
+                } 
+            }
         }
     });
 
@@ -337,7 +374,7 @@ function renderCharts(year, totals, rows) {
             responsive: true,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true },
+                y: { type: 'logarithmic' },
                 x: { ticks: { maxRotation: 45, minRotation: 30 } }
             }
         }
@@ -515,4 +552,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-<?php /* developed by dubes favour-it */ ?>
+<!-- developed by zhayyn™ -->

@@ -63,9 +63,10 @@ class WaCarakaAdminController extends Controller
             $action === 'reconnect'     => $this->wa->reconnect(),
             $action === 'disconnect'    => $this->wa->disconnect(),
 
-            // History
+            // History & Inbox
             $action === 'history'       => $this->wa->history(),
             $action === 'history/clear' => $this->wa->clearHistory(),
+            $action === 'inbox/clear'   => $this->wa->clearInbox(),
 
             // Stats
             $action === 'stats'         => ['ok' => true, 'status' => 200, 'data' => $this->wa->stats()],

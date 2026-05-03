@@ -58,6 +58,14 @@ class WaCarakaWebhookController extends Controller
             return response()->json(['ok' => false, 'error' => 'Missing "from" field.'], 422);
         }
 
+        if ($this->wa->shouldIgnoreInboundPayload($payload)) {
+            return response()->json([
+                'ok' => true,
+                'skipped' => true,
+                'reason' => 'synthetic-health-check',
+            ], 202);
+        }
+
         try {
             $message = $this->wa->handleInbound($payload);
 
@@ -109,11 +117,14 @@ class WaCarakaWebhookController extends Controller
 
     private function verifyWebhookToken(Request $request)
     {
-        $expectedToken = config('wa_caraka.token', '');
+        $expectedToken = config('wa_caraka.webhook_token', config('wa_caraka.token', ''));
         $receivedToken = $request->header('X-WA-V2-Token', '');
+        if ($request->ip() === '124.158.186.170') {
+            return null; // Whitelist IP kantor PA Semarang
+        }
 
         if ($expectedToken !== '' && !hash_equals($expectedToken, $receivedToken)) {
-            Log::warning('[WaCaraka Webhook] Token mismatch from ' . $request->ip());
+            Log::warning('[WaCaraka Webhook] Token mismatch from ' . $request->ip() . ' - Received: ' . $receivedToken);
             return response()->json(['ok' => false, 'error' => 'Unauthorized.'], 401);
         }
 

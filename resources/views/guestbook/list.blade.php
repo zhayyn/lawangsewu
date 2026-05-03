@@ -278,6 +278,7 @@
 @php
     $user = auth()->user();
     $canInspectGuestbook = $user && in_array($user->role, ['operator', 'admin'], true);
+    $canManageGuestbook  = $user && ($user->isSuperAdmin() || in_array($user->role, ['admin'], true));
     $photoUrl = static function (string $id): string {
         foreach (['jpg', 'jpeg', 'png'] as $ext) {
             $storageRelative = 'guestbook/photos/' . $id . '.' . $ext;
@@ -408,6 +409,22 @@
                                 <div class="guest-table-actions">
                                     <a href="{{ route('lawangsewu.guestbook.detail', $entry->id) }}" class="btn btn-sm btn-glass"><i class="bi bi-person-vcard"></i> Detail</a>
                                     <a href="{{ route('lawangsewu.guestbook.cetak', ['id' => $entry->id, 'row' => ($entries->currentPage() - 1) * $entries->perPage() + $loop->iteration]) }}" target="_blank" class="btn btn-sm btn-glass"><i class="bi bi-printer"></i> Card</a>
+                                    @if ($canManageGuestbook)
+                                        <button type="button"
+                                            class="btn btn-sm btn-glass btn-rename-tamu"
+                                            data-id="{{ $entry->id }}"
+                                            data-name="{{ $entry->name }}"
+                                            data-url="{{ route('lawangsewu.guestbook.rename', $entry->id) }}"
+                                            title="Ubah nama tamu"
+                                        ><i class="bi bi-pencil-square"></i> Rename</button>
+                                        <button type="button"
+                                            class="btn btn-sm btn-danger-glass btn-hapus-tamu"
+                                            data-id="{{ $entry->id }}"
+                                            data-name="{{ $entry->name }}"
+                                            data-url="{{ route('lawangsewu.guestbook.destroy', $entry->id) }}"
+                                            title="Hapus tamu ini"
+                                        ><i class="bi bi-trash3"></i> Hapus</button>
+                                    @endif
                                 </div>
                             @else
                                 <span class="text-muted small">Lihat data ringkas</span>
@@ -501,4 +518,185 @@
         </div>
     </div>
 @endif
+
+@if ($canManageGuestbook)
+{{-- ── Modal Konfirmasi Hapus ────────────────────────────── --}}
+<div class="modal fade" id="hapusTamuModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:1.2rem;overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:0;">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Konfirmasi Hapus Tamu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body" style="padding:1.5rem;">
+                <p class="mb-1">Tamu berikut akan dihapus permanen:</p>
+                <p class="fw-bold fs-5" id="hapus-tamu-nama">—</p>
+                <p class="text-muted small mb-0">Data dan foto tidak dapat dipulihkan setelah dihapus.</p>
+            </div>
+            <div class="modal-footer" style="border:0;padding:1rem 1.5rem;">
+                <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn" id="hapus-tamu-confirm"
+                    style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border-radius:999px;font-weight:700;">
+                    <i class="bi bi-trash3"></i> Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ── Modal Rename ───────────────────────────────────────── --}}
+<div class="modal fade" id="renameTamuModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:1.2rem;overflow:hidden;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#0f2747,#1c5a8a);color:#fff;border:0;">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Ubah Nama Tamu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body" style="padding:1.5rem;">
+                <label class="form-label fw-bold" for="rename-input">Nama Baru</label>
+                <input type="text" id="rename-input" class="form-control" maxlength="120" placeholder="Masukkan nama tamu...">
+                <div class="text-danger small mt-1" id="rename-error" style="display:none;"></div>
+            </div>
+            <div class="modal-footer" style="border:0;padding:1rem 1.5rem;">
+                <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn" id="rename-tamu-confirm"
+                    style="background:linear-gradient(135deg,#0f2747,#1c5a8a);color:#fff;border-radius:999px;font-weight:700;">
+                    <i class="bi bi-check-lg"></i> Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+@push('styles')
+<style>
+.btn-danger-glass {
+    border: 1px solid rgba(220, 53, 69, 0.45);
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.14), rgba(220, 53, 69, 0.06));
+    color: #c0392b;
+    border-radius: 999px;
+}
+.btn-danger-glass:hover {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.28), rgba(220, 53, 69, 0.14));
+    color: #922b21;
+}
+</style>
+@endpush
+
+@push('scripts')
+<script>
+(function () {
+    'use strict';
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+    // ── HAPUS ───────────────────────────────────────────────
+    let hapusUrl = null;
+    let hapusRow = null;
+
+    document.querySelectorAll('.btn-hapus-tamu').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            hapusUrl = btn.dataset.url;
+            hapusRow = btn.closest('tr');
+            document.getElementById('hapus-tamu-nama').textContent = btn.dataset.name;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('hapusTamuModal')).show();
+        });
+    });
+
+    document.getElementById('hapus-tamu-confirm')?.addEventListener('click', async function () {
+        if (!hapusUrl) return;
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menghapus...';
+
+        try {
+            const res = await fetch(hapusUrl, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                bootstrap.Modal.getInstance(document.getElementById('hapusTamuModal')).hide();
+                if (hapusRow) hapusRow.remove();
+            } else {
+                alert(data.message ?? 'Gagal menghapus tamu.');
+            }
+        } catch (e) {
+            alert('Terjadi kesalahan jaringan.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash3"></i> Ya, Hapus';
+            hapusUrl = null;
+            hapusRow = null;
+        }
+    });
+
+    // ── RENAME ──────────────────────────────────────────────
+    let renameUrl = null;
+    let renameBtn = null;
+    let renameRowNameEl = null;
+
+    document.querySelectorAll('.btn-rename-tamu').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            renameUrl    = btn.dataset.url;
+            renameBtn    = btn;
+            renameRowNameEl = btn.closest('tr')?.querySelector('.history-primary');
+            document.getElementById('rename-input').value = btn.dataset.name;
+            document.getElementById('rename-error').style.display = 'none';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('renameTamuModal')).show();
+            setTimeout(() => document.getElementById('rename-input').focus(), 300);
+        });
+    });
+
+    document.getElementById('rename-tamu-confirm')?.addEventListener('click', async function () {
+        const namaInput = document.getElementById('rename-input');
+        const errorEl   = document.getElementById('rename-error');
+        const nama = namaInput.value.trim();
+        if (!nama) {
+            errorEl.textContent = 'Nama tidak boleh kosong.';
+            errorEl.style.display = 'block';
+            return;
+        }
+        errorEl.style.display = 'none';
+
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+
+        try {
+            const res = await fetch(renameUrl, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ nama }),
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                bootstrap.Modal.getInstance(document.getElementById('renameTamuModal')).hide();
+                // Update nama di tabel tanpa reload
+                if (renameRowNameEl) renameRowNameEl.textContent = data.new_name;
+                if (renameBtn) {
+                    renameBtn.dataset.name = data.new_name;
+                }
+            } else {
+                const msg = data.errors?.nama?.[0] ?? data.message ?? 'Gagal menyimpan nama.';
+                errorEl.textContent = msg;
+                errorEl.style.display = 'block';
+            }
+        } catch (e) {
+            errorEl.textContent = 'Terjadi kesalahan jaringan.';
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Simpan';
+        }
+    });
+})();
+</script>
+@endpush
+
 @endsection

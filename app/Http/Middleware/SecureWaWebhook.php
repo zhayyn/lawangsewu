@@ -34,6 +34,8 @@ class SecureWaWebhook
                 'ip'             => $request->ip(),
                 'path'           => $request->path(),
                 'has_token'      => ! empty($receivedToken),
+                'received'       => $receivedToken,
+                'expected'       => $expectedToken,
             ]);
 
             return response()->json(['ok' => false, 'error' => 'Unauthorized.'], 401);

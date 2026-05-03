@@ -176,11 +176,14 @@ onBeforeUnmount(() => {
                     type="text"
                     class="mt-1 block w-full !bg-[var(--surface-1)] !border-[var(--border)]"
                     v-model="form.alias"
-                    placeholder="Contoh: Sang Juara, Delta One, dll"
+                    placeholder="Contoh: Sang Juara ✦, Delta One 🔵, dll"
+                    autocapitalize="none"
+                    autocorrect="off"
+                    spellcheck="false"
                 />
                 
-                <p class="mt-1 text-[10px] font-bold text-[var(--text-3)] uppercase tracking-wider">
-                    Nama ini akan tampil di header, chat, dan statistik operator.
+                <p class="mt-1 text-[10px] font-bold text-[var(--text-3)] tracking-wider">
+                    Nama ini akan tampil di header, chat, dan statistik operator. Boleh pakai emoji atau simbol unik. ✦ 🎯
                 </p>
 
                 <InputError class="mt-2" :message="form.errors.alias" />

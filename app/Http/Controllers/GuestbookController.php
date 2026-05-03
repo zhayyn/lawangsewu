@@ -380,6 +380,43 @@ class GuestbookController extends Controller
         ]);
     }
 
+    public function rename(Request $request, string $id): JsonResponse
+    {
+        $entry = GuestbookEntry::query()->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'nama' => ['required', 'string', 'max:120'],
+        ], [
+            'nama.required' => 'Nama tamu wajib diisi.',
+            'nama.max'      => 'Nama tamu maksimal 120 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Validasi gagal.',
+                'errors'  => $validator->errors()->toArray(),
+            ], 422);
+        }
+
+        $oldName = $entry->name;
+        $entry->update([
+            'name' => $this->normalizeDisplayCase((string) $request->string('nama')),
+        ]);
+
+        Log::info("Guestbook entry {$id} renamed by operator", [
+            'user_id'  => optional(auth()->user())->id,
+            'old_name' => $oldName,
+            'new_name' => $entry->name,
+        ]);
+
+        return response()->json([
+            'status'   => 'success',
+            'message'  => 'Nama tamu berhasil diubah.',
+            'new_name' => $entry->name,
+        ]);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $entry = GuestbookEntry::query()->findOrFail($id);

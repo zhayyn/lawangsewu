@@ -72,7 +72,7 @@ class DocumentStylerService
                 * { box-sizing: border-box; margin: 0; padding: 0; }
 
                 @page {
-                    margin: 22mm 18mm 22mm 18mm;
+                    margin: 30mm 30mm 30mm 40mm;
                 }
 
                 body {
@@ -88,37 +88,19 @@ class DocumentStylerService
                     border-bottom: 3px solid #1a5f7a;
                     padding-bottom: 14px;
                     margin-bottom: 24px;
-                }
-
-                .doc-header-inner {
-                    display: table;
                     width: 100%;
-                }
-
-                .doc-logo-cell {
-                    display: table-cell;
-                    vertical-align: middle;
-                    width: 54px;
                 }
 
                 .doc-logo {
                     width: 42px;
                     height: 42px;
-                    background: linear-gradient(135deg, #1a5f7a 0%, #0f3d52 100%);
+                    background: #1a5f7a;
                     border-radius: 8px;
-                    display: table-cell;
-                    vertical-align: middle;
                     text-align: center;
                     color: #ffffff;
                     font-size: 18px;
                     font-weight: 900;
-                    letter-spacing: -0.5px;
-                }
-
-                .doc-title-cell {
-                    display: table-cell;
-                    vertical-align: middle;
-                    padding-left: 12px;
+                    line-height: 42px;
                 }
 
                 .doc-app-name {
@@ -133,7 +115,6 @@ class DocumentStylerService
                     font-size: 18px;
                     font-weight: 900;
                     color: #0f172a;
-                    letter-spacing: -0.3px;
                     margin-top: 2px;
                 }
 
@@ -290,24 +271,20 @@ class DocumentStylerService
                     border-top: 2px solid #e2e8f0;
                     margin-top: 32px;
                     padding-top: 10px;
-                    display: table;
                     width: 100%;
                 }
 
                 .doc-footer-left {
-                    display: table-cell;
                     font-size: 8.5px;
                     color: #94a3b8;
                 }
 
                 .doc-footer-right {
-                    display: table-cell;
                     text-align: right;
                     font-size: 8.5px;
                     color: #cbd5e1;
                     font-weight: 600;
                     text-transform: uppercase;
-                    letter-spacing: 0.1em;
                 }
 
                 /* ── Page break helper ────────────────────────── */
@@ -316,28 +293,30 @@ class DocumentStylerService
         ";
 
         $header = "
-            <div class='doc-header'>
-                <div class='doc-header-inner'>
-                    <div class='doc-logo-cell'>
+            <table class='doc-header'>
+                <tr>
+                    <td style='width: 54px; vertical-align: middle; border: none; padding: 0;'>
                         <div class='doc-logo'>LS</div>
-                    </div>
-                    <div class='doc-title-cell'>
+                    </td>
+                    <td style='vertical-align: middle; border: none; padding: 0; padding-left: 12px;'>
                         <div class='doc-app-name'>Super App Lawangsewu &bull; Dokumen Resmi</div>
                         <div class='doc-title'>{$title}</div>
                         <div class='doc-meta'>Digenerate pada: {$generatedAt}</div>
-                    </div>
-                </div>
-            </div>
+                    </td>
+                </tr>
+            </table>
         ";
 
         $footer = "
-            <div class='doc-footer'>
-                <div class='doc-footer-left'>
-                    Dokumen ini digenerate secara otomatis oleh sistem Lawangsewu.
-                    Tidak diperlukan tanda tangan basah.
-                </div>
-                <div class='doc-footer-right'>developed by zhayyn&trade;</div>
-            </div>
+            <table class='doc-footer'>
+                <tr>
+                    <td class='doc-footer-left' style='border: none; padding: 0;'>
+                        Dokumen ini digenerate secara otomatis oleh sistem Lawangsewu.<br>
+                        Tidak diperlukan tanda tangan basah.
+                    </td>
+                    <td class='doc-footer-right' style='border: none; padding: 0;'>&nbsp;</td>
+                </tr>
+            </table>
         ";
 
         return "<!DOCTYPE html><html lang='id'><head><meta charset='UTF-8'>{$style}</head>"
@@ -356,7 +335,7 @@ class DocumentStylerService
         $pdf = Pdf::loadHTML($fullHtml)
             ->setPaper('a4', $orientation)
             ->setOption('isHtml5ParserEnabled', true)
-            ->setOption('isRemoteEnabled', false)
+            ->setOption('isRemoteEnabled', true)
             ->setOption('chroot', public_path())
             ->setOption('defaultFont', 'DejaVu Sans');
 

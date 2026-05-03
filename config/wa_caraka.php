@@ -31,7 +31,7 @@ return [
     'log_display_limit' => 50,
 
     // Maximum outbound media payload accepted by UI/backend/runtime.
-    'max_media_bytes' => (int) env('LW_WA_MAX_MEDIA_BYTES', 15 * 1024 * 1024),
+    'max_media_bytes' => (int) env('LW_WA_MAX_MEDIA_BYTES', 5 * 1024 * 1024),
 
     // Laravel queue name for outbound messages (must match queue:work --queue flag)
     'queue' => env('WA_QUEUE', 'default'),

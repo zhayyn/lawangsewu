@@ -161,6 +161,19 @@ class WaCarakaService
         return $this->post('/history/clear');
     }
 
+    public function clearInbox(): array
+    {
+        try {
+            WaCarakaMessage::truncate();
+            WaCarakaConversation::truncate();
+            \Illuminate\Support\Facades\Log::info('[WaCaraka] Inbox cleared by superadmin');
+            return ['ok' => true, 'status' => 200];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('[WaCaraka] Failed to clear inbox', ['error' => $e->getMessage()]);
+            return $this->error('Gagal menghapus inbox', $e->getMessage());
+        }
+    }
+
     public function getLidMappings(): array
     {
         return $this->get('/lid-mappings');
@@ -657,6 +670,36 @@ class WaCarakaService
         return $message;
     }
 
+    public function shouldIgnoreInboundPayload(array $payload): bool
+    {
+        $candidates = [
+            $payload['from'] ?? null,
+            $payload['number'] ?? null,
+            $payload['remote'] ?? null,
+            $payload['remoteJid'] ?? null,
+            $payload['fromPn'] ?? null,
+            $payload['resolvedFrom'] ?? null,
+            $payload['resolvedFromJid'] ?? null,
+        ];
+
+        $systemSenders = ['engine-health-check', 'health-check', 'health_check'];
+        foreach ($candidates as $candidate) {
+            $normalized = strtolower(trim((string) $candidate));
+            if ($normalized !== '' && in_array($normalized, $systemSenders, true)) {
+                return true;
+            }
+        }
+
+        $messageText = strtolower(trim((string) (
+            $payload['text']
+            ?? $payload['body']
+            ?? $payload['message']
+            ?? ''
+        )));
+
+        return $messageText === 'tokenless-route-check';
+    }
+
     public function ingestWebhookMessage(array $payload): WaCarakaMessage
     {
         $attributes = $this->buildMessageAttributesFromWebhookPayload($payload);
@@ -956,6 +999,10 @@ class WaCarakaService
         // Store each pulled message if not already stored
         $stored = 0;
         foreach ($messages as $msg) {
+            if ($this->shouldIgnoreInboundPayload((array) $msg)) {
+                continue;
+            }
+
             $waId = $msg['id'] ?? $msg['messageId'] ?? null;
 
             if ($waId && WaCarakaMessage::where('wa_message_id', $waId)->exists()) {
@@ -1255,14 +1302,16 @@ class WaCarakaService
             ->filter(fn ($item) => ($item['direction'] ?? null) !== 'outbound')
             ->count();
 
+        $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast'];
+
         return [
-            'totalMessages'  => WaCarakaMessage::count(),
-            'inbound'        => WaCarakaMessage::inbound()->count(),
-            'outbound'       => WaCarakaMessage::outbound()->count(),
-            'unreplied'      => $unrepliedConversations,
-            'todayInbound'   => WaCarakaMessage::inbound()->today()->count(),
-            'todayOutbound'  => WaCarakaMessage::outbound()->today()->count(),
-            'conversations'  => WaCarakaMessage::distinct('conversation_id')->count('conversation_id'),
+            'totalMessages'  => WaCarakaMessage::whereNotIn('remote_number', $excludeNumbers)->count(),
+            'inbound'        => WaCarakaMessage::inbound()->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'outbound'       => WaCarakaMessage::outbound()->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'unreplied'      => WaCarakaMessage::inbound()->whereNull('replied_at')->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'todayInbound'   => WaCarakaMessage::inbound()->whereNotIn('remote_number', $excludeNumbers)->today()->count(),
+            'todayOutbound'  => WaCarakaMessage::outbound()->whereNotIn('remote_number', $excludeNumbers)->today()->count(),
+            'conversations'  => WaCarakaMessage::whereNotIn('remote_number', $excludeNumbers)->distinct('conversation_id')->count('conversation_id'),
         ];
     }
 
@@ -1600,6 +1649,33 @@ class WaCarakaService
                     // Increment unread only for newly created messages
                     if ($message->wasRecentlyCreated) {
                         $convo->increment('unread_count');
+                    }
+                    // Buka kembali percakapan yang sudah selesai jika ada pesan masuk baru,
+                    // KECUALI pesan tersebut hanya berupa ucapan terima kasih atau penutup singkat.
+                    if (!$isHistorySync && $convo->status === 'closed') {
+                        $rawText = trim($message->message_text ?? '');
+                        $text = strtolower($rawText);
+                        
+                        $isQuestion = str_contains($rawText, '?');
+                        $isShort = strlen($rawText) <= 45;
+                        
+                        $isClosing = false;
+                        if (!$isQuestion && $isShort) {
+                            $cleanText = trim(preg_replace('/[^\p{L}\p{N}\s]/u', '', $text));
+                            $closingRegex = '/^(ok|oke|okey|sip|siap|baik|mantap|ya|iya|terima kasih|makasih|tq|thanks|suwun|nuhun)(?:\s+(min|mas|mbak|pak|bu|kak|bang|infonya|informasinya|banyak))?(?:\s+(terima kasih|makasih|tq|thanks|suwun|nuhun))?(?:\s+(min|mas|mbak|pak|bu|kak|bang))?$/i';
+                            
+                            if (preg_match($closingRegex, $cleanText) || preg_match('/^(terima kasih|makasih|thanks|tq)/i', $cleanText)) {
+                                $isClosing = true;
+                            }
+                        }
+
+                        if ($isClosing) {
+                            // Anggap sebagai pesan penutup, biarkan status 'closed' dan tandai pesan langsung 'replied_at' = now()
+                            // agar tidak masuk ke hitungan "Pesan Masuk Baru"
+                            $message->update(['replied_at' => now()]);
+                        } else {
+                            $updateData['status'] = 'pending';
+                        }
                     }
                     $convo->update($updateData);
                 } else {

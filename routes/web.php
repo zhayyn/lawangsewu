@@ -37,6 +37,8 @@ Route::prefix('api')->middleware('throttle:60,1')->group(function () {
 // System health check — unauthenticated, untuk uptime monitoring
 Route::get('/health', [HealthController::class, 'index'])->name('health');
 
+Route::get('/og-image/case-statistics.png', [\App\Http\Controllers\OgImageController::class, 'caseStatisticsPreview'])->name('og.case-statistics');
+
 Route::get('/daftar-widget', [WidgetCompatController::class, 'html'])->defaults('page', 'daftar-widget');
 Route::get('/widget-links', [WidgetCompatController::class, 'html'])->defaults('page', 'widget-links');
 
@@ -116,6 +118,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
     Route::get('/dashboard', [PortalController::class, 'dashboard'])->name('lawangsewu.dashboard');
     Route::get('/cctv', [PortalController::class, 'cctv'])->name('lawangsewu.cctv');
     Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('lawangsewu.chat');
+    Route::get('/chat/messages', [\App\Http\Controllers\ChatController::class, 'messages'])->name('lawangsewu.chat.messages');
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'store'])->name('lawangsewu.chat.store');
     Route::delete('/chat/{message}', [\App\Http\Controllers\ChatController::class, 'destroy'])->name('lawangsewu.chat.destroy');
     Route::post('/chat/{message}/delete', [\App\Http\Controllers\ChatController::class, 'destroy'])->name('lawangsewu.chat.destroy.post');
@@ -155,6 +158,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::delete('/buku-tamu/kelola/{id}', [GuestbookController::class, 'destroy'])->name('lawangsewu.guestbook.destroy');
     Route::post('/buku-tamu/kelola/bulk-delete', [GuestbookController::class, 'bulkDestroy'])->name('lawangsewu.guestbook.bulk-delete');
     Route::post('/buku-tamu/kelola/settings', [GuestbookController::class, 'saveSettings'])->name('lawangsewu.guestbook.settings');
+    Route::patch('/buku-tamu/kelola/{id}/rename', [GuestbookController::class, 'rename'])->name('lawangsewu.guestbook.rename');
 
     // WA Caraka Dashboard & Operator Tools
     Route::get('/wa-caraka', [WaCarakaController::class, 'index'])->name('lawangsewu.wacaraka.index');
@@ -201,6 +205,7 @@ Route::middleware(['auth', 'verified', 'active'])->prefix('admin')->name('admin.
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
         Route::post('/users', [UserAccessController::class, 'store'])->name('users.store');
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->name('users.update');
+        Route::delete('/users/{user}', [UserAccessController::class, 'destroy'])->name('users.destroy');
     });
 });
 
@@ -228,6 +233,10 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::middleware('permission:admin.laporan')->group(function () {
         Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
         Route::post('/laporan/generate', [LaporanController::class, 'generate'])->name('laporan.generate');
+    });
+
+    Route::middleware('permission:admin.laporan')->group(function () {
+        Route::get('/analytics', [\App\Http\Controllers\Admin\AnalyticsController::class, 'index'])->name('analytics.index');
     });
 
     Route::middleware('permission:admin.cctv')->group(function () {

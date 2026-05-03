@@ -59,6 +59,41 @@ class ChatController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint JSON ringan khusus polling InterkomPanel sidebar.
+     * Tidak memuat Inertia — lebih hemat karena tidak perlu navGroups/appMeta.
+     */
+    public function messages(Request $request): JsonResponse
+    {
+        $limit = min(60, max(10, (int) $request->query('limit', 40)));
+
+        $messages = ChatMessage::with('user:id,name,alias,avatar')
+            ->where('type', 'global')
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get()
+            ->reverse()
+            ->values()
+            ->map(function (ChatMessage $message) {
+                $user = $message->user;
+                return [
+                    'id'         => $message->id,
+                    'user_id'    => $message->user_id,
+                    'content'    => $message->content,
+                    'created_at' => $message->created_at?->toISOString(),
+                    'user'       => [
+                        'id'    => $user?->id,
+                        'name'  => $user?->name ?? 'Operator',
+                        'alias' => $user?->alias,
+                        'avatar'=> $user?->avatar,
+                    ],
+                ];
+            })
+            ->all();
+
+        return response()->json(['messages' => $messages]);
+    }
+
     public function store(Request $request)
     {
         Log::info('Chat upload request received.', [

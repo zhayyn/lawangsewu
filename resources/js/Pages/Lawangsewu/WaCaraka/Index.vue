@@ -1,5 +1,6 @@
 <script setup>
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
+import InterkomPanel from '@/Components/lawangsewu/InterkomPanel.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -82,7 +83,8 @@ const replyCooldownRef = ref(null);
 const sendCooldownRef = ref(null);
 const pendingReadConversationIds = new Set();
 const pendingConversationFetchIds = new Set();
-const MAX_MEDIA_FILE_BYTES = Number(props.config?.maxMediaBytes || 15 * 1024 * 1024);
+const deletedTempIds = new Set(); // Track deleted temp messages to prevent re-merge
+const MAX_MEDIA_FILE_BYTES = Number(props.config?.maxMediaBytes || 5 * 1024 * 1024);
 let threadLoadingDelayRef = null;
 let inboxRefreshTimerRef = null;
 
@@ -97,6 +99,45 @@ const handoverToggling = ref(false);
 const statusText = ref('Memeriksa koneksi...');
 const statusTone = ref('warn');
 
+// ─── Toast Notification System (replaces native alert) ───
+const toast = ref({
+    isOpen: false,
+    type: 'error',    // 'success' | 'error' | 'warning' | 'info'
+    title: '',
+    message: '',
+    timer: null,
+});
+
+const toastIcons = {
+    success: '✦',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ',
+};
+
+const toastTitles = {
+    success: 'Berhasil',
+    error: 'Gagal',
+    warning: 'Perhatian',
+    info: 'Info',
+};
+
+const showToast = (type, message, title = null, duration = 4500) => {
+    if (toast.value.timer) clearTimeout(toast.value.timer);
+    toast.value = {
+        isOpen: true,
+        type,
+        title: title || toastTitles[type] || 'Notifikasi',
+        message,
+        timer: setTimeout(() => dismissToast(), duration),
+    };
+};
+
+const dismissToast = () => {
+    if (toast.value.timer) clearTimeout(toast.value.timer);
+    toast.value.isOpen = false;
+};
+
 // Dialog Konfirmasi
 const confirmModal = ref({ isOpen: false, title: '', message: '', resolve: null });
 const openConfirmModal = (title, message) => {
@@ -106,6 +147,30 @@ const resolveConfirmModal = (val) => {
     if (confirmModal.value.resolve) confirmModal.value.resolve(val);
     confirmModal.value.isOpen = false;
 };
+
+// ─── Interkom Panel (Sidebar Kanan) ───────────────────
+const showInterkom = ref(
+    typeof window !== 'undefined'
+        ? localStorage.getItem('wacaraka.showInterkom') !== 'false'
+        : true
+);
+const unreadInterkom = ref(0);
+const interkomRef = ref(null);
+
+const toggleInterkom = () => {
+    showInterkom.value = !showInterkom.value;
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('wacaraka.showInterkom', String(showInterkom.value));
+    }
+    if (showInterkom.value) unreadInterkom.value = 0;
+};
+
+// Sinkron unread count dari komponen child
+watch(() => interkomRef.value?.unread, (val) => {
+    if (!showInterkom.value && typeof val === 'number') {
+        unreadInterkom.value = val;
+    }
+});
 
 // Tickets
 const tickets           = ref(props.recentTickets ?? []);
@@ -134,6 +199,25 @@ const myId = computed(() => props.authUser?.id);
 
 // Deteksi dark mode dari DOM (sinkron dengan LawangsewuLayout)
 const isDark = ref(typeof window !== 'undefined' && localStorage.getItem('lawangsewu-theme') === 'dark');
+
+// ─── Mobile Responsive ───────────────────────────────
+// On mobile (< 640px), show either inbox or thread, not both
+const isMobile = ref(false);
+const mobileView = ref('inbox'); // 'inbox' or 'thread'
+
+const checkMobile = () => {
+    isMobile.value = typeof window !== 'undefined' && window.innerWidth < 640;
+};
+
+const showMobileThread = () => {
+    if (isMobile.value) mobileView.value = 'thread';
+};
+
+const backToMobileInbox = () => {
+    mobileView.value = 'inbox';
+    activeConvoId.value = '';
+    conversationMessages.value = [];
+};
 
 const threadSurfaceDarkStyle = computed(() => isDark.value ? {
     backgroundColor: '#0b1320',
@@ -353,7 +437,7 @@ const handleContextMenuDelete = async () => {
         await refreshAll();
     } catch (err) {
         appendLog('Gagal menghapus sesi percakapan', { error: err?.error });
-        alert(err?.error || 'Gagal menghapus percakapan');
+        showToast('error', err?.error || 'Gagal menghapus percakapan');
     }
 };
 
@@ -368,6 +452,10 @@ const handleContextMenuMark = () => {
 onMounted(() => {
     window.addEventListener('click', closeContextMenu);
     window.addEventListener('scroll', closeContextMenu, { passive: true });
+
+    // Mobile responsive: detect screen size
+    checkMobile();
+    window.addEventListener('resize', checkMobile, { passive: true });
 
     // Watch DOM for theme-dark class changes (sinkron dengan toggle di LawangsewuLayout)
     if (typeof MutationObserver !== 'undefined') {
@@ -396,6 +484,7 @@ onMounted(() => {
 onUnmounted(() => {
     window.removeEventListener('click', closeContextMenu);
     window.removeEventListener('scroll', closeContextMenu);
+    window.removeEventListener('resize', checkMobile);
     stopParticles();
     if (window._wacarakaThemeObserver) {
         window._wacarakaThemeObserver.disconnect();
@@ -407,7 +496,26 @@ const filteredConversations = computed(() => {
     const keyword = conversationSearch.value.trim().toLowerCase();
     const filter = conversationFilter.value;
 
+    // Patterns for automated/bot conversations to auto-hide from inbox
+    const healthCheckPatterns = [
+        'engine-health-check',
+        'tokenless-route-check',
+        'health-check',
+        'health_check',
+        'status@broadcast',
+    ];
+
     return conversations.value.filter((conversation) => {
+        // Auto-hide health-check/bot conversations (unless explicitly searched)
+        if (!keyword) {
+            const title = (conversation.displayTitle || conversation.remoteName || '').toLowerCase();
+            const preview = (conversation.lastMessagePreview || '').toLowerCase();
+            const remoteNum = (conversation.remoteNumber || '').toLowerCase();
+            if (healthCheckPatterns.some(p => title.includes(p) || preview.includes(p) || remoteNum.includes(p))) {
+                return false;
+            }
+        }
+
         if (filter === 'unread' && Number(conversation.unreadCount || 0) <= 0) {
             return false;
         }
@@ -1262,6 +1370,7 @@ const markTempMessageStatus = (tempId, status) => {
 
 const removeTempMessage = (tempId) => {
     if (!tempId) return;
+    deletedTempIds.add(tempId); // Mark as deleted to prevent re-merge
     const nextMessages = conversationMessages.value.filter((msg) => msg._tempId !== tempId);
     conversationMessages.value = nextMessages;
     persistConversationCache(activeConvoId.value, nextMessages);
@@ -1881,8 +1990,9 @@ const refreshConvoMessages = async (convoId = activeConvoId.value, options = {})
         if (activeThreadRequestId.value !== requestId || activeConvoId.value !== convoId) return;
 
         // Preserve temp messages (sending/failed) that are not yet in DB
+        // BUT exclude any that were explicitly deleted by the user
         const pendingTemps = conversationMessages.value.filter(
-            (m) => m._tempId && ['sending', 'failed'].includes(m.status)
+            (m) => m._tempId && ['sending', 'failed'].includes(m.status) && !deletedTempIds.has(m._tempId)
         );
         const mergedMessages = [...serverMessages, ...pendingTemps];
         await applyThreadMessages(mergedMessages, { preserveViewport: background });
@@ -2080,6 +2190,34 @@ const clearConversationAction = async () => {
     }
 };
 
+const clearAllConversationsAction = async () => {
+    if (isBusy.value) return;
+    if (!(await openConfirmModal(
+        '⚠️ Hapus Semua Inbox',
+        'Seluruh percakapan, pesan, mark, dan handover di inbox akan dihapus permanen.\n\nAksi ini tidak dapat dibatalkan. Lanjutkan?'
+    ))) return;
+
+    isBusy.value = true;
+    try {
+        const d = await callApi('clear-all-conversations', { method: 'post' });
+        appendLog('Semua inbox berhasil dihapus', d);
+        // Reset state lokal dulu
+        conversations.value = [];
+        activeConvoId.value = '';
+        conversationMessages.value = [];
+        conversationMessageCache.value = {};
+        // Hanya refresh dari DB lokal — JANGAN panggil refreshAll()
+        // karena refreshAll() memanggil pullInbox() yang akan mengisi ulang
+        // percakapan dari runtime WA
+        await refreshInboxList();
+    } catch (err) {
+        appendLog('Gagal menghapus semua inbox', { error: err?.error });
+        showToast('error', err?.error || 'Gagal menghapus semua inbox.');
+    } finally {
+        isBusy.value = false;
+    }
+};
+
 const openReportsPage = () => {
     const fallback = '/wa-caraka/reports';
     try {
@@ -2119,6 +2257,9 @@ const selectConversation = async (convoId) => {
     // Langsung fetch tanpa tunggu watcher — eliminasi 1 async tick delay
     _lastSelectFetchedConvoId = convoId;
     refreshConvoMessages(convoId, { background: hasCache });
+
+    // Mobile: auto-switch to thread view
+    showMobileThread();
 };
 
 const replyToConversation = async () => {
@@ -2187,7 +2328,7 @@ const replyToConversation = async () => {
         
         const errorMsg = err?.error || err?.message || 'Terjadi kesalahan sistem.';
         appendLog('Balasan gagal', { error: errorMsg });
-        alert(`Gagal mengirim pesan: ${errorMsg}`);
+        showToast('error', errorMsg, 'Gagal Mengirim Pesan');
         
         // Restore input jika gagal agar ketikan user tidak hilang
         if (!replyText.value && text) replyText.value = text;
@@ -2310,6 +2451,14 @@ const closeConvo = async () => {
     } catch { /* silent */ }
 };
 
+const reopenConvo = async () => {
+    if (!activeConvoId.value) return;
+    try {
+        await callApi('reopen', { method: 'post', data: { conversation_id: activeConvoId.value } });
+        await refreshInboxList();
+    } catch { /* silent */ }
+};
+
 const deleteMessageAction = async (messageId) => {
     if (!messageId || !(await openConfirmModal('Hapus Pesan', 'Yakin ingin menghapus pesan ini? Hapus data bersifat permanen.'))) return;
     try {
@@ -2319,7 +2468,7 @@ const deleteMessageAction = async (messageId) => {
         await refreshStatsIfNeeded();
     } catch (err) {
         appendLog('Gagal menghapus pesan', { error: err?.error });
-        alert(err?.error || 'Gagal menghapus pesan.');
+        showToast('error', err?.error || 'Gagal menghapus pesan.');
     }
 };
 
@@ -2596,17 +2745,31 @@ onUnmounted(() => {
                     <button @click="refreshAll" :disabled="isLoading" class="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1 text-[11px] font-bold text-sky-200 hover:bg-sky-400/20 transition disabled:opacity-40">
                         {{ isLoading ? 'Memuat...' : '↻ Refresh' }}
                     </button>
+                    <!-- Toggle Interkom Sidebar -->
+                    <button
+                        @click="toggleInterkom"
+                        class="relative rounded-full border px-3 py-1 text-[11px] font-bold transition"
+                        :class="showInterkom
+                            ? 'border-violet-400/50 bg-violet-400/15 text-violet-200 hover:bg-violet-400/25'
+                            : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'"
+                        title="Interkom Operator"
+                    >
+                        💬 Interkom
+                        <span
+                            v-if="!showInterkom && unreadInterkom > 0"
+                            class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-black text-white leading-none"
+                        >{{ unreadInterkom > 9 ? '9+' : unreadInterkom }}</span>
+                    </button>
                 </div>
             </div>
 
-            <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
+            <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
                 <article v-for="card in [
-                    { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
                     { label: 'Aktif', value: latestConvoStats.open, color: 'text-emerald-300' },
-                    { label: 'Belum Dibaca', value: latestConvoStats.pending, color: 'text-amber-300' },
-                    { label: 'Selesai', value: latestConvoStats.closed, color: 'text-slate-300' },
-                    { label: 'Pesan Masuk', value: latestMsgStats.todayInbound, color: 'text-cyan-300' },
-                    { label: 'Belum Dibalas', value: latestMsgStats.unreplied, color: latestMsgStats.unreplied > 0 ? 'text-rose-300' : 'text-emerald-300' },
+                    { label: 'Belum Dibalas', value: latestConvoStats.pending, color: latestConvoStats.pending === 0 ? 'text-emerald-300' : (latestConvoStats.pending > 10 ? 'text-rose-300' : 'text-amber-300') },
+                    { label: 'Pesan Masuk Baru', value: latestMsgStats.unreplied, color: 'text-cyan-300' },
+                    { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
+                    { label: 'Selesai', value: latestConvoStats.closed, color: 'text-emerald-300' },
                     { label: 'Pending Handover', value: latestConvoStats.pendingHandovers, color: latestConvoStats.pendingHandovers > 0 ? 'text-orange-300' : 'text-slate-400' },
                 ]" :key="`operator-summary-${card.label}`" class="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 backdrop-blur transition hover:bg-white/10">
                     <p class="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">{{ card.label }}</p>
@@ -2615,20 +2778,22 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <!-- ░░ Main: Inbox + Thread ░░ -->
-        <section class="grid min-w-0 grid-cols-[minmax(190px,44%),minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(230px,37%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(420px,30%,500px),minmax(0,1fr)] xl:gap-5 2xl:grid-cols-[clamp(450px,31%,540px),minmax(0,1fr)]">
+        <!-- ░░ Main: Inbox + Thread + Interkom ░░ -->
+        <div class="interkom-outer flex min-w-0 gap-3 sm:gap-4 xl:gap-5">
+
+        <!-- Inbox + Thread grid -->
+        <section class="min-w-0 flex-1 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(230px,37%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(380px,30%,460px),minmax(0,1fr)] xl:gap-5">
 
             <!-- Sidebar: Conversation List -->
-            <aside class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-1rem)] xl:sticky xl:top-2 xl:rounded-[2rem]">
+            <aside
+                class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-1rem)] xl:sticky xl:top-2 xl:rounded-[2rem]"
+                :class="{ 'hidden': isMobile && mobileView !== 'inbox', 'sm:flex': true }"
+            >
                 <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2.5 flex-shrink-0 sm:px-4 sm:py-3 xl:px-5">
                     <div>
                         <h2 class="text-sm font-black text-[var(--text-1)] sm:text-base">Inbox</h2>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button @click="pullInbox().then(refreshInboxList)" :disabled="isLoading"
-                                class="rounded-xl border border-[var(--border)] px-2 py-1 text-[9px] font-bold text-[var(--text-2)] hover:border-sky-400/50 hover:text-sky-400 transition sm:px-2.5 sm:text-[10px]">
-                            Pull
-                        </button>
                         <span class="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-2)] sm:px-2.5 sm:text-[10px]">{{ filteredConversations.length }}/{{ conversations.length }}</span>
                     </div>
                 </div>
@@ -2789,12 +2954,24 @@ onUnmounted(() => {
             </aside>
 
             <!-- Main: Thread + Reply -->
-            <div class="min-w-0 flex flex-col gap-3 sm:gap-4">
+            <div
+                class="min-w-0 flex flex-col gap-3 sm:gap-4"
+                :class="{ 'hidden': isMobile && mobileView !== 'thread', 'sm:flex': true }"
+            >
 
                 <!-- Thread Header -->
                 <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex items-start gap-3">
+                            <!-- Mobile back button -->
+                            <button
+                                v-if="isMobile"
+                                @click="backToMobileInbox"
+                                class="mt-1 flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)] transition hover:border-sky-400/50 hover:text-sky-400 flex-shrink-0"
+                                title="Kembali ke Inbox"
+                            >
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
                             <div v-if="activeConvo" class="mt-0.5 h-9 w-9 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-10 sm:w-10 xl:h-12 xl:w-12">
                                 <img
                                     v-if="activeConvo.profilePhotoUrl"
@@ -2871,16 +3048,20 @@ onUnmounted(() => {
 
                         <!-- Actions -->
                         <div v-if="activeConvo" class="flex flex-wrap gap-1.5 sm:gap-2">
-                            <button @click="refreshConvoMessages()" class="rounded-xl border border-[var(--border)] px-2 py-1.5 text-[10px] text-[var(--text-2)] hover:border-sky-400/50 transition sm:px-3 sm:text-xs">↻ Muat ulang</button>
 
-                            <!-- Close (owner or admin) -->
-                            <button v-if="(iMineConvo || isAdmin) && activeConvo.status !== 'closed'"
+                            <!-- Close (owner, admin, or unclaimed) -->
+                            <button v-if="(iMineConvo || isAdmin || activeConvo.ownership === 'unclaimed') && activeConvo.status !== 'closed'"
                                     @click="closeConvo"
                                     class="rounded-xl border border-slate-200 px-2 py-1.5 text-[10px] text-slate-600 hover:bg-slate-100 transition sm:px-3 sm:text-xs">
                                 ✓ Selesaikan
                             </button>
 
-
+                            <!-- Reopen (Superadmin only) -->
+                            <button v-if="isSuperAdmin && activeConvo.status === 'closed'"
+                                    @click="reopenConvo"
+                                    class="rounded-xl border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 hover:bg-amber-100 transition sm:px-3 sm:text-xs">
+                                ↻ Buka Kembali
+                            </button>
 
                             <!-- Force takeover (admin) -->
                             <button v-if="isAdmin && !iMineConvo && activeConvo.owner"
@@ -3086,6 +3267,11 @@ onUnmounted(() => {
                                             title="Hapus pesan yang gagal ini">
                                             Hapus
                                         </button>
+                                        <button v-else-if="msg.direction === 'outbound' && msg.status === 'failed' && msg._tempId && !msg.id" @click="removeTempMessage(msg._tempId)"
+                                            class="rounded-full border border-rose-300/70 bg-rose-50/90 px-2 py-0.5 text-[9px] font-black text-rose-700 transition hover:border-rose-400 hover:bg-rose-100"
+                                            title="Hapus pesan gagal dari daftar">
+                                            Hapus
+                                        </button>
                                         <span :class="outgoingStatusClass(msg)">
                                             <span v-if="msg.direction === 'outbound' && outgoingTickIcon(msg.status)" class="mr-1 font-black" :class="outgoingTickClass(msg.status)">
                                                 {{ outgoingTickIcon(msg.status) }}
@@ -3184,7 +3370,30 @@ onUnmounted(() => {
             </div>
         </section>
 
+        <!-- ── Interkom Sidebar Kanan ── -->
+        <transition name="interkom-slide">
+            <aside
+                v-if="showInterkom"
+                class="interkom-sidebar flex-shrink-0 xl:sticky xl:top-2 self-start"
+            >
+                <div class="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]/70 rounded-t-[1.5rem] xl:rounded-t-[2rem]">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-[var(--text-2)]">💬 Interkom</span>
+                    <button
+                        @click="toggleInterkom"
+                        class="h-6 w-6 flex items-center justify-center rounded-lg text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-[var(--text-1)] transition text-sm"
+                        title="Sembunyikan Interkom"
+                    >✕</button>
+                </div>
+                <InterkomPanel
+                    ref="interkomRef"
+                    :visible="showInterkom"
+                    class="rounded-b-[1.5rem] xl:rounded-b-[2rem] border border-t-0 border-[var(--border)] shadow-[var(--shadow)] overflow-hidden"
+                    style="height: calc(100vh - 10rem); min-height: 400px;"
+                />
+            </aside>
+        </transition>
 
+        </div><!-- end .interkom-outer -->
 
         <!-- ░░ Tiket: Pengaduan & Konsultasi ░░ -->
         <section v-if="isSuperAdmin" class="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] overflow-hidden">
@@ -3406,7 +3615,7 @@ onUnmounted(() => {
             <article v-else-if="isSuperAdmin" class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-[var(--shadow)]">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-black text-[var(--text-1)]">Status Device WA</h2>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button v-if="isAdmin" @click="runAction('restart', 'Restart')" :disabled="isBusy"
                                 class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition disabled:opacity-40">Restart</button>
                         <button v-if="isAdmin" @click="runAction('reconnect', 'Reconnect')" :disabled="isBusy"
@@ -3417,6 +3626,10 @@ onUnmounted(() => {
                                 class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-40" title="Tandai semua chat belum dibalas menjadi sudah, reset status inbox ke open">Reset State</button>
                         <button v-if="isAdmin" @click="syncContactsAction" :disabled="isBusy"
                                 class="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 transition disabled:opacity-40" title="Scan kontak WA untuk memperbarui mapping LID ke nomor HP">Sync Kontak</button>
+                        <button v-if="isSuperAdmin" @click="clearAllConversationsAction" :disabled="isBusy"
+                                class="rounded-xl border border-rose-400 bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition disabled:opacity-40" title="Hapus seluruh percakapan, pesan, dan handover dari inbox — tidak dapat dibatalkan">
+                            🗑 Hapus Semua Inbox
+                        </button>
                     </div>
                 </div>
 
@@ -3617,6 +3830,114 @@ onUnmounted(() => {
             </div>
         </Teleport>
 
+        <!-- ░░ Quest-Reward Toast Notification ░░ -->
+        <Teleport to="body">
+            <Transition name="toast-quest">
+                <div v-if="toast.isOpen"
+                     class="fixed inset-0 z-[10001] flex items-center justify-center px-4 pointer-events-none"
+                     style="perspective: 800px;"
+                >
+                    <div class="toast-quest-card pointer-events-auto relative overflow-hidden rounded-3xl p-[2px] shadow-2xl"
+                         :class="{
+                             'toast-glow-error': toast.type === 'error',
+                             'toast-glow-success': toast.type === 'success',
+                             'toast-glow-warning': toast.type === 'warning',
+                             'toast-glow-info': toast.type === 'info',
+                         }"
+                    >
+                        <!-- Animated gradient border -->
+                        <div class="toast-border-glow absolute inset-0 rounded-3xl"></div>
+
+                        <!-- Card content -->
+                        <div class="relative z-10 flex flex-col items-center gap-4 rounded-[1.35rem] bg-slate-950/95 px-8 py-7 backdrop-blur-xl sm:px-10 sm:py-8 min-w-[280px] max-w-[380px]">
+
+                            <!-- Glow ring behind icon -->
+                            <div class="toast-icon-ring relative flex h-16 w-16 items-center justify-center rounded-full sm:h-20 sm:w-20"
+                                 :class="{
+                                     'bg-rose-500/20 ring-rose-500/30': toast.type === 'error',
+                                     'bg-emerald-500/20 ring-emerald-500/30': toast.type === 'success',
+                                     'bg-amber-500/20 ring-amber-500/30': toast.type === 'warning',
+                                     'bg-sky-500/20 ring-sky-500/30': toast.type === 'info',
+                                 }"
+                                 style="ring-width: 2px;"
+                            >
+                                <!-- Pulsing particles -->
+                                <div class="toast-particles absolute inset-0 rounded-full"></div>
+
+                                <!-- Icon -->
+                                <span class="toast-icon-symbol relative z-10 text-3xl font-black sm:text-4xl"
+                                      :class="{
+                                          'text-rose-400': toast.type === 'error',
+                                          'text-emerald-400': toast.type === 'success',
+                                          'text-amber-400': toast.type === 'warning',
+                                          'text-sky-400': toast.type === 'info',
+                                      }"
+                                >
+                                    <svg v-if="toast.type === 'error'" class="h-8 w-8 sm:h-10 sm:w-10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path stroke-linecap="round" d="M15 9l-6 6M9 9l6 6" />
+                                    </svg>
+                                    <svg v-else-if="toast.type === 'success'" class="h-8 w-8 sm:h-10 sm:w-10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4" />
+                                    </svg>
+                                    <svg v-else-if="toast.type === 'warning'" class="h-8 w-8 sm:h-10 sm:w-10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                    </svg>
+                                    <svg v-else class="h-8 w-8 sm:h-10 sm:w-10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path stroke-linecap="round" d="M12 16h.01M12 8v4" />
+                                    </svg>
+                                </span>
+                            </div>
+
+                            <!-- Title -->
+                            <h3 class="text-center text-lg font-black tracking-tight sm:text-xl"
+                                :class="{
+                                    'text-rose-300': toast.type === 'error',
+                                    'text-emerald-300': toast.type === 'success',
+                                    'text-amber-300': toast.type === 'warning',
+                                    'text-sky-300': toast.type === 'info',
+                                }"
+                            >{{ toast.title }}</h3>
+
+                            <!-- Message -->
+                            <p class="text-center text-sm font-medium leading-relaxed text-slate-300/90 max-w-[300px]">
+                                {{ toast.message }}
+                            </p>
+
+                            <!-- Dismiss button -->
+                            <button
+                                @click="dismissToast"
+                                class="mt-1 rounded-2xl px-8 py-2.5 text-sm font-bold transition-all duration-200 active:scale-95"
+                                :class="{
+                                    'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 ring-1 ring-rose-500/30': toast.type === 'error',
+                                    'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 ring-1 ring-emerald-500/30': toast.type === 'success',
+                                    'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 ring-1 ring-amber-500/30': toast.type === 'warning',
+                                    'bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 ring-1 ring-sky-500/30': toast.type === 'info',
+                                }"
+                            >
+                                OK
+                            </button>
+
+                            <!-- Auto-dismiss progress bar -->
+                            <div class="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-3xl bg-white/5">
+                                <div class="toast-progress h-full rounded-full"
+                                     :class="{
+                                         'bg-rose-500': toast.type === 'error',
+                                         'bg-emerald-500': toast.type === 'success',
+                                         'bg-amber-500': toast.type === 'warning',
+                                         'bg-sky-500': toast.type === 'info',
+                                     }"
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+
         <!-- Footer kecil -->
         <footer class="mt-4 mb-2 flex justify-center">
             <a
@@ -3645,6 +3966,61 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ─── Interkom Outer Wrapper ──────────────────────────── */
+.interkom-outer {
+    align-items: flex-start;
+}
+
+/* ─── Interkom Sidebar ────────────────────────────────── */
+.interkom-sidebar {
+    width: 272px;
+    max-width: 272px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+    /* Di bawah lg: panel muncul sebagai overlay/fixed di bawah layar */
+    .interkom-sidebar {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: min(320px, 100vw);
+        max-width: 100vw;
+        z-index: 40;
+        border-radius: 1.25rem 1.25rem 0 0 !important;
+    }
+}
+
+/* ─── Interkom Slide Transition ───────────────────────── */
+.interkom-slide-enter-active,
+.interkom-slide-leave-active {
+    transition: opacity 0.25s ease, transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+.interkom-slide-enter-from,
+.interkom-slide-leave-to {
+    opacity: 0;
+    transform: translateX(24px);
+    max-width: 0;
+}
+.interkom-slide-enter-to,
+.interkom-slide-leave-from {
+    opacity: 1;
+    transform: translateX(0);
+    max-width: 272px;
+}
+
+@media (max-width: 1024px) {
+    .interkom-slide-enter-from,
+    .interkom-slide-leave-to {
+        transform: translateY(100%);
+    }
+    .interkom-slide-enter-to,
+    .interkom-slide-leave-from {
+        transform: translateY(0);
+    }
+}
+
 /* ─── Particle Canvas ─────────────────────────────── */
 .particle-canvas {
     position: absolute;
@@ -4094,4 +4470,208 @@ onUnmounted(() => {
         transform: rotate(360deg);
     }
 }
+
+/* ─── Mobile Responsive ──────────────────────────────── */
+@media (max-width: 639px) {
+    /* Full-width inbox on mobile */
+    aside {
+        max-height: calc(100vh - 8rem) !important;
+        max-height: calc(100dvh - 8rem) !important;
+    }
+
+    /* Touch-friendly scrolling */
+    .overflow-y-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Hide scrollbars on mobile for cleaner look */
+    :deep(::-webkit-scrollbar) {
+        width: 4px;
+    }
+
+    /* Thread viewport: use dynamic viewport height */
+    .thread-surface,
+    .thread-surface-dark {
+        max-height: calc(100vh - 16rem) !important;
+        max-height: calc(100dvh - 16rem) !important;
+    }
+
+    /* Bubbles: wider on mobile */
+    .bubble-outbound,
+    .bubble-inbound {
+        max-width: 94% !important;
+    }
+
+    /* Stats grid: 2 cols instead of 4 on very small screens */
+    .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ─── Quest-Reward Toast Notification ─────────────── */
+/* Entrance / Exit */
+.toast-quest-enter-active {
+    transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toast-quest-leave-active {
+    transition: opacity 0.25s ease, transform 0.3s ease;
+}
+.toast-quest-enter-from {
+    opacity: 0;
+    transform: scale(0.7) translateY(30px);
+}
+.toast-quest-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+.toast-quest-leave-to {
+    opacity: 0;
+    transform: scale(0.85) translateY(-15px);
+}
+
+/* Glow variants */
+.toast-glow-error {
+    box-shadow:
+        0 0 40px rgba(244, 63, 94, 0.25),
+        0 0 80px rgba(244, 63, 94, 0.12),
+        0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: toastGlowPulse-error 2s ease-in-out infinite;
+}
+.toast-glow-success {
+    box-shadow:
+        0 0 40px rgba(16, 185, 129, 0.25),
+        0 0 80px rgba(16, 185, 129, 0.12),
+        0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: toastGlowPulse-success 2s ease-in-out infinite;
+}
+.toast-glow-warning {
+    box-shadow:
+        0 0 40px rgba(245, 158, 11, 0.25),
+        0 0 80px rgba(245, 158, 11, 0.12),
+        0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: toastGlowPulse-warning 2s ease-in-out infinite;
+}
+.toast-glow-info {
+    box-shadow:
+        0 0 40px rgba(14, 165, 233, 0.25),
+        0 0 80px rgba(14, 165, 233, 0.12),
+        0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: toastGlowPulse-info 2s ease-in-out infinite;
+}
+
+/* Animated gradient border */
+.toast-border-glow {
+    background: conic-gradient(
+        from var(--toast-angle, 0deg),
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 10%,
+        transparent 20%,
+        rgba(255, 255, 255, 0.08) 50%,
+        transparent 60%,
+        rgba(255, 255, 255, 0.12) 80%,
+        transparent 100%
+    );
+    animation: toastBorderSpin 4s linear infinite;
+}
+
+.toast-glow-error .toast-border-glow {
+    background: conic-gradient(
+        from var(--toast-angle, 0deg),
+        transparent, rgba(244, 63, 94, 0.5), transparent, rgba(251, 113, 133, 0.3), transparent
+    );
+    animation: toastBorderSpin 3s linear infinite;
+}
+.toast-glow-success .toast-border-glow {
+    background: conic-gradient(
+        from var(--toast-angle, 0deg),
+        transparent, rgba(16, 185, 129, 0.5), transparent, rgba(52, 211, 153, 0.3), transparent
+    );
+    animation: toastBorderSpin 3s linear infinite;
+}
+.toast-glow-warning .toast-border-glow {
+    background: conic-gradient(
+        from var(--toast-angle, 0deg),
+        transparent, rgba(245, 158, 11, 0.5), transparent, rgba(251, 191, 36, 0.3), transparent
+    );
+    animation: toastBorderSpin 3s linear infinite;
+}
+.toast-glow-info .toast-border-glow {
+    background: conic-gradient(
+        from var(--toast-angle, 0deg),
+        transparent, rgba(14, 165, 233, 0.5), transparent, rgba(56, 189, 248, 0.3), transparent
+    );
+    animation: toastBorderSpin 3s linear infinite;
+}
+
+/* Icon ring pulse */
+.toast-icon-ring {
+    animation: toastIconPulse 1.8s ease-in-out infinite;
+}
+
+/* Icon entrance */
+.toast-icon-symbol {
+    animation: toastIconBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+}
+
+/* Particles shimmer */
+.toast-particles {
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 8px 8px;
+    animation: toastParticleShimmer 2s ease-in-out infinite;
+}
+
+/* Progress bar countdown */
+.toast-progress {
+    animation: toastProgressShrink 4.5s linear forwards;
+}
+
+@keyframes toastGlowPulse-error {
+    0%, 100% { box-shadow: 0 0 40px rgba(244, 63, 94, 0.25), 0 0 80px rgba(244, 63, 94, 0.12), 0 20px 60px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 55px rgba(244, 63, 94, 0.35), 0 0 100px rgba(244, 63, 94, 0.18), 0 20px 60px rgba(0, 0, 0, 0.4); }
+}
+@keyframes toastGlowPulse-success {
+    0%, 100% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.25), 0 0 80px rgba(16, 185, 129, 0.12), 0 20px 60px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 55px rgba(16, 185, 129, 0.35), 0 0 100px rgba(16, 185, 129, 0.18), 0 20px 60px rgba(0, 0, 0, 0.4); }
+}
+@keyframes toastGlowPulse-warning {
+    0%, 100% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.25), 0 0 80px rgba(245, 158, 11, 0.12), 0 20px 60px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 55px rgba(245, 158, 11, 0.35), 0 0 100px rgba(245, 158, 11, 0.18), 0 20px 60px rgba(0, 0, 0, 0.4); }
+}
+@keyframes toastGlowPulse-info {
+    0%, 100% { box-shadow: 0 0 40px rgba(14, 165, 233, 0.25), 0 0 80px rgba(14, 165, 233, 0.12), 0 20px 60px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 55px rgba(14, 165, 233, 0.35), 0 0 100px rgba(14, 165, 233, 0.18), 0 20px 60px rgba(0, 0, 0, 0.4); }
+}
+
+@property --toast-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes toastBorderSpin {
+    from { --toast-angle: 0deg; }
+    to   { --toast-angle: 360deg; }
+}
+
+@keyframes toastIconPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: 0.9; }
+}
+
+@keyframes toastIconBounce {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes toastParticleShimmer {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes toastProgressShrink {
+    0% { width: 100%; }
+    100% { width: 0%; }
+}
 </style>
+

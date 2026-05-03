@@ -511,6 +511,40 @@ class WaCarakaModuleTest extends TestCase
         $this->assertSame('Pesan baru', $matchingThreads[0]['lastMessagePreview']);
     }
 
+    public function test_inbox_shows_unresolved_lid_conversations(): void
+    {
+        \App\Models\WaCarakaConversation::create([
+            'conversation_id' => 'wa_lid_167430794035369_3494d36120',
+            'remote_number' => '167430794035369@lid',
+            'remote_name' => 'AAA',
+            'status' => 'pending',
+            'unread_count' => 3,
+            'last_activity_at' => now(),
+        ]);
+
+        WaCarakaMessage::create([
+            'direction' => 'inbound',
+            'remote_number' => '167430794035369@lid',
+            'message_text' => 'Selamat malam',
+            'message_type' => 'text',
+            'status' => 'received',
+            'conversation_id' => 'wa_lid_167430794035369_3494d36120',
+            'metadata' => [
+                'fromLid' => '167430794035369@lid',
+                'isLid' => true,
+            ],
+        ]);
+
+        $this->actingAs($this->operatorUser())
+            ->getJson(route('lawangsewu.wacaraka.api', ['action' => 'inbox']))
+            ->assertOk()
+            ->assertJsonFragment([
+                'conversationId' => 'wa_lid_167430794035369_3494d36120',
+                'remoteNumber' => '167430794035369@lid',
+                'lastMessagePreview' => 'Selamat malam',
+            ]);
+    }
+
     public function test_pull_inbox_stores_new_messages_from_runtime(): void
     {
         Http::fake([

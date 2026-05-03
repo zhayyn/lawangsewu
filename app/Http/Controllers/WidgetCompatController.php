@@ -21,21 +21,18 @@ class WidgetCompatController extends Controller
                 abort(404, 'Direktori widget belum tersedia.');
             }
 
-            return response()->file($publicFile, [
-                'Content-Type' => 'text/html; charset=UTF-8',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-            ]);
+            return response()->file($publicFile, $this->iframeHeaders());
         }
 
         $map = [
-            'berita-pengadilan' => 'berita-pengadilan.html',
-            'berita-pasmg' => 'berita-pasmg.html',
+            'berita-pengadilan'      => 'berita-pengadilan.html',
+            'berita-pasmg'           => 'berita-pasmg.html',
             'panduan-embed-pengumuman' => 'pa-semarang-embed-snippet.html',
-            'bridge-server10' => 'server10-data-app.html',
+            'bridge-server10'        => 'server10-data-app.html',
             'biaya-proses-berperkara' => 'biaya-proses-berperkara.html',
-            'biaya-perkara' => 'biaya-proses-berperkara.html',
-            'monitor-wa' => 'wa-v2-qr-viewer.html',
-            'agenda-kegiatan' => 'agenda-kegiatan.html',
+            'biaya-perkara'          => 'biaya-proses-berperkara.html',
+            'monitor-wa'             => 'wa-v2-qr-viewer.html',
+            'agenda-kegiatan'        => 'agenda-kegiatan.html',
         ];
 
         if (! isset($map[$page])) {
@@ -48,45 +45,50 @@ class WidgetCompatController extends Controller
             abort(404, 'Widget HTML tidak ditemukan.');
         }
 
-        return response()->file($file, [
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-        ]);
+        $this->logVisitor($page, request());
+
+        return response()->file($file, $this->iframeHeaders());
     }
 
     public function phpPublic(string $page): Response
     {
         $map = [
-            'monitor-persidangan' => 'monitor-antrian-sidang.php',
-            'monitor-antrian-sidang' => 'monitor-antrian-sidang.php',
-            'antrian-persidangan' => 'antrian-sidang.php',
-            'antrian-sidang' => 'antrian-sidang.php',
-            'dashboard-perkara' => 'statistik-perkara.php',
-            'statistik-perkara' => 'statistik-perkara.php',
-            'dashboard-ecourt' => 'statistik-ecourt.php',
-            'statistik-ecourt' => 'statistik-ecourt.php',
-            'dashboard-hakim' => 'statistik-hakim.php',
-            'statistik-hakim' => 'statistik-hakim.php',
-            'widget-pengumuman' => 'widget-pengumuman-rss.php',
-            'pengumuman-rss-widget' => 'widget-pengumuman-rss.php',
-            'pengumuman-peradilan' => 'pa-semarang-pengumuman.php',
-            'pa-semarang-pengumuman' => 'pa-semarang-pengumuman.php',
-            'pengumuman-peradilan-embed' => 'pa-semarang-pengumuman-embed.php',
+            'monitor-persidangan'       => 'monitor-antrian-sidang.php',
+            'monitor-antrian-sidang'    => 'monitor-antrian-sidang.php',
+            'antrian-persidangan'       => 'antrian-sidang.php',
+            'antrian-sidang'            => 'antrian-sidang.php',
+            'dashboard-perkara'         => 'statistik-perkara.php',
+            'statistik-perkara'         => 'statistik-perkara.php',
+            'dashboard-ecourt'          => 'statistik-ecourt.php',
+            'statistik-ecourt'          => 'statistik-ecourt.php',
+            'dashboard-hakim'           => 'statistik-hakim.php',
+            'statistik-hakim'           => 'statistik-hakim.php',
+            'widget-pengumuman'         => 'widget-pengumuman-rss.php',
+            'pengumuman-rss-widget'     => 'widget-pengumuman-rss.php',
+            'pengumuman-peradilan'      => 'pa-semarang-pengumuman.php',
+            'pa-semarang-pengumuman'    => 'pa-semarang-pengumuman.php',
+            'pengumuman-peradilan-embed'   => 'pa-semarang-pengumuman-embed.php',
             'pa-semarang-pengumuman-embed' => 'pa-semarang-pengumuman-embed.php',
-            'radius-ghaib' => 'biaya-radius-ghaib.php',
-            'biaya-radius-ghaib' => 'biaya-radius-ghaib.php',
-            'radius-kecamatan' => 'tabel-radius-kecamatan.php',
-            'tabel-radius-kecamatan' => 'tabel-radius-kecamatan.php',
-            'info-persidangan' => 'info-persidangan.php',
+            'radius-ghaib'              => 'biaya-radius-ghaib.php',
+            'biaya-radius-ghaib'        => 'biaya-radius-ghaib.php',
+            'radius-kecamatan'          => 'tabel-radius-kecamatan.php',
+            'tabel-radius-kecamatan'    => 'tabel-radius-kecamatan.php',
+            'info-persidangan'          => 'info-persidangan.php',
             'info-persidangan-hijautua' => 'info-persidangan-hijautua.php',
-            'info-persidangan-stabilo' => 'info-persidangan-stabilo.php',
+            'info-persidangan-stabilo'  => 'info-persidangan-stabilo.php',
         ];
 
         if (! isset($map[$page])) {
             abort(404);
         }
 
-        return $this->executePhpScript(base_path('widgets/views/php/public/'.$map[$page]));
+        $this->logVisitor($page, request());
+
+        return $this->executePhpScript(
+            base_path('widgets/views/php/public/'.$map[$page]),
+            'text/html; charset=UTF-8',
+            $this->iframeHeaders()
+        );
     }
 
     public function apiPengumuman(Request $request, ?string $source = null): Response
@@ -98,7 +100,8 @@ class WidgetCompatController extends Controller
 
         return $this->executePhpScript(
             base_path('widgets/views/php/api/api-pengumuman-rss.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
@@ -111,7 +114,8 @@ class WidgetCompatController extends Controller
 
         return $this->executePhpScript(
             base_path('widgets/views/php/api/api-pengumuman.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
@@ -119,7 +123,8 @@ class WidgetCompatController extends Controller
     {
         return $this->executePhpScript(
             base_path('widgets/views/php/api/statistik-data.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
@@ -127,7 +132,8 @@ class WidgetCompatController extends Controller
     {
         return $this->executePhpScript(
             base_path('widgets/views/php/api/jadwal-persidangan-api.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
@@ -140,7 +146,8 @@ class WidgetCompatController extends Controller
 
         return $this->executePhpScript(
             base_path('widgets/views/php/api/api-server10.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
@@ -153,12 +160,79 @@ class WidgetCompatController extends Controller
 
         return $this->executePhpScript(
             base_path('widgets/views/php/api/api-wa-v2.php'),
-            'application/json; charset=utf-8'
+            'application/json; charset=utf-8',
+            $this->apiHeaders()
         );
     }
 
-    private function executePhpScript(string $file, string $contentType = 'text/html; charset=UTF-8'): Response
+    private function iframeHeaders(): array
     {
+        $trustedOrigins = $this->trustedEmbedOrigins();
+
+        $frameAncestors = 'frame-ancestors ' . implode(' ', $trustedOrigins);
+
+        return [
+            'Content-Type'            => 'text/html; charset=UTF-8',
+            'Cache-Control'           => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Content-Security-Policy' => $frameAncestors,
+            'X-Frame-Options'         => 'ALLOWALL',
+            'X-Content-Type-Options'  => 'nosniff',
+        ];
+    }
+
+    private function apiHeaders(): array
+    {
+        $trustedOrigins = $this->trustedEmbedOrigins();
+
+        return [
+            'Content-Type'                  => 'application/json; charset=utf-8',
+            'Cache-Control'                 => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Access-Control-Allow-Origin'   => implode(', ', $trustedOrigins),
+            'Access-Control-Allow-Methods'  => 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers'  => 'Content-Type, X-Requested-With',
+            'X-Content-Type-Options'        => 'nosniff',
+            'X-Frame-Options'               => 'DENY',
+        ];
+    }
+
+    private function trustedEmbedOrigins(): array
+    {
+        $envOrigins = env('WIDGET_EMBED_ORIGINS', '');
+
+        if ($envOrigins !== '') {
+            return array_filter(array_map('trim', explode(' ', $envOrigins)));
+        }
+
+        return [
+            "'self'",
+            'https://pa-semarang.go.id',
+            'https://www.pa-semarang.go.id',
+            'https://lawangsewu.pa-semarang.go.id',
+            'http://localhost',
+            'http://localhost:3000',
+            'http://localhost:5173',
+        ];
+    }
+
+    private function logVisitor(string $widgetName, Request $request): void
+    {
+        try {
+            \App\Models\WidgetVisitor::create([
+                'widget_name' => $widgetName,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'visit_date' => now()->toDateString(),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to log widget visitor: ' . $e->getMessage());
+        }
+    }
+
+    private function executePhpScript(
+        string $file,
+        string $contentType = 'text/html; charset=UTF-8',
+        array $extraHeaders = []
+    ): Response {
         if (! is_file($file)) {
             abort(404, 'File widget tidak ditemukan.');
         }
@@ -183,9 +257,11 @@ class WidgetCompatController extends Controller
             }
         }
 
-        return response((string) $content, 200, [
-            'Content-Type' => $contentType,
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-        ]);
+        $headers = array_merge(
+            ['Content-Type' => $contentType, 'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0'],
+            $extraHeaders
+        );
+
+        return response((string) $content, 200, $headers);
     }
 }

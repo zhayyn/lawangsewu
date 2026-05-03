@@ -37,7 +37,6 @@ class GoogleController extends Controller
         return Socialite::driver('google')
             ->setScopes(['openid', 'email', 'profile'])
             ->with([
-                'response_mode' => 'form_post',
                 'access_type' => 'online',
             ])
             ->redirect();

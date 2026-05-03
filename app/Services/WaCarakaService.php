@@ -834,15 +834,39 @@ class WaCarakaService
         if (isset($metadata['media']) && is_array($metadata['media'])) {
             $kind = strtolower((string) ($metadata['media']['kind'] ?? $metadata['type'] ?? ''));
             $dataUrl = $metadata['media']['dataUrl'] ?? null;
+            $url     = $metadata['media']['url'] ?? null;
 
-            $url = $metadata['media']['url'] ?? null;
+            // ── Proxy URL internal runtime → URL Laravel (dikerjakan saat READ) ─────
+            // Ini menangani SEMUA pesan lama yang tersimpan sebelum fix normalizePayloadMediaUrls.
+            // Pattern: http://192.168.88.33:8790/internal/media/{token}/{filename}
+            $internalPattern = '#/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?#i';
 
+            foreach (['url', 'dataUrl'] as $field) {
+                $val = $metadata['media'][$field] ?? null;
+                if (is_string($val) && preg_match($internalPattern, $val, $m)) {
+                    $token     = strtolower($m[1]);
+                    $filename  = $m[2] ?? '';
+                    $proxyPath = $filename !== '' ? $token . '/' . $filename : $token;
+                    $proxyUrl  = route('lawangsewu.wacaraka.media', ['path' => $proxyPath]);
+                    $metadata['media'][$field] = $proxyUrl;
+                    // Sinkronkan keduanya agar Vue bisa memilih salah satu
+                    $metadata['media']['url']     = $proxyUrl;
+                    $metadata['media']['dataUrl'] = $proxyUrl;
+                    break;
+                }
+            }
+
+            // Refresh nilai setelah normalisasi di atas
+            $dataUrl = $metadata['media']['dataUrl'] ?? null;
+            $url     = $metadata['media']['url'] ?? null;
+
+            // Untuk non-image/sticker: hapus dataUrl mentah (base64/internal) agar tidak
+            // membebani payload JSON — kecuali sudah berupa URL proxy Laravel.
             if (
                 is_string($dataUrl)
-                && (
-                    !in_array($kind, ['image', 'sticker'], true)
-                    || (is_string($url) && $url !== '' && $url !== $dataUrl)
-                )
+                && !in_array($kind, ['image', 'sticker'], true)
+                && !str_starts_with($dataUrl, '/')
+                && !str_starts_with($dataUrl, 'http')
             ) {
                 unset($metadata['media']['dataUrl']);
             }
@@ -1262,19 +1286,27 @@ class WaCarakaService
             $senderName = $message->user ? ($message->user->alias ?: $message->user->name) : ($senderName ?? 'Operator');
         }
 
+        // Jika senderName tidak ada, coba pakai participant — tapi JANGAN tampilkan raw JID
+        // seperti 158445907009562@lid atau 6281234@s.whatsapp.net
         if (!$senderName && $participant !== '') {
-            $senderName = $participant;
+            // Cek apakah participant berformat JID WhatsApp
+            if (preg_match('/@(s\.whatsapp\.net|g\.us|lid)$/i', $participant)) {
+                // Jangan pakai JID mentah sebagai nama — biarkan null, frontend akan fallback ke remoteName
+                $senderName = null;
+            } else {
+                $senderName = $participant;
+            }
         }
 
         if (!$senderName) {
-            $senderName = $message->direction === 'outbound' ? 'Operator' : 'Kontak';
+            $senderName = $message->direction === 'outbound' ? 'Operator' : null; // null = frontend handles fallback
         }
 
         return [
-            'is_group' => $isGroup,
-            'group_name' => $groupName,
+            'is_group'    => $isGroup,
+            'group_name'  => $groupName,
             'sender_name' => $senderName,
-            'sender_key' => $participant !== '' ? $participant : ($isGroup ? $remoteJid : $remote),
+            'sender_key'  => $participant !== '' ? $participant : ($isGroup ? $remoteJid : $remote),
         ];
     }
 

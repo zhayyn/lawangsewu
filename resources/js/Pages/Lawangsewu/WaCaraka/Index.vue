@@ -3283,9 +3283,9 @@ onUnmounted(() => {
                                      :class="bubbleMetaClass(msg)">
                                     <span class="inline-flex items-center gap-1.5">
                                         <span v-if="msg.isGroup && msg.direction === 'inbound'" class="font-bold" :class="msg.senderColorClass">
-                                            {{ msg.senderDisplay }}
+                                            {{ msg.senderDisplay || 'Anggota Grup' }}
                                         </span>
-                                        <span v-else>{{ msg.direction === 'outbound' ? (msg.senderDisplay || msg.operator || 'Anda') : (msg.senderDisplay || 'Kontak') }}</span>
+                                        <span v-else>{{ msg.direction === 'outbound' ? (msg.senderDisplay || msg.operator || 'Anda') : (msg.senderDisplay || activeConvo?.remoteName || activeConvo?.resolvedNumber || 'Kontak') }}</span>
                                         <span v-if="msg.isGroup" class="rounded-full bg-slate-200/70 px-1.5 py-[1px] text-[9px] font-black uppercase tracking-wide text-slate-600">grup</span>
                                     </span>
                                     <span class="whitespace-nowrap">{{ msg.sentAt }}</span>

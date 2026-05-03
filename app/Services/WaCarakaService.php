@@ -96,10 +96,21 @@ class WaCarakaService
 
     private function wrap(\Illuminate\Http\Client\Response $response): array
     {
+        $data = $response->json();
+        $error = null;
+        $detail = null;
+
+        if (is_array($data)) {
+            $error = $data['error'] ?? $data['message'] ?? null;
+            $detail = $data['detail'] ?? $data['details'] ?? null;
+        }
+
         return [
             'ok'     => $response->successful(),
             'status' => $response->status(),
-            'data'   => $response->json(),
+            'data'   => $data,
+            'error'  => is_string($error) && trim($error) !== '' ? $error : null,
+            'detail' => is_string($detail) && trim($detail) !== '' ? $detail : null,
         ];
     }
 
@@ -506,7 +517,7 @@ class WaCarakaService
                 'caption' => $caption,
                 'byteLength' => $byteLength,
                 // Prefer bridge source URL for large docs/files, fallback to original data URL.
-                'dataUrl' => $kind === 'image' || $kind === 'sticker' ? ($mediaUrl ?? $sourceUrl) : null,
+                'dataUrl' => ($kind === 'image' || $kind === 'sticker') && !$sourceUrl ? $mediaUrl : null,
                 'url' => $sourceUrl ?? $mediaUrl,
             ],
         );
@@ -809,9 +820,35 @@ class WaCarakaService
             'wa_message_id' => $payload['id'] ?? $payload['messageId'] ?? null,
             'status' => $payload['status'] ?? ($direction === 'inbound' ? 'received' : 'sent'),
             'conversation_id' => WaCarakaMessage::conversationIdFor($remoteNumber),
-            'metadata' => $payload,
+            'metadata' => $this->compactMessageMetadata($payload),
             'occurred_at' => $timestamp,
         ];
+    }
+
+    private function compactMessageMetadata(array $metadata): array
+    {
+        if (isset($metadata['raw']) && is_array($metadata['raw'])) {
+            unset($metadata['raw']['mediaData']);
+        }
+
+        if (isset($metadata['media']) && is_array($metadata['media'])) {
+            $kind = strtolower((string) ($metadata['media']['kind'] ?? $metadata['type'] ?? ''));
+            $dataUrl = $metadata['media']['dataUrl'] ?? null;
+
+            $url = $metadata['media']['url'] ?? null;
+
+            if (
+                is_string($dataUrl)
+                && (
+                    !in_array($kind, ['image', 'sticker'], true)
+                    || (is_string($url) && $url !== '' && $url !== $dataUrl)
+                )
+            ) {
+                unset($metadata['media']['dataUrl']);
+            }
+        }
+
+        return $metadata;
     }
 
     private function storeWebhookMessage(array $attributes): WaCarakaMessage
@@ -1107,7 +1144,7 @@ class WaCarakaService
             ->reverse()
             ->values()
             ->map(function (WaCarakaMessage $msg) {
-                $metadata = is_array($msg->metadata) ? $msg->metadata : [];
+                $metadata = $this->compactMessageMetadata(is_array($msg->metadata) ? $msg->metadata : []);
                 $context = $this->messageContext($msg);
 
                 return [

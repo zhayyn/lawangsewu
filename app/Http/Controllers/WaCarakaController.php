@@ -269,18 +269,44 @@ class WaCarakaController extends Controller
 
     private function sendMedia(Request $request): array
     {
+        $maxBytes = (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024);
+
         $validated = $request->validate([
             'to' => 'required_without:conversation_id|string|min:8|max:32',
             'conversation_id' => 'nullable|string|max:255',
             'media_kind' => 'required|string|in:image,sticker,video,audio,document',
-            'media_url' => 'required|string',
+            'media_url' => 'required_without:media_file|nullable|string',
+            'media_file' => 'required_without:media_url|nullable|file|max:' . max(1, (int) ceil($maxBytes / 1024)),
             'mime_type' => 'nullable|string|max:255',
             'file_name' => 'nullable|string|max:255',
             'caption' => 'nullable|string|max:4096',
             'ptt' => 'nullable|boolean',
         ]);
 
-        $maxBytes = (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024);
+        if ($request->hasFile('media_file')) {
+            $uploaded = $request->file('media_file');
+            $fileBytes = (int) $uploaded->getSize();
+
+            if ($fileBytes > $maxBytes) {
+                return [
+                    'ok' => false,
+                    'status' => 422,
+                    'error' => 'Ukuran file melebihi batas maksimum ' . max(1, (int) round($maxBytes / (1024 * 1024))) . ' MB.',
+                ];
+            }
+
+            $mimeType = $validated['mime_type'] ?? $uploaded->getMimeType() ?? 'application/octet-stream';
+            $fileName = $validated['file_name'] ?? $uploaded->getClientOriginalName();
+
+            $validated['media_url'] = sprintf(
+                'data:%s;base64,%s',
+                $mimeType,
+                base64_encode((string) file_get_contents($uploaded->getRealPath())),
+            );
+            $validated['mime_type'] = $mimeType;
+            $validated['file_name'] = $fileName;
+        }
+
         $payloadBytes = $this->mediaPayloadBytes((string) $validated['media_url']);
 
         if ($payloadBytes > $maxBytes) {

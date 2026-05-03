@@ -16,6 +16,7 @@ use App\Services\WaCarakaChatbotService;
 use App\Services\WaCarakaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -396,6 +397,116 @@ class WaCarakaModuleTest extends TestCase
             'message_type' => 'sticker',
             'status' => 'sent',
         ]);
+    }
+
+    public function test_send_media_accepts_multipart_file_payload(): void
+    {
+        Http::fake([
+            'http://127.0.0.1:8790/send-media' => Http::response([
+                'ok' => true,
+                'messageId' => 'media-file-001',
+                'media' => [
+                    'kind' => 'image',
+                    'mimetype' => 'image/png',
+                    'fileName' => 'gugatan.png',
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($this->operatorUser())
+            ->post(route('lawangsewu.wacaraka.api', ['action' => 'send-media']), [
+                'to' => '628123456789',
+                'media_kind' => 'image',
+                'media_file' => UploadedFile::fake()->image('gugatan.png', 320, 480)->size(128),
+                'mime_type' => 'image/png',
+                'file_name' => 'gugatan.png',
+                'caption' => 'Contoh gugatan',
+            ])
+            ->assertOk()
+            ->assertJsonFragment(['messageId' => 'media-file-001']);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://127.0.0.1:8790/send-media'
+                && $request['media_kind'] === 'image'
+                && str_starts_with((string) $request['media_url'], 'data:image/png;base64,')
+                && $request['file_name'] === 'gugatan.png';
+        });
+
+        $this->assertDatabaseHas('wa_caraka_messages', [
+            'remote_number' => '628123456789',
+            'direction' => 'outbound',
+            'message_type' => 'image',
+            'status' => 'sent',
+        ]);
+    }
+
+    public function test_failed_send_media_returns_runtime_error_message(): void
+    {
+        Http::fake([
+            'http://127.0.0.1:8790/send-media' => Http::response([
+                'ok' => false,
+                'error' => 'Nomor tidak valid/tidak terdaftar',
+            ], 502),
+        ]);
+
+        $this->actingAs($this->operatorUser())
+            ->postJson(route('lawangsewu.wacaraka.api', ['action' => 'send-media']), [
+                'to' => '628000000000',
+                'media_kind' => 'image',
+                'media_url' => 'data:image/png;base64,SGVsbG8=',
+                'mime_type' => 'image/png',
+                'file_name' => 'contoh.png',
+            ])
+            ->assertStatus(502)
+            ->assertJsonFragment([
+                'error' => 'Nomor tidak valid/tidak terdaftar',
+            ]);
+
+        $this->assertDatabaseHas('wa_caraka_messages', [
+            'remote_number' => '628000000000',
+            'direction' => 'outbound',
+            'message_type' => 'image',
+            'status' => 'failed',
+        ]);
+    }
+
+    public function test_conversation_messages_omit_raw_media_payloads(): void
+    {
+        $conversationId = 'wa_lid_123456789_abc123';
+
+        \App\Models\WaCarakaConversation::create([
+            'conversation_id' => $conversationId,
+            'remote_number' => '123456789@lid',
+            'status' => 'open',
+            'last_activity_at' => now(),
+        ]);
+
+        WaCarakaMessage::create([
+            'direction' => 'inbound',
+            'remote_number' => '123456789@lid',
+            'message_text' => 'audio.mp3',
+            'message_type' => 'document',
+            'status' => 'received',
+            'conversation_id' => $conversationId,
+            'metadata' => [
+                'type' => 'document',
+                'media' => [
+                    'kind' => 'document',
+                    'fileName' => 'audio.mp3',
+                    'dataUrl' => 'data:audio/mpeg;base64,QUJD',
+                ],
+                'raw' => [
+                    'mediaData' => str_repeat('A', 4096),
+                    'fileName' => 'audio.mp3',
+                ],
+            ],
+        ]);
+
+        $messages = app(WaCarakaService::class)->conversationMessages($conversationId);
+
+        $this->assertSame('audio.mp3', $messages[0]['metadata']['media']['fileName']);
+        $this->assertArrayNotHasKey('dataUrl', $messages[0]['metadata']['media']);
+        $this->assertArrayNotHasKey('mediaData', $messages[0]['metadata']['raw']);
     }
 
     // ──────────────────────────────────────────────

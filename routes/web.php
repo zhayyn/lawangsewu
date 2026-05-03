@@ -233,9 +233,6 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::middleware('permission:admin.laporan')->group(function () {
         Route::get('/laporan', [LaporanController::class, 'index'])->name('laporan.index');
         Route::post('/laporan/generate', [LaporanController::class, 'generate'])->name('laporan.generate');
-    });
-
-    Route::middleware('permission:admin.laporan')->group(function () {
         Route::get('/analytics', [\App\Http\Controllers\Admin\AnalyticsController::class, 'index'])->name('analytics.index');
     });
 

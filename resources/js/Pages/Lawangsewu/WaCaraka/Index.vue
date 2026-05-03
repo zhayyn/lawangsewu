@@ -773,6 +773,7 @@ const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) =
     const method = String(options.method || 'get').toUpperCase();
     const url = route('lawangsewu.wacaraka.api', { action });
     const query = options.params ? '?' + new URLSearchParams(options.params).toString() : '';
+    const isFormData = typeof FormData !== 'undefined' && options.data instanceof FormData;
     const xhr = new XMLHttpRequest();
     xhr.open(method, url + query, true);
     xhr.setRequestHeader('Accept', 'application/json');
@@ -781,7 +782,7 @@ const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) =
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     if (csrfToken) xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
 
-    if (options.data) {
+    if (options.data && !isFormData) {
         xhr.setRequestHeader('Content-Type', 'application/json');
     }
 
@@ -800,10 +801,13 @@ const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) =
             return;
         }
 
-        reject(normalizeApiError(xhr.status, json?.error));
+        const error = normalizeApiError(xhr.status, json?.error);
+        error.response = json;
+        error.responseText = xhr.responseText || '';
+        reject(error);
     };
 
-    xhr.onerror = () => reject({ status: 0, error: 'Jaringan terputus saat mengirim permintaan.' });
+    xhr.onerror = () => reject({ status: 0, error: 'Jaringan terputus saat mengirim permintaan.', response: {}, responseText: '' });
 
     if (typeof options.onUploadProgress === 'function' && xhr.upload) {
         xhr.upload.onprogress = (event) => {
@@ -812,7 +816,7 @@ const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) =
         };
     }
 
-    xhr.send(options.data ? JSON.stringify(options.data) : null);
+    xhr.send(options.data ? (isFormData ? options.data : JSON.stringify(options.data)) : null);
 });
 
 const appendLog = (title, payload = null) => {
@@ -904,6 +908,20 @@ const dataUrlByteLength = (dataUrl) => {
     else if (payload.endsWith('=')) padding = 1;
 
     return Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
+};
+
+const dataUrlToBlob = (dataUrl, fallbackMime = 'application/octet-stream') => {
+    const value = String(dataUrl || '');
+    const [header, payload = ''] = value.split(',', 2);
+    const mime = header.match(/^data:([^;,]+)/i)?.[1] || fallbackMime;
+    const binary = window.atob((payload || '').replace(/\s+/g, ''));
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+    }
+
+    return new Blob([bytes], { type: mime });
 };
 
 const compressImageDataUrl = async (dataUrl, mimeType = 'image/jpeg', maxBytes = MAX_MEDIA_FILE_BYTES) => {
@@ -1165,12 +1183,15 @@ const onMediaFileChange = async (event) => {
             return;
         }
 
+        const finalBlob = dataUrlToBlob(finalDataUrl, mime);
+
         mediaAttachment.value = {
             name: file.name,
-            size: finalByteLength || file.size,
+            size: finalBlob.size || finalByteLength || file.size,
             mime,
             kind,
             dataUrl: finalDataUrl,
+            blob: finalBlob,
         };
     } catch {
         replyState.value = 'error';
@@ -1924,10 +1945,8 @@ const refreshInboxList = async (preserveActive = true) => {
             activeConvoId.value = preferredConvoId;
         }
 
-        // Prefetch lebih agresif agar konversasi sudah siap saat operator klik
-        conversations.value
-            .slice(0, operatorLiteMode.value ? 6 : 10)
-            .forEach((conversation) => prefetchConversation(conversation.conversationId));
+        // Prefetch tetap tersedia saat hover/focus item inbox, tapi jangan otomatis
+        // saat refresh karena media inline bisa membuat browser terasa lambat.
     } catch {
         /* silent */
     }
@@ -2274,18 +2293,26 @@ const replyToConversation = async () => {
     composerRows();
 
     try {
+        const mediaForm = media ? new FormData() : null;
+        if (mediaForm) {
+            mediaForm.append('conversation_id', activeConvoId.value);
+            mediaForm.append('media_kind', media.kind);
+            mediaForm.append('mime_type', media.mime || '');
+            mediaForm.append('file_name', media.name || '');
+            mediaForm.append('caption', text || '');
+            mediaForm.append('ptt', media.kind === 'audio' ? '1' : '0');
+
+            if (media.blob) {
+                mediaForm.append('media_file', media.blob, media.name || 'media.bin');
+            } else {
+                mediaForm.append('media_url', media.dataUrl || '');
+            }
+        }
+
         const result = media
             ? await callApiWithXhr('send-media', {
                 method: 'post',
-                data: {
-                    conversation_id: activeConvoId.value,
-                    media_kind: media.kind,
-                    media_url: media.dataUrl,
-                    mime_type: media.mime,
-                    file_name: media.name,
-                    caption: text || null,
-                    ptt: media.kind === 'audio',
-                },
+                data: mediaForm,
                 onUploadProgress: (progress) => {
                     replyProgress.value = Math.max(replyProgress.value, progress);
                 },
@@ -2327,8 +2354,15 @@ const replyToConversation = async () => {
         replyState.value = 'error';
         
         const errorMsg = err?.error || err?.message || 'Terjadi kesalahan sistem.';
-        appendLog('Balasan gagal', { error: errorMsg });
-        showToast('error', errorMsg, 'Gagal Mengirim Pesan');
+        const statusText = Number(err?.status || 0) > 0 ? `HTTP ${err.status}` : 'network';
+        const responseError = err?.response?.error || err?.response?.message || null;
+        appendLog('Balasan gagal', {
+            status: statusText,
+            error: errorMsg,
+            responseError,
+            responseText: String(err?.responseText || '').slice(0, 240),
+        });
+        showToast('error', `${statusText}: ${errorMsg}`, 'Gagal Mengirim Pesan');
         
         // Restore input jika gagal agar ketikan user tidak hilang
         if (!replyText.value && text) replyText.value = text;
@@ -4674,4 +4708,3 @@ onUnmounted(() => {
     100% { width: 0%; }
 }
 </style>
-

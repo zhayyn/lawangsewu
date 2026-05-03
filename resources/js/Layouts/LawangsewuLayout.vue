@@ -80,13 +80,6 @@ const displayNavGroups = computed(() => {
                     badge: 'Admin',
                 },
                 {
-                    label: 'Laporan',
-                    short: 'LR',
-                    routeKey: 'admin-laporan',
-                    href: safeRoute('admin.laporan.index', '/admin/laporan'),
-                    badge: 'Admin',
-                },
-                {
                     label: 'Tailscale Network',
                     short: 'TS',
                     routeKey: 'tailscale',

@@ -23,20 +23,23 @@ class AnalyticsController extends Controller
             ->whereYear('visit_date', now()->year)
             ->count();
             
-        // 7 Hari Terakhir untuk Grafik (dengan padding 0 untuk hari kosong)
-        $last7DaysData = WidgetVisitor::select('visit_date', DB::raw('count(*) as total'))
+        // 7 Hari Terakhir untuk Grafik (Breakdown per Widget)
+        $last7DaysBreakdown = WidgetVisitor::select('visit_date', 'widget_name', DB::raw('count(*) as total'))
             ->where('visit_date', '>=', now()->subDays(6)->toDateString())
-            ->groupBy('visit_date')
-            ->orderBy('visit_date')
-            ->get()
-            ->pluck('total', 'visit_date');
+            ->groupBy('visit_date', 'widget_name')
+            ->get();
 
         $last7Days = collect();
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i)->toDateString();
+            $dayData = $last7DaysBreakdown->where('visit_date', $date);
+            
             $last7Days->push([
                 'visit_date' => $date,
-                'total'      => $last7DaysData->get($date, 0),
+                'total'      => $dayData->sum('total'),
+                'statistik_perkara' => $dayData->where('widget_name', 'statistik-perkara')->sum('total'),
+                'berita_pengadilan' => $dayData->where('widget_name', 'berita-pengadilan')->sum('total'),
+                'info_persidangan'  => $dayData->where('widget_name', 'info-persidangan')->sum('total'),
             ]);
         }
             

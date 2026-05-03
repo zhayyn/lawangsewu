@@ -39,27 +39,43 @@ onMounted(() => {
                 datasets: [
                     {
                         type: 'line',
-                        label: 'Tren Garis',
-                        data: data,
+                        label: 'Info Persidangan',
+                        data: props.stats.chart_data.map(d => d.info_persidangan),
                         borderColor: '#8b5cf6', // Violet
-                        backgroundColor: gradientLine,
+                        backgroundColor: 'transparent',
                         borderWidth: 3,
-                        tension: 0.4, // Smooth curve
-                        fill: true,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#8b5cf6',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        yAxisID: 'y',
+                    },
+                    {
+                        type: 'line',
+                        label: 'Statistik Perkara',
+                        data: props.stats.chart_data.map(d => d.statistik_perkara),
+                        borderColor: '#10b981', // Emerald/Green
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        yAxisID: 'y',
+                    },
+                    {
+                        type: 'line',
+                        label: 'Berita Pengadilan',
+                        data: props.stats.chart_data.map(d => d.berita_pengadilan),
+                        borderColor: '#3b82f6', // Blue
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 3,
                         yAxisID: 'y',
                     },
                     {
                         type: 'bar',
-                        label: 'Volume Batang',
-                        data: data,
+                        label: 'Total Pengunjung',
+                        data: props.stats.chart_data.map(d => d.total),
                         backgroundColor: gradientBar,
-                        borderRadius: 6, // Rounded bars
-                        borderSkipped: false,
+                        borderRadius: 6,
                         barPercentage: 0.6,
                         categoryPercentage: 0.8,
                         yAxisID: 'y',
@@ -74,7 +90,19 @@ onMounted(() => {
                     intersect: false,
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: { 
+                        display: true, 
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: { size: 10, weight: 'bold' },
+                            color: '#94a3b8'
+                        }
+                    },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.9)',
                         titleColor: '#f8fafc',

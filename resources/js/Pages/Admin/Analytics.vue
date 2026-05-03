@@ -132,6 +132,12 @@ onMounted(() => {
         });
     }
 });
+function getWidgetColor(name) {
+    if (name === 'statistik-perkara') return 'bg-emerald-500/10 text-emerald-500';
+    if (name === 'berita-pengadilan') return 'bg-blue-500/10 text-blue-500';
+    if (name === 'info-persidangan')  return 'bg-violet-500/10 text-violet-500';
+    return 'bg-slate-500/10 text-slate-500';
+}
 </script>
 
 <template>
@@ -237,7 +243,7 @@ onMounted(() => {
                                 </span>
                                 <span class="text-[13px] font-semibold text-[var(--text-1)]">{{ widget.widget_name }}</span>
                             </div>
-                            <span class="rounded-full bg-violet-500/10 px-2.5 py-0.5 text-[11px] font-bold text-violet-500">
+                            <span :class="['rounded-full px-2.5 py-0.5 text-[11px] font-bold', getWidgetColor(widget.widget_name)]">
                                 {{ widget.total }}
                             </span>
                         </li>

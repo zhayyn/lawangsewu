@@ -417,23 +417,86 @@ class GuestbookController extends Controller
         ]);
     }
 
+    public function updateInfo(Request $request, string $id): JsonResponse
+    {
+        // Only superadmin can update info
+        if (!optional(auth()->user())->isSuperAdmin()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Anda tidak memiliki izin untuk mengubah informasi tamu.',
+            ], 403);
+        }
+
+        $entry = GuestbookEntry::query()->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'nama' => ['required', 'string', 'max:120'],
+            'instansi' => ['required', 'string', 'max:160'],
+        ], [
+            'nama.required' => 'Nama tamu wajib diisi.',
+            'nama.max'      => 'Nama tamu maksimal 120 karakter.',
+            'instansi.required' => 'Asal instansi wajib diisi.',
+            'instansi.max'      => 'Asal instansi maksimal 160 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Validasi gagal.',
+                'errors'  => $validator->errors()->toArray(),
+            ], 422);
+        }
+
+        $oldName = $entry->name;
+        $oldInstitution = $entry->institution;
+
+        $entry->update([
+            'name' => $this->normalizeDisplayCase((string) $request->string('nama')),
+            'institution' => $this->normalizeDisplayCase((string) $request->string('instansi')),
+        ]);
+
+        Log::info("Guestbook entry {$id} info updated by superadmin", [
+            'user_id'  => optional(auth()->user())->id,
+            'old_name' => $oldName,
+            'new_name' => $entry->name,
+            'old_institution' => $oldInstitution,
+            'new_institution' => $entry->institution,
+        ]);
+
+        return response()->json([
+            'status'   => 'success',
+            'message'  => 'Data tamu berhasil diubah.',
+            'name' => $entry->name,
+            'institution' => $entry->institution,
+        ]);
+    }
+
+    private function deletePhotoFiles(string $entryId): void
+    {
+        $extensions = ['jpg', 'png', 'webp'];
+        
+        foreach ($extensions as $ext) {
+            try {
+                $storagePath = "guestbook/photos/{$entryId}.{$ext}";
+                if (Storage::disk('public')->exists($storagePath)) {
+                    Storage::disk('public')->delete($storagePath);
+                }
+                
+                $publicPath = public_path("guestbook/photos/{$entryId}.{$ext}");
+                if (File::exists($publicPath)) {
+                    File::delete($publicPath);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to delete photo {$ext} for guestbook entry {$entryId}", ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $entry = GuestbookEntry::query()->findOrFail($id);
 
-        // Delete photo files if they exist
-        try {
-            $photoPath = "guestbook/photos/{$id}.jpg";
-            if (Storage::disk('public')->exists($photoPath)) {
-                Storage::disk('public')->delete($photoPath);
-            }
-            if (File::exists(public_path("guestbook/photos/{$id}.jpg"))) {
-                File::delete(public_path("guestbook/photos/{$id}.jpg"));
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to delete photo for guestbook entry {$id}", ['error' => $e->getMessage()]);
-        }
-
+        $this->deletePhotoFiles($id);
         $entry->delete();
 
         Log::info("Guestbook entry {$id} deleted by operator", ['user_id' => optional(auth()->user())->id]);
@@ -463,18 +526,7 @@ class GuestbookController extends Controller
         $entries = GuestbookEntry::query()->whereIn('id', $ids)->get();
 
         foreach ($entries as $entry) {
-            try {
-                $photoPath = "guestbook/photos/{$entry->id}.jpg";
-                if (Storage::disk('public')->exists($photoPath)) {
-                    Storage::disk('public')->delete($photoPath);
-                }
-                if (File::exists(public_path("guestbook/photos/{$entry->id}.jpg"))) {
-                    File::delete(public_path("guestbook/photos/{$entry->id}.jpg"));
-                }
-            } catch (\Exception $e) {
-                Log::warning("Failed to delete photo for guestbook entry {$entry->id}", ['error' => $e->getMessage()]);
-            }
-
+            $this->deletePhotoFiles($entry->id);
             $entry->delete();
         }
 

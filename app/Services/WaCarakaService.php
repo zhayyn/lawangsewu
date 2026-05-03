@@ -1014,6 +1014,16 @@ class WaCarakaService
      */
     public function pullInbox(?string $since = null): array
     {
+        if ($since === null && WaCarakaDatabase::hasTable('wa_caraka_messages')) {
+            $latestMessageAt = WaCarakaMessage::query()->max('created_at');
+
+            if ($latestMessageAt) {
+                $since = Carbon::parse($latestMessageAt)
+                    ->subMinutes(5)
+                    ->toIso8601String();
+            }
+        }
+
         $query = $since ? ['since' => $since] : [];
 
         $response = $this->get('/messages', $query);

@@ -40,6 +40,7 @@ class PendopoAdminController extends Controller
             ],
             'stats' => $summary['stats'],
             'monthlySummary' => $summary['monthly_summary'],
+            'profileSummary' => $summary['profile_summary'],
             'recentEntries' => $summary['recent_entries'],
             'photoCount' => $summary['photo_count'],
             'legacy' => [

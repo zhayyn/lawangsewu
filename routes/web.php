@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CctvCameraController;
 use App\Http\Controllers\Admin\LaporanController;
+use App\Http\Controllers\Admin\PendopoAdminController;
 use App\Http\Controllers\Admin\SystemMonitorController;
 use App\Http\Controllers\Admin\UserAccessController;
 use App\Http\Controllers\Admin\WaCarakaAdminController;
@@ -159,6 +160,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::post('/buku-tamu/kelola/bulk-delete', [GuestbookController::class, 'bulkDestroy'])->name('lawangsewu.guestbook.bulk-delete');
     Route::post('/buku-tamu/kelola/settings', [GuestbookController::class, 'saveSettings'])->name('lawangsewu.guestbook.settings');
     Route::patch('/buku-tamu/kelola/{id}/rename', [GuestbookController::class, 'rename'])->name('lawangsewu.guestbook.rename');
+    Route::patch('/buku-tamu/kelola/{id}/update-info', [GuestbookController::class, 'updateInfo'])->name('lawangsewu.guestbook.update-info');
 
     // WA Caraka Dashboard & Operator Tools
     Route::get('/wa-caraka', [WaCarakaController::class, 'index'])->name('lawangsewu.wacaraka.index');
@@ -235,6 +237,11 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
         Route::post('/laporan/generate', [LaporanController::class, 'generate'])->name('laporan.generate');
         Route::get('/analytics', [\App\Http\Controllers\Admin\AnalyticsController::class, 'index'])->name('analytics.index');
     });
+
+    Route::get('/pendopo', [PendopoAdminController::class, 'index'])->name('pendopo.index');
+    Route::patch('/pendopo/settings', [PendopoAdminController::class, 'updateSettings'])->name('pendopo.settings.update');
+    Route::post('/pendopo/sync-legacy', [PendopoAdminController::class, 'syncLegacy'])->name('pendopo.sync');
+    Route::delete('/pendopo/entries/{entry}', [PendopoAdminController::class, 'destroyEntry'])->name('pendopo.entries.destroy');
 
     Route::middleware('permission:admin.cctv')->group(function () {
         Route::get('/cctv', [CctvCameraController::class, 'index'])->name('cctv.index');

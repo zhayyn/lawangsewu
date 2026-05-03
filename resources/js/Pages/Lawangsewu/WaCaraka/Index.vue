@@ -3193,9 +3193,13 @@ onUnmounted(() => {
                         </div>
                     </div>
 
-                    <div v-else-if="threadLoadingVisible" class="space-y-3 py-4 sm:space-y-4">
-                        <div v-for="placeholder in 4" :key="`thread-skeleton-${placeholder}`" class="flex" :class="placeholder % 2 === 0 ? 'justify-end' : 'justify-start'">
-                            <div class="thread-skeleton w-[72%] rounded-3xl px-4 py-4 sm:w-[58%]"></div>
+                    <div v-else-if="threadLoadingVisible" class="grid min-h-[280px] place-items-center px-4 text-center">
+                        <div class="thread-loading-panel" role="status" aria-live="polite">
+                            <span class="thread-loading-spinner" aria-hidden="true"></span>
+                            <span class="text-sm font-extrabold text-[var(--text)]">Memuat percakapan...</span>
+                            <span class="max-w-[18rem] text-xs leading-relaxed text-[var(--text-2)]">
+                                Pesan sedang disinkronkan dari WA Caraka. Thread akan tampil otomatis setelah data siap.
+                            </span>
                         </div>
                     </div>
 
@@ -4199,6 +4203,39 @@ onUnmounted(() => {
     animation: unreadPulse 1.8s ease-in-out infinite;
 }
 
+.thread-loading-panel {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    min-height: 150px;
+    width: min(100%, 24rem);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.86);
+    padding: 1.5rem;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.thread-surface-dark .thread-loading-panel {
+    border-color: rgba(96, 165, 250, 0.22);
+    background: rgba(15, 23, 42, 0.84);
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.34);
+}
+
+.thread-loading-spinner {
+    height: 2.25rem;
+    width: 2.25rem;
+    border-radius: 9999px;
+    border: 3px solid rgba(14, 165, 233, 0.22);
+    border-top-color: #0ea5e9;
+    animation: threadLoadingSpin 0.8s linear infinite;
+}
+
 .thread-skeleton {
     position: relative;
     overflow: hidden;
@@ -4472,6 +4509,12 @@ onUnmounted(() => {
 @keyframes skeletonSweep {
     100% {
         transform: translateX(100%);
+    }
+}
+
+@keyframes threadLoadingSpin {
+    to {
+        transform: rotate(360deg);
     }
 }
 

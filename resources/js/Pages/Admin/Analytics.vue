@@ -2,6 +2,7 @@
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
 import { Head } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
+import Chart from 'chart.js/auto';
 
 const props = defineProps({
     appMeta:   { type: Object, default: () => ({}) },
@@ -12,7 +13,7 @@ const props = defineProps({
 const chartCanvas = ref(null);
 
 onMounted(() => {
-    if (chartCanvas.value && window.Chart) {
+    if (chartCanvas.value) {
         const ctx = chartCanvas.value.getContext('2d');
         const labels = props.stats.chart_data.map(d => d.visit_date);
         const data = props.stats.chart_data.map(d => d.total);
@@ -23,40 +24,80 @@ onMounted(() => {
             data.push(0);
         }
 
-        new window.Chart(ctx, {
-            type: 'line',
+        const gradientBar = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientBar.addColorStop(0, 'rgba(56, 189, 248, 0.8)'); // Sky 400
+        gradientBar.addColorStop(1, 'rgba(56, 189, 248, 0.1)');
+
+        const gradientLine = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientLine.addColorStop(0, 'rgba(139, 92, 246, 0.4)'); // Violet 500
+        gradientLine.addColorStop(1, 'rgba(139, 92, 246, 0.0)');
+
+        new Chart(ctx, {
+            type: 'bar', // Mixed chart base
             data: {
                 labels: labels,
-                datasets: [{
-                    label: 'Pengunjung Web',
-                    data: data,
-                    borderColor: '#8b5cf6',
-                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#ffffff',
-                    pointBorderColor: '#8b5cf6',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                }]
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'Tren Garis',
+                        data: data,
+                        borderColor: '#8b5cf6', // Violet
+                        backgroundColor: gradientLine,
+                        borderWidth: 3,
+                        tension: 0.4, // Smooth curve
+                        fill: true,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#8b5cf6',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        yAxisID: 'y',
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Volume Batang',
+                        data: data,
+                        backgroundColor: gradientBar,
+                        borderRadius: 6, // Rounded bars
+                        borderSkipped: false,
+                        barPercentage: 0.6,
+                        categoryPercentage: 0.8,
+                        yAxisID: 'y',
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        displayColors: true,
+                        usePointStyle: true,
+                        boxPadding: 4,
+                    }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 1, color: '#94a3b8' },
-                        grid: { color: 'rgba(148, 163, 184, 0.1)', borderDash: [5, 5] }
+                        ticks: { stepSize: 1, color: '#94a3b8', font: { family: "'Inter', sans-serif", size: 11 } },
+                        grid: { color: 'rgba(148, 163, 184, 0.1)', borderDash: [5, 5] },
+                        border: { display: false }
                     },
                     x: {
-                        ticks: { color: '#94a3b8' },
-                        grid: { display: false }
+                        ticks: { color: '#94a3b8', font: { family: "'Inter', sans-serif", size: 11 } },
+                        grid: { display: false },
+                        border: { display: false }
                     }
                 }
             }
@@ -106,10 +147,11 @@ onMounted(() => {
                         <span class="text-4xl font-black tabular-nums tracking-tight text-[var(--text-1)]">{{ stats.today }}</span>
                         <span class="text-xs font-semibold text-[var(--text-3)]">kunjungan</span>
                     </div>
-                    <div class="mt-3 inline-flex items-center gap-1 rounded-full bg-white/50 px-2 py-0.5 text-[10px] font-bold text-[var(--text-2)] dark:bg-black/20">
-                        <span v-if="stats.today >= stats.yesterday" class="text-emerald-500">↑ Naiki</span>
-                        <span v-else class="text-red-500">↓ Turun</span>
-                        dibanding kemarin ({{ stats.yesterday }})
+                    <div class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/50 px-2.5 py-1 text-[10px] font-bold text-[var(--text-2)] dark:bg-black/20">
+                        <span v-if="stats.today > stats.yesterday" class="text-emerald-500">↑ Naik {{ stats.today - stats.yesterday }}</span>
+                        <span v-else-if="stats.today < stats.yesterday" class="text-red-500">↓ Turun {{ stats.yesterday - stats.today }}</span>
+                        <span v-else class="text-[var(--text-3)]">Stabil</span>
+                        <span class="opacity-60">dibanding kemarin ({{ stats.yesterday }})</span>
                     </div>
                 </div>
 

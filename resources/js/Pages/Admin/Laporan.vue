@@ -2,6 +2,7 @@
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
 import { ref, computed, onMounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import Chart from 'chart.js/auto';
 
 const props = defineProps({
     appMeta:      { type: Object, default: () => ({}) },
@@ -32,8 +33,8 @@ onMounted(() => {
     const chartData = props.visitorStats.chart_data || [];
     const labels = chartData.length ? chartData.map(d => d.visit_date) : ['—'];
     const data   = chartData.length ? chartData.map(d => d.total)      : [0];
-    if (window.Chart) {
-        new window.Chart(chartCanvas.value.getContext('2d'), {
+    if (chartCanvas.value) {
+        new Chart(chartCanvas.value.getContext('2d'), {
             type: 'line',
             data: {
                 labels,

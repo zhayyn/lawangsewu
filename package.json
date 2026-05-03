@@ -26,6 +26,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "chart.js": "^4.5.1",
         "emoji-picker-element": "^1.29.1",
         "lucide-vue-next": "^1.0.0"
     }

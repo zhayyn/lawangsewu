@@ -17,8 +17,10 @@ const IFRAME_LOAD_TIMEOUT_MS = 20_000;
 // Stagger delay per kamera agar tidak loading sekaligus
 const STAGGER_DELAY_MS = 400;
 
+const DEFAULT_ZONE = 'Pelayanan';
+
 const expandedCameraIndex = ref(null);
-const selectedZone = ref('all');
+const selectedZone = ref(DEFAULT_ZONE);
 const isIdle = ref(false);
 const isFullscreen = ref(false);
 const lastActivity = ref(Date.now());
@@ -185,8 +187,12 @@ function retryIframe(key) {
 onMounted(() => {
     const storedZone = window.localStorage.getItem(STORAGE_KEY);
 
+    // Hanya pakai localStorage jika user pernah memilih zona sebelumnya
+    // Default ke 'Pelayanan' agar tidak load semua zona sekaligus
     if (storedZone && zoneCatalog.value.some((zone) => zone.key === storedZone)) {
         selectedZone.value = storedZone;
+    } else {
+        selectedZone.value = DEFAULT_ZONE;
     }
 
     // Staggered loading: muat kamera satu per satu dengan jeda agar tidak overload

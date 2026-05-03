@@ -149,10 +149,11 @@ const resolveConfirmModal = (val) => {
 };
 
 // ─── Interkom Panel (Sidebar Kanan) ───────────────────
+// Default: tersembunyi. Hanya terbuka jika user sebelumnya sudah membukanya.
 const showInterkom = ref(
     typeof window !== 'undefined'
-        ? localStorage.getItem('wacaraka.showInterkom') !== 'false'
-        : true
+        ? localStorage.getItem('wacaraka.showInterkom') === 'true'
+        : false
 );
 const unreadInterkom = ref(0);
 const interkomRef = ref(null);

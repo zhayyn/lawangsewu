@@ -1,6 +1,9 @@
 <?php
 /* developed by zhayyn™ */
 
+// ⚠️ CRITICAL: Set timezone untuk ensure date consistency
+date_default_timezone_set('Asia/Jakarta');
+
 if (function_exists('opcache_reset')) {
     opcache_reset();
 }
@@ -56,6 +59,12 @@ if (isset($_GET['format_jadwal'])) {
     $http_code = 0;
     $error_log = array();
     $allRows = array();
+
+    // Helper: Check if today is a working day (Monday-Friday)
+    $isWorkingDay = function(): bool {
+        $dayOfWeek = (int) date('N'); // 1 = Monday, 7 = Sunday
+        return $dayOfWeek >= 1 && $dayOfWeek <= 5; // True untuk Senin-Jumat
+    };
 
     $buildRows = function (array $rawRows): array {
         $rows = array();
@@ -199,15 +208,21 @@ if (isset($_GET['format_jadwal'])) {
             )
         );
 
+        // Set timezone di MySQL untuk ensure consistency dengan PHP timezone
+        $pdo->exec("SET SESSION time_zone = '+07:00'");
+
         try {
+            // Use explicit date instead of CURDATE() to ensure timezone consistency
+            $todayDate = date('Y-m-d');
             $stmtSipp = $pdo->prepare(
                 'SELECT p.nomor_perkara, pjs.agenda, pjs.ruangan AS ruang_sidang,
                         pjs.keterangan AS keterangan_manual, pjs.dihadiri_oleh
                  FROM perkara_jadwal_sidang pjs
                  LEFT JOIN perkara p ON p.perkara_id = pjs.perkara_id
-                 WHERE pjs.tanggal_sidang = CURDATE()
+                 WHERE DATE(pjs.tanggal_sidang) = :today_date
                  ORDER BY COALESCE(pjs.jam_sidang, "00:00:00") ASC, pjs.urutan ASC, pjs.id ASC'
             );
+            $stmtSipp->bindParam(':today_date', $todayDate, PDO::PARAM_STR);
             $stmtSipp->execute();
             $sippRows = $stmtSipp->fetchAll();
             if (is_array($sippRows) && count($sippRows) > 0) {
@@ -236,7 +251,8 @@ if (isset($_GET['format_jadwal'])) {
 
         if (count($allRows) === 0) {
             try {
-                $stmtLocal = $pdo->prepare('SELECT nomor_perkara, agenda, ruang_sidang, keterangan FROM jadwal_persidangan_local WHERE tanggal_sidang = CURDATE() ORDER BY urutan ASC, id ASC');
+                $stmtLocal = $pdo->prepare('SELECT nomor_perkara, agenda, ruang_sidang, keterangan FROM jadwal_persidangan_local WHERE DATE(tanggal_sidang) = :today_date ORDER BY urutan ASC, id ASC');
+                $stmtLocal->bindParam(':today_date', $todayDate, PDO::PARAM_STR);
                 $stmtLocal->execute();
                 $localRows = $stmtLocal->fetchAll();
                 if (is_array($localRows) && count($localRows) > 0) {
@@ -357,6 +373,13 @@ if (isset($_GET['format_jadwal'])) {
         }
     }
     unset($row);
+
+    // ⚠️ FILTER: Jika hari ini adalah weekend (Sabtu/Minggu), kosongkan jadwal
+    // Ini mencegah data stale dari fallback sources ditampilkan saat libur
+    if (!$isWorkingDay()) {
+        $allRows = array();
+        $error_log[] = 'Weekend detected: no sessions expected';
+    }
 
     $totalRows = count($allRows);
 

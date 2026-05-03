@@ -2010,7 +2010,7 @@ const refreshConvoMessages = async (convoId = activeConvoId.value, options = {})
     pendingConversationFetchIds.add(convoId);
     // Selalu tampilkan loading saat buka konversasi, bahkan jika ada cache
     // agar tidak langsung tampil "Belum ada pesan" sebelum data server datang
-    if (isVisibleThread) {
+    if (isVisibleThread && !background) {
         setThreadLoadingState(true);
     }
     if (isVisibleThread) {
@@ -2082,8 +2082,9 @@ const refreshAll = async () => {
         
         // Only attempt heavier calls if connected or at least has health response
         if (runtimeHealth.value?.status) {
-            // Pull first, then refresh list so ordering reflects newest incoming chat immediately.
-            await pullInbox();
+            // Pull inbox dinonaktifkan dari loop berkala untuk mencegah blocking/OOM.
+            // Memanfaatkan Webhook dari server Node.js (.33) untuk menerima pesan secara background.
+            // await pullInbox();
             await Promise.all([
                 refreshInboxList(),
                 operatorLiteMode.value ? Promise.resolve() : refreshQr(),
@@ -2305,6 +2306,20 @@ const selectConversation = async (convoId) => {
 
     // Mobile: auto-switch to thread view
     showMobileThread();
+
+    // Fetch profile picture if missing
+    if (activeConvo.value && !activeConvo.value.profilePhotoUrl) {
+        callApi('resolve-contacts', { method: 'post', data: { jids: [activeConvo.value.remoteNumber] } })
+            .then(res => {
+                if (res?.items?.[0]?.profilePhotoUrl) {
+                    mergeConversation({
+                        conversationId: activeConvoId.value,
+                        profilePhotoUrl: res.items[0].profilePhotoUrl,
+                    });
+                }
+            })
+            .catch(() => {});
+    }
 };
 
 const replyToConversation = async () => {

@@ -13,7 +13,7 @@ const props = defineProps({
 const page = usePage();
 
 // ── Form State ───────────────────────────────────────────
-const title       = ref('Laporan Sistem Lawangsewu');
+const title       = ref('Export Laporan');
 const orientation = ref('portrait');
 const content     = ref('');
 
@@ -197,7 +197,238 @@ _Ringkasan singkat kondisi bulan ini._
 - —
 - —`,
     },
+    {
+        id: 'ptsp',
+        label: '🏢 Laporan Antrian PTSP',
+        content: `# Laporan Kinerja Antrian PTSP
+
+## Ringkasan Periode
+
+_Tanggal Laporan: [DD MMM YYYY] — [DD MMM YYYY]_
+
+| Metrik                    | Jumlah | Target | Status |
+|---------------------------|--------|--------|--------|
+| Total Pengunjung          | —      | —      | —      |
+| Pengunjung Terlayani      | —      | 100%   | —      |
+| Rata-rata Waktu Tunggu    | — mnt  | 15 mnt | —      |
+| Tingkat Kepuasan Pelayanan| — %    | 90%    | —      |
+
+## Analisis Per Loket Layanan
+
+| Loket Pelayanan | Pengunjung | Rata-rata Waktu | Keterangan |
+|-----------------|------------|-----------------|------------|
+| Loket 1         | —          | —               | —          |
+| Loket 2         | —          | —               | —          |
+| Loket 3         | —          | —               | —          |
+
+## Rekomendasi Perbaikan
+
+- —
+- —
+- —`,
+    },
+    {
+        id: 'sidang',
+        label: '⚖️ Laporan Antrian Sidang',
+        content: `# Laporan Kinerja Antrian Sidang
+
+## Ringkasan Periode
+
+_Tanggal Laporan: [DD MMM YYYY] — [DD MMM YYYY]_
+
+| Metrik                       | Jumlah | Keterangan |
+|------------------------------|--------|------------|
+| Total Perkara Diajukan       | —      | —          |
+| Total Perkara Selesai        | —      | —          |
+| Total Perkara Ditunda        | —      | —          |
+| Rata-rata Durasi Sidang      | — mnt  | —          |
+
+## Rincian Per Ruang Sidang
+
+| Ruang Sidang | Perkara | Selesai | Durasi | Catatan |
+|--------------|---------|---------|--------|---------|
+| Ruang 1      | —       | —       | —      | —       |
+| Ruang 2      | —       | —       | —      | —       |
+| Ruang 3      | —       | —       | —      | —       |
+
+## Hambatan & Solusi
+
+- _Hambatan 1: [deskripsi]_
+  - Solusi: [deskripsi]
+- _Hambatan 2: [deskripsi]_
+  - Solusi: [deskripsi]`,
+    },
+    {
+        id: 'pendopo',
+        label: '👥 Laporan Tamu Pendopo',
+        content: `# Laporan Penerimaan Tamu Pendopo
+
+## Ringkasan Eksekutif
+
+_Periode: [BULAN] [TAHUN]_
+
+| Indikator           | Jumlah | Perubahan dari Periode Sebelumnya |
+|---------------------|--------|-----------------------------------|
+| Total Tamu          | —      | —                                 |
+| Tamu Hari Ini       | —      | —                                 |
+| Tamu Minggu Ini     | —      | —                                 |
+| Tamu Bulan Ini      | —      | —                                 |
+
+## Rincian Per Kategori Instansi
+
+| Kategori Instansi    | Jumlah | Persentase |
+|----------------------|--------|------------|
+| Mahkamah Agung       | —      | —%         |
+| Instansi Perusahaan  | —      | —%         |
+| Universitas/Sekolah  | —      | —%         |
+| Perseorangan         | —      | —%         |
+
+## Top 5 Instansi Pengunjung
+
+1. —
+2. —
+3. —
+4. —
+5. —
+
+## Catatan & Rekomendasi
+
+_Isi catatan dan rekomendasi di sini._`,
+    },
+    {
+        id: 'wacaraka',
+        label: '💬 Laporan WA Caraka',
+        content: `# Laporan Performa WhatsApp Caraka
+
+## Ringkasan Aktivitas
+
+| Metrik                        | Nilai  | Target | Status |
+|-------------------------------|--------|--------|--------|
+| Total Pesan Diterima          | —      | —      | —      |
+| Total Pesan Terproses         | —      | 100%   | —      |
+| Rata-rata Response Time       | — dtk  | 30 dtk | —      |
+| Tingkat Kesalahan Pemrosesan  | —%     | <5%    | —      |
+
+## Distribusi Tipe Permintaan
+
+| Tipe Permintaan | Jumlah | Terselesaikan | Status |
+|-----------------|--------|---------------|--------|
+| Informasi       | —      | —             | —      |
+| Keluhan         | —      | —             | —      |
+| Pengaduan       | —      | —             | —      |
+| Lainnya         | —      | —             | —      |
+
+## Waktu Response (Breakdown)
+
+| Range Time       | Jumlah | Persentase |
+|------------------|--------|------------|
+| < 10 detik       | —      | —%         |
+| 10-30 detik      | —      | —%         |
+| 30-60 detik      | —      | —%         |
+| > 60 detik       | —      | —%         |
+
+## Issues & Solusi
+
+- _Issue 1: [deskripsi]_ → Solusi: [deskripsi]
+- _Issue 2: [deskripsi]_ → Solusi: [deskripsi]`,
+    },
+    {
+        id: 'sippkomprehensif',
+        label: '📑 Laporan SIPP Komprehensif',
+        content: `# Laporan Data SIPP Hub
+
+## Ringkasan Periode
+
+_Tanggal: [DD MMM YYYY] — [DD MMM YYYY]_
+
+| Kategori           | Jumlah | Target | Capaian |
+|--------------------|--------|--------|---------|
+| Perkara Perdata    | —      | —      | —%      |
+| Perkara Pidana     | —      | —      | —%      |
+| Perkara TUN        | —      | —      | —%      |
+| Total Perkara      | —      | —      | —%      |
+
+## Status Pendistribusian
+
+| Status                 | Jumlah | Persentase |
+|------------------------|--------|------------|
+| Sudah Didistribusi     | —      | —%         |
+| Belum Didistribusi     | —      | —%         |
+| Error Distribusi       | —      | —%         |
+
+## Detail per Pengadilan
+
+| Pengadilan              | Perdata | Pidana | TUN | Total |
+|------------------------|---------|--------|-----|-------|
+| Pengadilan Negeri      | —       | —      | —   | —     |
+| Pengadilan Agama       | —       | —      | —   | —     |
+| Pengadilan Tata Usaha  | —       | —      | —   | —     |
+
+## Keterangan & Catatan
+
+_Isi keterangan dan catatan penting di sini._`,
+    },
+    {
+        id: 'dashboardkomprehensif',
+        label: '📊 Laporan Dashboard Komprehensif',
+        content: `# Laporan Dashboard Sistem Lawangsewu Komprehensif
+
+## I. Ringkasan Eksekutif
+
+_Periode: [DD MMM YYYY] — [DD MMM YYYY]_
+
+Laporan ini merangkum seluruh aktivitas dan kinerja sistem Lawangsewu mencakup:
+- Sistem Antrian PTSP & Sidang
+- Penerimaan Tamu (Pendopo)
+- Integrasi WhatsApp Caraka
+- SIPP Hub Integration
+- Analytics & Monitoring
+
+---
+
+## II. Metrik Utama Sistem
+
+| Area Layanan       | Total Aktivitas | Tingkat Keberhasilan | Status |
+|--------------------|-----------------|----------------------|--------|
+| PTSP Frontdesk     | —               | —%                   | —      |
+| Antrian Sidang     | —               | —%                   | —      |
+| Penerimaan Tamu    | —               | —%                   | —      |
+| WA Caraka          | —               | —%                   | —      |
+| SIPP Integration   | —               | —%                   | —      |
+
+## III. Performance Indicators
+
+### Uptime & Reliability
+- **Availability Sistem**: —%
+- **Response Time Rata-rata**: — ms
+- **Error Rate**: —%
+
+### User Engagement
+- **Total Pengguna Aktif**: —
+- **Total Transaksi**: —
+- **Rata-rata Session Duration**: — menit
+
+## IV. Kesimpulan & Rekomendasi
+
+### Pencapaian Positif
+- —
+- —
+
+### Area Perbaikan
+- —
+- —
+
+### Rekomendasi Strategis
+1. —
+2. —
+3. —
+
+---
+_Generated: [Tanggal & Waktu]_
+_Status: Laporan Resmi Lawangsewu_`,
+    },
 ]);
+
 
 function applyTemplate(t) {
     title.value   = t.label.replace(/^[^\w]+/, '').trim();
@@ -258,8 +489,8 @@ async function generatePdf() {
                         </svg>
                     </div>
                     <div>
-                        <h1 class="text-lg font-black text-[var(--text-1)] tracking-tight leading-none">Laporan Sistem</h1>
-                        <p class="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mt-0.5">PDF Generator • Markdown Engine</p>
+                        <h1 class="text-lg font-black text-[var(--text-1)] tracking-tight leading-none">Export Laporan</h1>
+                        <p class="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mt-0.5">Semua Laporan Monev Pelayanan • PDF Generator</p>
                     </div>
                 </div>
                 <span class="mt-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-violet-500/10 border border-violet-500/20 text-violet-400">Superadmin</span>

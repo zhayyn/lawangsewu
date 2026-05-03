@@ -179,7 +179,23 @@ const btnRefresh = document.getElementById('btnRefresh');
 const searchJenis = document.getElementById('searchJenis');
 const btnTvMode = document.getElementById('btnTvMode');
 const tvDuration = document.getElementById('tvDuration');
+
+// Determine Lawangsewu base URL for API calls
+// Prioritize absolute URL to Lawangsewu API to support embed in external sites (WordPress)
+const getLawangsewuApiBase = () => {
+    // Check if already in Lawangsewu domain
+    if (window.location.hostname.includes('lawangsewu') || window.location.pathname.includes('/lawangsewu')) {
+        return undefined; // Use relative URLs
+    }
+    // Return absolute URL to Lawangsewu when embedded elsewhere (e.g., WordPress)
+    return 'https://lawangsewu.pa-semarang.go.id';
+};
+
+const LAWANGSEWU_BASE = getLawangsewuApiBase();
+
 const API_CANDIDATES = [
+    ...(LAWANGSEWU_BASE ? [`${LAWANGSEWU_BASE}/widgets/views/php/api/statistik-data.php`] : []),
+    '/widgets/views/php/api/statistik-data.php',
     '/api/statistik-data',
     '/lawangsewu/api/statistik-data',
     '/lawangsewu/statistik-data',

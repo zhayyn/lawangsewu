@@ -79,6 +79,7 @@ class WaCarakaController extends Controller
             'history' => $this->wa->history(),
             'lid-mappings' => $this->wa->getLidMappings(),
             'sync-contacts' => $this->wa->syncContacts(),
+            'resolve-contacts' => $this->wa->resolveContactsMeta($request->input('jids', [])),
             'stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->stats()],
             'message-stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->messageStats()],
             'convo-stats' => ['ok' => true, 'status' => 200, 'data' => $this->conversations->stats()],

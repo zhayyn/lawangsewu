@@ -3299,16 +3299,14 @@ onUnmounted(() => {
                                             </button>
                                         </div>
                                     </div>
-                                    <a
+                                    <button
                                         v-if="msg.mediaUrl && msg.mediaKind && msg.mediaKind !== 'document'"
-                                        :href="msg.mediaUrl"
-                                        :download="msg.metadata?.media?.fileName || ''"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        type="button"
                                         class="inline-flex items-center rounded-lg border border-sky-300/60 bg-sky-50/60 px-2 py-1 text-[10px] font-bold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100/70"
+                                        @click.stop="downloadDocument(msg.mediaUrl, msg.metadata?.media?.fileName || extractMessageFileName(msg))"
                                     >
-                                        Unduh {{ messageTypeLabel(msg.mediaKind, msg) }}
-                                    </a>
+                                        ⬇ Unduh {{ messageTypeLabel(msg.mediaKind, msg) }}
+                                    </button>
                                 </div>
 
                                 <div class="mt-1.5 flex items-center justify-between gap-2 text-[10px]"

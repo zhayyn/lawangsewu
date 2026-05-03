@@ -127,13 +127,13 @@ class LawangsewuPortal
                 ],
             ],
             [
-                'label' => 'SIPP Hub & Data',
+                'label' => 'Monev Pelayanan',
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
                     ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Ready'],
+                    ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'guestbook.report', 'href' => route('lawangsewu.guestbook.report'), 'badge' => 'Ready'],
                     ...(self::isSuperAdmin()
                         ? [
-                            ['label' => 'WA Caraka Admin', 'short' => 'WA⚙', 'routeKey' => 'wacaraka.admin', 'href' => self::routeOrNull('admin.wacaraka.index'), 'badge' => 'Admin'],
                             ['label' => 'Laporan Sistem', 'short' => 'LS', 'routeKey' => 'laporan', 'href' => self::routeOrNull('admin.laporan.index'), 'badge' => 'Admin'],
                             ['label' => 'Lawangsewu Analytics', 'short' => 'LA', 'routeKey' => 'analytics', 'href' => self::routeOrNull('admin.analytics.index'), 'badge' => 'Admin']
                           ]

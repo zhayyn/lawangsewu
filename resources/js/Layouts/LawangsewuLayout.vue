@@ -87,6 +87,13 @@ const displayNavGroups = computed(() => {
                     badge: 'Superadmin',
                 },
                 {
+                    label: 'WA Caraka Admin',
+                    short: 'WA⚙',
+                    routeKey: 'wacaraka.admin',
+                    href: safeRoute('admin.wacaraka.index', '/admin/wa-caraka'),
+                    badge: 'Superadmin',
+                },
+                {
                     label: 'Kelola CCTV',
                     short: 'CC',
                     routeKey: 'admin-cctv',

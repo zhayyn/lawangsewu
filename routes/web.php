@@ -242,13 +242,11 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
         Route::patch('/cctv/{camera}', [CctvCameraController::class, 'update'])->name('cctv.update');
     });
 
-    Route::middleware('permission:admin.wacaraka')->group(function () {
-        // WA Caraka Admin (superadmin only)
-        Route::get('/wa-caraka', [WaCarakaAdminController::class, 'index'])->name('wacaraka.index');
-        Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaAdminController::class, 'api'])
-            ->where('action', '.*')
-            ->name('wacaraka.api');
-    });
+    // WA Caraka Admin (superadmin only)
+    Route::get('/wa-caraka', [WaCarakaAdminController::class, 'index'])->name('wacaraka.index');
+    Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaAdminController::class, 'api'])
+        ->where('action', '.*')
+        ->name('wacaraka.api');
 });
 
 require __DIR__.'/auth.php';

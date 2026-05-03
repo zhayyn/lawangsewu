@@ -131,7 +131,9 @@ class LawangsewuPortal
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
                     ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Ready'],
-                    ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'guestbook.report', 'href' => route('lawangsewu.guestbook.report'), 'badge' => 'Ready'],
+                    self::isSuperAdmin()
+                        ? ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'admin-pendopo', 'href' => self::routeOrNull('admin.pendopo.index') ?? route('lawangsewu.guestbook.report'), 'badge' => 'Admin']
+                        : ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'guestbook.report', 'href' => route('lawangsewu.guestbook.report'), 'badge' => 'Ready'],
                     ...(self::isSuperAdmin()
                         ? [
                             ['label' => 'Laporan Sistem', 'short' => 'LS', 'routeKey' => 'laporan', 'href' => self::routeOrNull('admin.laporan.index'), 'badge' => 'Admin'],
@@ -273,16 +275,19 @@ class LawangsewuPortal
 
     public static function cctvPayload(): array
     {
+        $activeCount  = CctvCamera::query()->active()->count();
+        $zoneCount    = CctvCamera::query()->active()->distinct('zone')->count('zone');
+
         return [
-            'appMeta' => self::appMeta(),
+            'appMeta'   => self::appMeta(),
             'navGroups' => self::navGroups(),
-            'alerts' => self::alerts(),
-            'cameras' => self::cameras(),
+            'alerts'    => self::alerts(),
+            'cameras'   => self::cameras(),
             'networkSummary' => [
-                'cameraCount' => CctvCamera::query()->active()->count(),
-                'locationCount' => CctvCamera::query()->active()->distinct('zone')->count('zone'),
-                'status' => 'Jaringan stabil',
-                'latency' => '1.2 detik',
+                'cameraCount'   => $activeCount,
+                'locationCount' => $zoneCount,
+                'status'        => $zoneCount > 0 ? "{$zoneCount} zona terpantau" : 'Tidak ada zona aktif',
+                'latency'       => '1.2 detik',
             ],
         ];
     }

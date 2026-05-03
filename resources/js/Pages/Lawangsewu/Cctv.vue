@@ -12,8 +12,10 @@ const props = defineProps({
 
 const STORAGE_KEY = 'lawangsewu-cctv-zone';
 const IDLE_TIMEOUT = 10 * 60 * 1000;
-// Setelah 8 detik tanpa iframe load event, tampilkan fallback "tidak tersedia"
-const IFRAME_LOAD_TIMEOUT_MS = 8_000;
+// Setelah 20 detik tanpa iframe load event, tampilkan fallback "tidak tersedia"
+const IFRAME_LOAD_TIMEOUT_MS = 20_000;
+// Stagger delay per kamera agar tidak loading sekaligus
+const STAGGER_DELAY_MS = 400;
 
 const expandedCameraIndex = ref(null);
 const selectedZone = ref('all');
@@ -187,8 +189,10 @@ onMounted(() => {
         selectedZone.value = storedZone;
     }
 
-    // Mulai timer untuk setiap kamera yang tampil
-    visibleCameras.value.forEach((camera) => startIframeTimer(camera.key));
+    // Staggered loading: muat kamera satu per satu dengan jeda agar tidak overload
+    visibleCameras.value.forEach((camera, i) => {
+        setTimeout(() => startIframeTimer(camera.key), i * STAGGER_DELAY_MS);
+    });
 
     resetIdleTimer();
     resetCameraHeaderTimer();
@@ -217,8 +221,10 @@ onUnmounted(() => {
 
 watch(selectedZone, (value) => {
     window.localStorage.setItem(STORAGE_KEY, value);
-    // Reset dan mulai timer untuk kamera yang tampil setelah ganti zona
-    visibleCameras.value.forEach((camera) => startIframeTimer(camera.key));
+    // Staggered setelah ganti zona
+    visibleCameras.value.forEach((camera, i) => {
+        setTimeout(() => startIframeTimer(camera.key), i * STAGGER_DELAY_MS);
+    });
 });
 </script>
 
@@ -405,13 +411,13 @@ watch(selectedZone, (value) => {
                         @click="expandCamera(index)"
                     >
                         <iframe
-                            :src="camera.iframeSrc"
+                            :src="iframeState[camera.key] === undefined ? '' : camera.iframeSrc"
                             :title="camera.name"
                             class="absolute inset-0 h-full w-full border-0 opacity-90 transition-opacity group-hover:opacity-100"
                             loading="lazy"
-                            allow="autoplay; fullscreen"
-                            referrerpolicy="strict-origin-when-cross-origin"
-                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                            allow="autoplay; fullscreen; picture-in-picture"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                             @load="onIframeLoad(camera.key)"
                             @error="onIframeError(camera.key)"
                         />

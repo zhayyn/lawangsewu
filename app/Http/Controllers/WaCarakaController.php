@@ -509,14 +509,21 @@ class WaCarakaController extends Controller
                 ->whereNull('replied_at')
                 ->update(['replied_at' => now()]);
 
+            // Kirim pesan macro penutup SETELAH response dikembalikan ke browser
+            // (fire-and-forget) agar operator tidak perlu menunggu runtime WA.
             if ($conversation->remote_number) {
                 $macroText = "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ";
-                $this->wa->sendText(
-                    $conversation->remote_number,
-                    $macroText,
-                    $this->senderLabel($request->user()),
-                    $request->user()->id
-                );
+                $remoteNumber  = $conversation->remote_number;
+                $senderLabel   = $this->senderLabel($request->user());
+                $userId        = $request->user()->id;
+                $waService     = $this->wa;
+                app()->terminating(static function () use ($waService, $remoteNumber, $macroText, $senderLabel, $userId) {
+                    try {
+                        $waService->sendText($remoteNumber, $macroText, $senderLabel, $userId);
+                    } catch (\Throwable) {
+                        // Silent — jangan crash setelah response dikirim
+                    }
+                });
             }
         }
 
@@ -729,7 +736,7 @@ class WaCarakaController extends Controller
             ->get();
 
         $deduped = $rows
-            ->groupBy(fn (WaCarakaConversation $conversation) => WaCarakaMessage::normalizeRemoteNumber((string) $conversation->remote_number))
+            ->groupBy(fn (WaCarakaConversation $conversation) => $conversation->resolved_number ?: WaCarakaMessage::normalizeRemoteNumber((string) $conversation->remote_number))
             ->map(function (Collection $group) use ($latestMessages) {
                 return $group->sortByDesc(function (WaCarakaConversation $conversation) use ($latestMessages) {
                     $message = $latestMessages->get($conversation->conversation_id);

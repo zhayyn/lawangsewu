@@ -3,6 +3,7 @@ import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
 import InterkomPanel from '@/Components/lawangsewu/InterkomPanel.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import 'emoji-picker-element';
 
 const props = defineProps({
     appMeta:   { type: Object, default: () => ({}) },
@@ -78,6 +79,13 @@ const mediaInputRef = ref(null);
 const mediaAttachment = ref(null);
 const sendTo     = ref('');
 const sendText   = ref('');
+
+const showEmojiPicker = ref(false);
+const toggleEmojiPicker = () => { showEmojiPicker.value = !showEmojiPicker.value; };
+const onEmojiSelect = (e) => {
+    replyText.value += e.detail.unicode;
+    replyTextareaRef.value?.focus();
+};
 const sendState  = ref('idle');
 const replyCooldownRef = ref(null);
 const sendCooldownRef = ref(null);
@@ -1530,7 +1538,7 @@ const normalizeConversation = (raw = {}) => {
     const waName = String(raw.remoteName || '').trim(); // notifyName from WhatsApp
     // Non-group title priority: alias > WA display name > normalized number
     const displayTitle = isGroup
-        ? (raw.displayTitle || groupName || 'Grup WhatsApp')
+        ? (aliasLabel || raw.displayTitle || groupName || 'Grup WhatsApp')
         : (aliasLabel || waName || getCleanRemoteNumber(remoteNumber));
 
     return {
@@ -2163,10 +2171,9 @@ const refreshAll = async () => {
                 activeConvoId.value ? refreshConvoMessages(activeConvoId.value, { background: true }) : Promise.resolve(),
             ]);
         } else {
-            // Unset data to indicate downtime
-            activeConvoId.value = '';
-            conversations.value = [];
-            conversationMessages.value = [];
+            // Runtime tidak merespons — jangan kosongkan daftar percakapan agar
+            // operator tidak kehilangan konteks. Cukup update status bar saja.
+            // Data lama tetap ditampilkan sampai koneksi pulih.
         }
     } catch (err) {
         appendLog('Error sinkronisasi', { message: err?.error || err?.message || 'Unknown' });
@@ -2993,17 +3000,34 @@ onUnmounted(() => {
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="truncate text-[10px] font-bold text-[var(--text-1)] sm:text-[11px] xl:text-[12px]">
-                                        <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle }}
+                                    <p class="flex min-w-0 items-baseline gap-1.5 font-bold text-[var(--text-1)] transition-all"
+                                       :class="!showInterkom ? 'text-[13px] sm:text-[14px] xl:text-[15px]' : 'text-[11px] sm:text-[12px] xl:text-[13px]'">
+                                        <span class="truncate">
+                                            <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle }}
+                                        </span>
+                                        <span class="shrink-0 font-mono text-[var(--text-2)] transition-all font-normal opacity-80"
+                                              :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
+                                            {{ primaryContactNumber(c.remoteNumber, c.resolvedNumber) }}
+                                        </span>
                                     </p>
                                     <!-- Unread badge -->
-                                    <span v-if="c.unreadCount > 0" class="unread-pill flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[8px] font-black text-white sm:px-2 sm:text-[9px]">
+                                    <span v-if="c.unreadCount > 0" class="unread-pill flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 font-black text-white transition-all"
+                                          :class="!showInterkom ? 'text-[10px] sm:px-2.5 sm:text-[11px]' : 'text-[9px] sm:px-2 sm:text-[10px]'">
                                         {{ c.unreadCount }}
                                     </span>
                                 </div>
 
-                                <p class="mt-0.5 text-[8px] text-[var(--text-2)] font-mono sm:text-[8px]">{{ primaryContactNumber(c.remoteNumber, c.resolvedNumber) }}</p>
-                                <p class="mt-0.5 line-clamp-1 text-[8px] text-[var(--text-2)] sm:text-[9px]">
+                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 truncate text-[var(--text-2)] transition-all"
+                                   :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
+                                    Nama WA: <span class="font-semibold">{{ c.remoteName }}</span>
+                                </p>
+                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 truncate text-[var(--text-2)] transition-all"
+                                   :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
+                                    Nama Group: <span class="font-semibold">{{ c.groupName }}</span>
+                                </p>
+
+                                <p class="mt-0.5 line-clamp-1 text-[var(--text-2)] transition-all"
+                                   :class="!showInterkom ? 'text-[11px] sm:text-[12px]' : 'text-[9px] sm:text-[10px]'">
                                     {{ conversationPreviewText(c) }}
                                 </p>
                                 <div v-if="inboxPreviewMedia(c)" class="mt-1.5 flex items-center gap-2">
@@ -3016,19 +3040,15 @@ onUnmounted(() => {
                                              decoding="async"
                                              class="h-8 w-8 object-cover" />
                                     </button>
-                                    <div v-else class="inline-flex items-center rounded-full border border-slate-200 bg-white/85 px-2 py-1 text-[8px] font-bold text-slate-500">
+                                    <div v-else class="inline-flex items-center rounded-full border border-slate-200 bg-white/85 px-2 py-1 font-bold text-slate-500 transition-all"
+                                         :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
                                         {{ inboxPreviewLabel(c) }}
                                     </div>
-                                    <p class="truncate text-[8px] text-[var(--text-2)]">
+                                    <p class="truncate text-[var(--text-2)] transition-all"
+                                       :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
                                         {{ inboxPreviewMedia(c).fileName || `Lampiran ${inboxPreviewLabel(c)}` }}
                                     </p>
                                 </div>
-                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 text-[7px] text-[var(--text-2)] sm:text-[8px]">
-                                    Nama Group: <span class="font-semibold">{{ c.groupName }}</span>
-                                </p>
-                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 text-[7px] text-[var(--text-2)] sm:text-[8px]">
-                                    Nama WA: <span class="font-semibold">{{ c.remoteName }}</span>
-                                </p>
 
                                 <div class="mt-1 flex flex-wrap items-center gap-1">
                                     <span class="rounded-full px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
@@ -3452,12 +3472,21 @@ onUnmounted(() => {
                                   @keydown="handleReplyKeydown" />
 
                         <div class="flex flex-col gap-2 xl:w-auto">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 relative">
                                 <button @click="pickMediaFile"
                                         :disabled="replyState === 'sending' || !activeConvo || !canReply"
                                         class="rounded-xl border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--text-2)] transition hover:border-sky-400/50 hover:text-sky-500 disabled:opacity-40 disabled:cursor-not-allowed">
                                     + Media
                                 </button>
+                                <button @click="toggleEmojiPicker"
+                                        :disabled="replyState === 'sending' || !activeConvo || !canReply"
+                                        title="Pilih Emoji"
+                                        class="flex items-center justify-center rounded-xl border border-[var(--border)] px-3 py-2 text-[12px] transition hover:border-sky-400/50 hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    😊
+                                </button>
+                                <div v-if="showEmojiPicker" class="absolute bottom-full left-0 mb-2 z-50 overflow-hidden rounded-xl shadow-2xl border border-[var(--border)] bg-white">
+                                    <emoji-picker @emoji-click="onEmojiSelect"></emoji-picker>
+                                </div>
                                 <button v-if="mediaAttachment" @click="clearMediaAttachment"
                                         :disabled="replyState === 'sending'"
                                         class="rounded-xl border border-rose-300/60 px-3 py-2 text-[10px] font-bold text-rose-500 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed">

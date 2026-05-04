@@ -165,6 +165,12 @@ class LawangsewuPortal
                 'items' => [
                     ['label' => 'Alias & Tema', 'short' => 'AT', 'routeKey' => 'appearance', 'href' => null, 'badge' => null],
                     ['label' => 'Preferensi Operator', 'short' => 'OP', 'routeKey' => 'preferences', 'href' => null, 'badge' => null],
+                    ...(self::isSuperAdmin()
+                        ? [
+                            ['label' => 'Kelola User', 'short' => 'KU', 'routeKey' => 'users', 'href' => route('admin.users.index'), 'badge' => 'Admin'],
+                            ['label' => 'OAuth2 SSO', 'short' => 'OA', 'routeKey' => 'oauth2', 'href' => route('admin.oauth2.index'), 'badge' => 'Admin']
+                          ]
+                        : []),
                 ],
             ],
         ];

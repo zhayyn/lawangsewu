@@ -266,6 +266,13 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaAdminController::class, 'api'])
         ->where('action', '.*')
         ->name('wacaraka.api');
+
+    // OAuth2 SSO Admin
+    Route::get('/oauth2', [\App\Http\Controllers\Admin\OAuth2AdminController::class, 'index'])->name('oauth2.index');
+    Route::post('/oauth2', [\App\Http\Controllers\Admin\OAuth2AdminController::class, 'store'])->name('oauth2.store');
+    // Passport doesn't use standard route model binding for clients by default if not set, 
+    // but we can use the ID.
+    Route::delete('/oauth2/{client}', [\App\Http\Controllers\Admin\OAuth2AdminController::class, 'destroy'])->name('oauth2.destroy');
 });
 
 require __DIR__.'/auth.php';

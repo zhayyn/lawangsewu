@@ -138,7 +138,7 @@ class WaCarakaController extends Controller
         return response()->json($result['data'] ?? ['ok' => true], $result['status'] ?? 200);
     }
 
-    public function downloadMedia(string $path)
+    public function downloadMedia(Request $request, string $path)
     {
         if (!preg_match('/^([a-f0-9]{32,})/i', $path, $matches)) {
             abort(404);
@@ -156,11 +156,13 @@ class WaCarakaController extends Controller
             abort($response->status() === 404 ? 404 : 502);
         }
 
-        // Ambil nama file dari path (misal: token/Doc1.docx → Doc1.docx)
-        // Jika tidak ada nama file eksplisit, gunakan token hex sebagai fallback
-        $fileName = basename($path);
-        if (!$fileName || $fileName === $token) {
-            $fileName = $token;
+        // Ambil nama file dari query parameter 'fn', lalu path, lalu token
+        $fileName = $request->query('fn');
+        if (!$fileName) {
+            $fileName = basename($path);
+            if (!$fileName || $fileName === $token) {
+                $fileName = $token;
+            }
         }
 
         // Tentukan MIME type: prioritaskan dari runtime, lalu inferensi dari ekstensi

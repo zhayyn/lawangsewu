@@ -15,6 +15,7 @@ use App\Http\Controllers\SippHubController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TailscaleDashboardController;
 use App\Http\Controllers\WidgetCompatController;
+use App\Http\Controllers\TdmsController;
 use App\Http\Controllers\WaCarakaController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -173,6 +174,17 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::get('/wa-caraka/media/{path}', [WaCarakaController::class, 'downloadMedia'])
         ->where('path', '.+')
         ->name('lawangsewu.wacaraka.media');
+
+    // ── TDMS — Tech Device Management System ──────────────────────
+    Route::get('/tdms', [TdmsController::class, 'index'])->name('lawangsewu.tdms.index');
+    Route::get('/tdms/assets', [TdmsController::class, 'assets'])->name('lawangsewu.tdms.assets');
+    Route::get('/tdms/service-records', [TdmsController::class, 'serviceRecords'])->name('lawangsewu.tdms.service-records');
+    Route::get('/tdms/maintenance', [TdmsController::class, 'maintenance'])->name('lawangsewu.tdms.maintenance');
+    Route::match(['get', 'post'], '/tdms/api/{action}', [TdmsController::class, 'api'])
+        ->where('action', '.*')
+        ->name('lawangsewu.tdms.api');
+    // QR Code scan — accessible by all auth users
+    Route::get('/tdms/qr/{token}', [TdmsController::class, 'assetQrDetail'])->name('lawangsewu.tdms.qr');
 });
 
 Route::middleware(['auth', 'verified', 'active'])->group(function () {

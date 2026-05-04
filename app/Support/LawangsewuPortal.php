@@ -143,6 +143,15 @@ class LawangsewuPortal
                 ],
             ],
             [
+                'label' => 'Infrastruktur IT',
+                'items' => [
+                    ['label' => 'TDMS Dashboard', 'short' => 'TD', 'routeKey' => 'tdms', 'href' => self::routeOrNull('lawangsewu.tdms.index'), 'badge' => 'New'],
+                    ['label' => 'Inventaris Aset', 'short' => 'IA', 'routeKey' => 'tdms-assets', 'href' => self::routeOrNull('lawangsewu.tdms.assets'), 'badge' => 'New'],
+                    ['label' => 'Tiket Perbaikan', 'short' => 'TP', 'routeKey' => 'tdms-service', 'href' => self::routeOrNull('lawangsewu.tdms.service-records'), 'badge' => 'New'],
+                    ['label' => 'Jadwal Perawatan', 'short' => 'JP', 'routeKey' => 'tdms-maintenance', 'href' => self::routeOrNull('lawangsewu.tdms.maintenance'), 'badge' => 'New'],
+                ],
+            ],
+            [
                 'label' => 'Organisasi',
                 'items' => [
                     ['label' => 'Kepegawaian', 'short' => 'KG', 'routeKey' => 'kepegawaian', 'href' => null, 'badge' => null],

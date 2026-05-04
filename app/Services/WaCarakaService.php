@@ -839,7 +839,7 @@ class WaCarakaService
             // ── Proxy URL internal runtime → URL Laravel (dikerjakan saat READ) ─────
             // Ini menangani SEMUA pesan lama yang tersimpan sebelum fix normalizePayloadMediaUrls.
             // Pattern: http://192.168.88.33:8790/internal/media/{token}/{filename}
-            $internalPattern = '#/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?#i';
+            $internalPattern = '~/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?~i';
 
             foreach (['url', 'dataUrl'] as $field) {
                 $val = $metadata['media'][$field] ?? null;
@@ -926,7 +926,7 @@ class WaCarakaService
         ) {
             // Coba ekstrak token dari URL internal runtime
             // Pattern: /internal/media/{hex32+}/{filename}
-            if (preg_match('#/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?#i', $rawUrl, $m)) {
+            if (preg_match('~/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?~i', $rawUrl, $m)) {
                 $token    = strtolower($m[1]);
                 $filename = $m[2] ?? '';
                 $proxyPath = $filename !== '' ? $token . '/' . $filename : $token;
@@ -1681,10 +1681,29 @@ class WaCarakaService
                     ->first();
             }
 
+            // ── LID resolution: when remote is a LID (@lid) and no conversation was
+            // found, try to resolve the LID to a real phone number via the runtime
+            // and look for an existing conversation under that phone number.
+            // This prevents duplicate contacts when the operator sends to a phone
+            // number but Baileys delivers the reply with the recipient's LID.
+            if (!$convo && str_ends_with($normalizedRemote, '@lid')) {
+                $convo = $this->resolveConversationForLid($normalizedRemote);
+            }
+
+            // Determine canonical remote_number: prefer phone over LID so we never
+            // downgrade an existing conversation from phone-format to @lid.
+            $isRemoteLid = str_ends_with($normalizedRemote, '@lid');
+            $existingRemoteIsPhone = $convo
+                && $convo->remote_number
+                && !str_ends_with(WaCarakaMessage::normalizeRemoteNumber((string) $convo->remote_number), '@lid');
+            $canonicalRemote = ($isRemoteLid && $existingRemoteIsPhone)
+                ? WaCarakaMessage::normalizeRemoteNumber((string) $convo->remote_number)
+                : $normalizedRemote;
+
             if (!$convo) {
                 $convo = WaCarakaConversation::create([
                     'conversation_id'  => $message->conversation_id,
-                    'remote_number'    => $normalizedRemote,
+                    'remote_number'    => $canonicalRemote,
                     'status'           => 'pending',
                     'last_activity_at' => $activityAt,
                 ]);
@@ -1737,7 +1756,7 @@ class WaCarakaService
 
                 $updateData = [
                     'last_activity_at' => $lastActivityAt,
-                    'remote_number' => $normalizedRemote,
+                    'remote_number'    => $canonicalRemote,
                 ];
                 if ($shouldUpdateName) {
                     $updateData['remote_name'] = $convo->remote_name;
@@ -1824,5 +1843,79 @@ class WaCarakaService
         }
 
         return $message->created_at ?? now();
+    }
+
+    /**
+     * When an inbound message arrives with a LID (@lid) remote_number and no
+     * conversation can be found by direct match, call the runtime to resolve
+     * the LID to a real phone number and search for an existing conversation
+     * under that number.
+     *
+     * This fixes the duplicate-contact bug where operator sends to a phone
+     * number but Baileys delivers the reply from the same contact using their
+     * LID instead of the phone number.
+     */
+    private function resolveConversationForLid(string $lidRemote): ?WaCarakaConversation
+    {
+        if (!str_ends_with($lidRemote, '@lid')) {
+            return null;
+        }
+
+        try {
+            $response = $this->resolveContactsMeta([$lidRemote]);
+            $items = $response['data']['items'] ?? [];
+
+            if (empty($items)) {
+                return null;
+            }
+
+            foreach ($items as $item) {
+                $phone = $item['pn']
+                    ?? $item['phone']
+                    ?? $item['number']
+                    ?? $item['resolvedNumber']
+                    ?? $item['resolved']
+                    ?? null;
+
+                if (!$phone) {
+                    continue;
+                }
+
+                $normalizedPhone = WaCarakaMessage::normalizeRemoteNumber((string) $phone);
+                if ($normalizedPhone === '' || str_ends_with($normalizedPhone, '@lid')) {
+                    continue;
+                }
+
+                // Search for an existing conversation with this phone number.
+                $convo = WaCarakaConversation::query()
+                    ->get(['id', 'conversation_id', 'remote_number', 'resolved_number', 'status', 'last_activity_at'])
+                    ->filter(function (WaCarakaConversation $item) use ($normalizedPhone) {
+                        $byRemote = WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedPhone;
+                        $byResolved = $item->resolved_number
+                            && WaCarakaMessage::normalizeRemoteNumber((string) $item->resolved_number) === $normalizedPhone;
+
+                        return $byRemote || $byResolved;
+                    })
+                    ->sortByDesc(fn (WaCarakaConversation $c) => optional($c->last_activity_at)?->getTimestamp() ?? 0)
+                    ->first();
+
+                if ($convo) {
+                    Log::info('[WaCaraka] LID resolved to existing conversation', [
+                        'lid'             => $lidRemote,
+                        'resolved_phone'  => $normalizedPhone,
+                        'conversation_id' => $convo->conversation_id,
+                    ]);
+
+                    return $convo;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[WaCaraka] LID resolution failed in syncConversation', [
+                'lid'   => $lidRemote,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 }

@@ -1243,6 +1243,7 @@ const mergeConversation = (incoming) => {
             customerMark: normalized.customerMark ?? existing.customerMark ?? null,
             remoteName:   normalized.remoteName   || existing.remoteName   || '',
             remoteNumber: normalized.remoteNumber || existing.remoteNumber || '',
+            resolvedNumber: normalized.resolvedNumber || existing.resolvedNumber || null,
             groupName:    normalized.groupName    || existing.groupName    || null,
             profilePhotoUrl: normalized.profilePhotoUrl || existing.profilePhotoUrl || null,
             owner:        normalized.owner        ?? existing.owner        ?? null,
@@ -1651,12 +1652,52 @@ const isImageMessage = (msg) => msg?.hasVisualMedia && !isStickerMessage(msg);
 const isVideoMessage = (msg) => msg?.mediaKind === 'video' && Boolean(msg?.mediaUrl);
 const isAudioMessage = (msg) => msg?.mediaKind === 'audio' && Boolean(msg?.mediaUrl);
 
-const extractMessageFileName = (msg) => (
-    msg?.metadata?.media?.fileName
-    || msg?.metadata?.fileName
-    || msg?.text
-    || `file-${msg?.id || 'media'}`
-);
+const extensionFromMime = (mime) => {
+    const map = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/webp': '.webp',
+        'video/mp4': '.mp4',
+        'audio/ogg': '.ogg',
+        'application/pdf': '.pdf',
+        'application/msword': '.doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+        'application/vnd.ms-excel': '.xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+        'application/vnd.ms-powerpoint': '.ppt',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+        'text/csv': '.csv',
+        'text/plain': '.txt',
+        'application/zip': '.zip',
+        'application/rar': '.rar',
+    };
+    return map[String(mime || '').toLowerCase()] || '';
+};
+
+const extractMessageFileName = (msg) => {
+    let name = msg?.metadata?.media?.fileName
+        || msg?.metadata?.fileName
+        || msg?.text
+        || `file-${msg?.id || 'media'}`;
+    
+    name = String(name).trim();
+
+    if (/\.[a-zA-Z0-9]{2,5}$/.test(name)) {
+        return name;
+    }
+
+    const mime = msg?.mediaMime || msg?.metadata?.media?.mimetype || msg?.metadata?.mimetype;
+    const ext = extensionFromMime(mime);
+    if (ext && !name.toLowerCase().endsWith(ext)) {
+        return name + ext;
+    }
+
+    if (msg?.mediaKind === 'document' && !name.includes('.')) {
+        return name + '.bin';
+    }
+
+    return name;
+};
 
 const humanFileSize = (bytes) => {
     const value = Number(bytes || 0);
@@ -1679,8 +1720,20 @@ const documentMetaText = (msg) => {
 // Safari melarang atribut `download` pada URL cross-origin, jadi kita fetch dulu lalu blobkan.
 const downloadDocument = async (url, fileName) => {
     if (!url) return;
+    
+    let fetchUrl = url;
     try {
-        const response = await fetch(url, { mode: 'cors' });
+        const urlObj = new URL(url, window.location.origin);
+        if (fileName && fileName !== 'dokumen' && !urlObj.searchParams.has('fn')) {
+            urlObj.searchParams.set('fn', fileName);
+        }
+        fetchUrl = urlObj.toString();
+    } catch {
+        // Fallback jika url invalid
+    }
+
+    try {
+        const response = await fetch(fetchUrl, { mode: 'cors' });
         if (!response.ok) throw new Error('fetch failed');
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1693,7 +1746,7 @@ const downloadDocument = async (url, fileName) => {
         setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
     } catch {
         // Fallback: buka di tab baru (Safari akan tampilkan opsi "Download" manual)
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(fetchUrl, '_blank', 'noopener,noreferrer');
     }
 };
 
@@ -2528,7 +2581,10 @@ const closeConvo = async () => {
     try {
         await callApi('close', { method: 'post', data: { conversation_id: activeConvoId.value } });
         await refreshInboxList();
-    } catch { /* silent */ }
+        showToast('success', 'Percakapan berhasil ditandai selesai', 'Berhasil');
+    } catch (err) { 
+        showToast('error', err?.error || 'Gagal menyelesaikan percakapan', 'Gagal');
+    }
 };
 
 const reopenConvo = async () => {
@@ -3134,7 +3190,7 @@ onUnmounted(() => {
                             <button v-if="(iMineConvo || isAdmin || activeConvo.ownership === 'unclaimed') && activeConvo.status !== 'closed'"
                                     @click="closeConvo"
                                     class="rounded-xl border border-slate-200 px-2 py-1.5 text-[10px] text-slate-600 hover:bg-slate-100 transition sm:px-3 sm:text-xs">
-                                ✓ Selesaikan
+                                ✓ Tandai Selesai
                             </button>
 
                             <!-- Reopen (Superadmin only) -->
@@ -3942,14 +3998,13 @@ onUnmounted(() => {
                         <div class="relative z-10 flex flex-col items-center gap-4 rounded-[1.35rem] bg-slate-950/95 px-8 py-7 backdrop-blur-xl sm:px-10 sm:py-8 min-w-[280px] max-w-[380px]">
 
                             <!-- Glow ring behind icon -->
-                            <div class="toast-icon-ring relative flex h-16 w-16 items-center justify-center rounded-full sm:h-20 sm:w-20"
+                            <div class="toast-icon-ring ring-2 relative flex h-16 w-16 items-center justify-center rounded-full sm:h-20 sm:w-20"
                                  :class="{
                                      'bg-rose-500/20 ring-rose-500/30': toast.type === 'error',
                                      'bg-emerald-500/20 ring-emerald-500/30': toast.type === 'success',
                                      'bg-amber-500/20 ring-amber-500/30': toast.type === 'warning',
                                      'bg-sky-500/20 ring-sky-500/30': toast.type === 'info',
                                  }"
-                                 style="ring-width90- 2px;"
                             >
                                 <!-- Pulsing particles -->
                                 <div class="toast-particles absolute inset-0 rounded-full"></div>

@@ -124,6 +124,7 @@ class WaCarakaController extends Controller
                 'handoverEnabled' => Cache::get('wacaraka_handover_enabled', true),
             ]],
             'toggle-handover-enabled' => $this->toggleHandoverEnabled($request),
+            'toggle-pin' => $this->togglePin($request),
             default => ['ok' => false, 'status' => 404, 'error' => 'Aksi tidak valid.'],
         };
 
@@ -598,6 +599,33 @@ class WaCarakaController extends Controller
         return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
     }
 
+    private function togglePin(Request $request): array
+    {
+        $validated = $request->validate([
+            'conversation_id' => 'required|string',
+        ]);
+
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+
+        $mark = WaCarakaConversationMark::query()->firstOrNew([
+            'user_id' => $request->user()->id,
+            'wa_caraka_conversation_id' => $conversation->id,
+        ]);
+
+        if (!$mark->exists) {
+            $mark->label = 'Sematkan';
+            $mark->tone = 'sky';
+        }
+
+        $mark->is_pinned = !$mark->is_pinned;
+        $mark->save();
+
+        return ['ok' => true, 'status' => 200, 'data' => [
+            'isPinned' => (bool) $mark->is_pinned,
+            'mark' => $this->formatMark($mark),
+        ]];
+    }
+
     private function deleteMessage(Request $request): array
     {
         $validated = $request->validate(['message_id' => 'required|integer']);
@@ -743,6 +771,10 @@ class WaCarakaController extends Controller
                     return optional($message?->created_at)->timestamp ?? optional($conversation->last_activity_at)->timestamp ?? 0;
                 })->first();
             })
+            ->sortByDesc(function (WaCarakaConversation $conversation) use ($marks) {
+                $mark = $marks->get($conversation->id);
+                return (bool) ($mark?->is_pinned ?? false);
+            })
             ->values();
 
         // ── Batch-resolve profiles dari server runtime (server .33) ────────────
@@ -807,6 +839,7 @@ class WaCarakaController extends Controller
                 'lastActivityTs' => $message?->created_at?->timestamp ?? $conversation->last_activity_at?->timestamp ?? 0,
                 'lastMessageMedia' => $message ? $this->lastMessageMedia($message) : null,
                 'customerMark' => $mark ? $this->formatMark($mark) : null,
+                'hasUnreplied' => $message ? ($message->direction === 'inbound' && is_null($message->replied_at)) : false,
             ]);
         })->all();
     }

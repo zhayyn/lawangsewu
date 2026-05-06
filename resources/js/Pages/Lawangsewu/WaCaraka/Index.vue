@@ -458,6 +458,33 @@ const handleContextMenuMark = () => {
     markEditorOpen.value = true;
 };
 
+const handleContextMenuTogglePin = async () => {
+    const convoId = contextMenu.value.convo?.conversationId;
+    closeContextMenu();
+    if (!convoId) return;
+
+    try {
+        const d = await callApi('toggle-pin', {
+            method: 'post',
+            data: { conversation_id: convoId },
+        });
+        appendLog('Pin toggled via context menu', d);
+        
+        // Update local state
+        const idx = conversations.value.findIndex(c => c.conversationId === convoId);
+        if (idx !== -1) {
+            conversations.value[idx].customerMark = d.mark;
+        }
+        
+        showToast('success', d.isPinned ? 'Percakapan disematkan ke atas' : 'Sematkan dilepas');
+        
+        // Refresh to re-sort (since we sort by isPinned)
+        await refreshAll();
+    } catch (err) {
+        showToast('error', err?.error || 'Gagal mengubah status pin');
+    }
+};
+
 onMounted(() => {
     window.addEventListener('click', closeContextMenu);
     window.addEventListener('scroll', closeContextMenu, { passive: true });
@@ -526,6 +553,10 @@ const filteredConversations = computed(() => {
         }
 
         if (filter === 'unread' && Number(conversation.unreadCount || 0) <= 0) {
+            return false;
+        }
+
+        if (filter === 'unreplied' && !conversation.hasUnreplied) {
             return false;
         }
 
@@ -772,7 +803,7 @@ const normalizeApiError = (status, rawError = null) => {
     }
 
     if (status >= 500) {
-        return { status, error: 'Server gagal memproses permintaan. Coba lagi beberapa saat.' };
+        return { status, error: 'Server gagal memproses permintaan. Jika sedang mengirim pesan, pastikan nomor valid dan terhubung dengan WhatsApp. Coba lagi beberapa saat.' };
     }
 
     return { status, error: 'Terjadi kesalahan.' };
@@ -2114,12 +2145,10 @@ const refreshConvoMessages = async (convoId = activeConvoId.value, options = {})
 
         if (activeThreadRequestId.value !== requestId || activeConvoId.value !== convoId) return;
 
-        // Preserve temp messages (sending/failed) that are not yet in DB
-        // BUT exclude any that were explicitly deleted by the user
-        const pendingTemps = conversationMessages.value.filter(
-            (m) => m._tempId && ['sending', 'failed'].includes(m.status) && !deletedTempIds.has(m._tempId)
+        const retainedTempMessages = conversationMessages.value.filter(
+            (m) => m._tempId && m.status === 'sending' && !deletedTempIds.has(m._tempId)
         );
-        const mergedMessages = [...serverMessages, ...pendingTemps];
+        const mergedMessages = [...serverMessages, ...retainedTempMessages];
         await applyThreadMessages(mergedMessages, { preserveViewport: background });
         persistConversationCache(convoId, conversationMessages.value);
     } catch {
@@ -2505,6 +2534,8 @@ const retryMessage = async (msg) => {
 
     if (msg._tempId) {
         removeTempMessage(msg._tempId);
+    } else if (msg.id) {
+        await deleteMessageAction(msg.id, true);
     }
 
     await replyToConversation();
@@ -2602,8 +2633,9 @@ const reopenConvo = async () => {
     } catch { /* silent */ }
 };
 
-const deleteMessageAction = async (messageId) => {
-    if (!messageId || !(await openConfirmModal('Hapus Pesan', 'Yakin ingin menghapus pesan ini? Hapus data bersifat permanen.'))) return;
+const deleteMessageAction = async (messageId, silent = false) => {
+    if (!messageId) return;
+    if (!silent && !(await openConfirmModal('Hapus Pesan', 'Yakin ingin menghapus pesan ini? Hapus data bersifat permanen.'))) return;
     try {
         await callApi('delete-message', { method: 'post', data: { message_id: messageId } });
         appendLog('Pesan dihapus');
@@ -2955,6 +2987,7 @@ onUnmounted(() => {
                             v-for="filter in [
                                 { value: 'all', label: 'Semua' },
                                 { value: 'unread', label: 'Belum Dibaca' },
+                                { value: 'unreplied', label: 'Belum Dibalas' },
                                 { value: 'mine', label: 'Milik Saya' },
                                 { value: 'group', label: 'Grup' },
                             ]"
@@ -3062,6 +3095,9 @@ onUnmounted(() => {
                                     <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
                                           :class="markToneClass(c.customerMark.tone)">
                                         {{ c.customerMark.label }}
+                                    </span>
+                                    <span v-if="c.customerMark?.isPinned" class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-50 shadow-sm ring-1 ring-amber-200/50">
+                                        <span class="text-[10px]">📌</span>
                                     </span>
                                     <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 sm:px-2 sm:text-[9px]">
                                         aktif kamu
@@ -3972,7 +4008,11 @@ onUnmounted(() => {
                     <p class="text-[10px] font-bold text-slate-500 truncate">{{ contextMenu.convo?.displayTitle }}</p>
                 </div>
                 <div class="py-1 flex flex-col">
-                    <button @click="handleContextMenuMark" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-violet-600 hover:bg-violet-50 transition">
+                    <button @click="handleContextMenuTogglePin" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-sky-600 hover:bg-sky-50 transition">
+                        <span class="mr-2">{{ contextMenu.convo?.customerMark?.isPinned ? '📌' : '📍' }}</span>
+                        {{ contextMenu.convo?.customerMark?.isPinned ? 'Lepas Pin' : 'Pin Percakapan' }}
+                    </button>
+                    <button @click="handleContextMenuMark" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-violet-600 hover:bg-violet-50 transition border-t border-slate-50">
                         <span class="mr-2">🏷</span> Atur Alias
                     </button>
                     <button @click="handleContextMenuDelete" class="flex items-center w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">

@@ -140,8 +140,10 @@ $y = (int)date('Y');
                 <canvas id="chartTrend" height="120"></canvas>
             </div>
             <div class="chart-box">
-                <h3>Komposisi Jenis Perkara Tahun Berjalan</h3>
-                <canvas id="chartType" height="120"></canvas>
+                <h3>Komposisi Tahun Berjalan</h3>
+                <div style="position: relative; height: 180px;">
+                    <canvas id="chartType"></canvas>
+                </div>
                 <div class="legend-wrap" id="legendType"></div>
             </div>
         </div>
@@ -168,6 +170,12 @@ $y = (int)date('Y');
     </div>
 
     <div class="footnote">Sumber: SIPP (via adapter Lawangsewu)</div>
+    <div style="text-align: center; margin-bottom: 30px;">
+        <a href="https://lawangsewu.pa-semarang.go.id/statistik-perkara" target="_blank" class="btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-size: 14px;">
+            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Lihat Selengkapnya Data Statistik
+        </a>
+    </div>
 </div>
 
 <script>
@@ -367,31 +375,39 @@ function renderCharts(year, totals, rows) {
         }
     });
 
-    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0)).slice(0, 12);
+    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0)).slice(0, 8);
     const rowColors = sorted.map(r => colorByLabel(r.jenis));
     const rowLabels = sorted.map(r => r.jenis || '-');
+    
     if (typeChart) typeChart.destroy();
     typeChart = new Chart(typeEl, {
-        type: 'bar',
-        plugins: [chartShadowPlugin],
+        type: 'doughnut',
         data: {
             labels: rowLabels,
             datasets: [{
-                label: 'Jumlah Perkara',
                 data: sorted.map(r => Number(r.th0 || 0)),
                 backgroundColor: rowColors,
-                borderColor: rowColors,
-                borderWidth: 1.5,
-                borderRadius: 8,
-                maxBarThickness: 44
+                hoverOffset: 12,
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { type: 'logarithmic' },
-                x: { ticks: { maxRotation: 45, minRotation: 30 } }
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const val = context.raw;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                            return `${context.label}: ${fmt(val)} (${pct}%)`;
+                        }
+                    }
+                }
             }
         }
     });
@@ -477,6 +493,7 @@ async function fetchStatistikPerkara(year) {
 }
 
 async function loadData() {
+    console.log("Statistik Perkara: Mengambil data...");
     statusText.textContent = 'Mengambil data statistik dari Server 10...';
     dataMeta.innerHTML = '';
     errorBox.style.display = 'none';
@@ -485,6 +502,7 @@ async function loadData() {
     try {
         const year = new Date().getFullYear();
         const json = await fetchStatistikPerkara(year);
+        console.log("Statistik Perkara: Data diterima dari", json._source, json);
 
         cachedRows = normalizeRows(Array.isArray(json.rows) ? json.rows : []);
         const apiTotals = {

@@ -1366,7 +1366,7 @@ class WaCarakaService
         $latestByConversation = [];
 
         WaCarakaMessage::query()
-            ->select(['conversation_id', 'direction', 'created_at', 'metadata'])
+            ->select(['conversation_id', 'direction', 'created_at', 'metadata', 'replied_at'])
             ->whereIn('conversation_id', $inboxConversationIds)
             ->orderBy('id')
             ->chunk(500, function ($rows) use (&$latestByConversation) {
@@ -1391,22 +1391,23 @@ class WaCarakaService
                         $latestByConversation[$cid] = [
                             'at' => $effectiveAt,
                             'direction' => $row->direction,
+                            'replied_at' => $row->replied_at,
                         ];
                     }
                 }
             });
 
         $unrepliedConversations = collect($latestByConversation)
-            ->filter(fn ($item) => ($item['direction'] ?? null) !== 'outbound')
+            ->filter(fn ($item) => ($item['direction'] ?? null) === 'inbound' && is_null($item['replied_at'] ?? null))
             ->count();
 
-        $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast'];
+        $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast', 'health-check', 'health_check'];
 
         return [
             'totalMessages'  => WaCarakaMessage::whereNotIn('remote_number', $excludeNumbers)->count(),
             'inbound'        => WaCarakaMessage::inbound()->whereNotIn('remote_number', $excludeNumbers)->count(),
             'outbound'       => WaCarakaMessage::outbound()->whereNotIn('remote_number', $excludeNumbers)->count(),
-            'unreplied'      => WaCarakaMessage::inbound()->whereNull('replied_at')->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'unreplied'      => $unrepliedConversations,
             'todayInbound'   => WaCarakaMessage::inbound()->whereNotIn('remote_number', $excludeNumbers)->today()->count(),
             'todayOutbound'  => WaCarakaMessage::outbound()->whereNotIn('remote_number', $excludeNumbers)->today()->count(),
             'conversations'  => WaCarakaMessage::whereNotIn('remote_number', $excludeNumbers)->distinct('conversation_id')->count('conversation_id'),

@@ -140,8 +140,8 @@ $y = (int)date('Y');
                 <canvas id="chartTrend" height="120"></canvas>
             </div>
             <div class="chart-box">
-                <h3>Komposisi Tahun Berjalan</h3>
-                <div style="position: relative; height: 180px;">
+                <h3>Komposisi Jenis Perkara Tahun Berjalan</h3>
+                <div style="position: relative; height: 260px;">
                     <canvas id="chartType"></canvas>
                 </div>
                 <div class="legend-wrap" id="legendType"></div>
@@ -375,27 +375,28 @@ function renderCharts(year, totals, rows) {
         }
     });
 
-    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0)).slice(0, 8);
+    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0));
     const rowColors = sorted.map(r => colorByLabel(r.jenis));
     const rowLabels = sorted.map(r => r.jenis || '-');
-    
+
     if (typeChart) typeChart.destroy();
     typeChart = new Chart(typeEl, {
-        type: 'doughnut',
+        type: 'bar',
+        plugins: [chartShadowPlugin],
         data: {
             labels: rowLabels,
             datasets: [{
+                label: 'Jumlah Perkara',
                 data: sorted.map(r => Number(r.th0 || 0)),
                 backgroundColor: rowColors,
-                hoverOffset: 12,
-                borderWidth: 2,
-                borderColor: '#ffffff'
+                borderRadius: 5,
+                borderSkipped: false,
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '65%',
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -404,9 +405,43 @@ function renderCharts(year, totals, rows) {
                             const val = context.raw;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
-                            return `${context.label}: ${fmt(val)} (${pct}%)`;
+                            return ` ${context.label}: ${fmt(val)} (${pct}%)`;
                         }
                     }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 40,
+                        minRotation: 30,
+                        font: { size: 10 },
+                        color: '#4b5563',
+                        callback: function(val, idx) {
+                            const lbl = rowLabels[idx] || '';
+                            return lbl.length > 18 ? lbl.slice(0, 16) + '…' : lbl;
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    type: 'logarithmic',
+                    min: 1,
+                    title: {
+                        display: true,
+                        text: 'Jumlah (skala log)',
+                        font: { size: 11 },
+                        color: '#6b7280'
+                    },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#6b7280',
+                        callback: (val) => {
+                            const niceTicks = [1, 5, 10, 50, 100, 500, 1000, 5000];
+                            return niceTicks.includes(val) ? val.toLocaleString('id-ID') : '';
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
                 }
             }
         }

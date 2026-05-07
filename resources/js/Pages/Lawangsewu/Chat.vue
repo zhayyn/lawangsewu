@@ -710,7 +710,7 @@ watch(() => props.initialMessages, (newMessages) => {
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 py-2 shadow-sm sm:gap-3 sm:rounded-[20px] sm:px-3">
+                                <div class="chat-input-wrapper flex items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 py-2 shadow-sm sm:gap-3 sm:rounded-[20px] sm:px-3" style="--input-radius: 20px;">
                                     <input
                                         ref="fileInput"
                                         type="file"

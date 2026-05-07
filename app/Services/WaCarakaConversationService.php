@@ -275,16 +275,25 @@ class WaCarakaConversationService
     // Stats helpers
     // ──────────────────────────────────────────────
 
-    public function stats(): array
+    public function stats(?User $user = null): array
     {
         $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast', 'health-check', 'health_check'];
 
+        $myConversations = 0;
+        if ($user) {
+            $myConversations = WaCarakaConversation::whereNotIn('remote_number', $excludeNumbers)
+                ->where('claimed_by', $user->id)
+                ->whereIn('status', ['open', 'pending'])
+                ->count();
+        }
+
         return [
-            'total'         => WaCarakaConversation::whereNotIn('remote_number', $excludeNumbers)->count(),
-            'open'          => WaCarakaConversation::open()->whereNotIn('remote_number', $excludeNumbers)->count(),
-            'pending'       => WaCarakaConversation::pending()->whereNotIn('remote_number', $excludeNumbers)->count(),
-            'closed'        => WaCarakaConversation::closed()->whereNotIn('remote_number', $excludeNumbers)->count(),
-            'pendingHandovers' => WaCarakaHandover::where('status', 'pending')->count(),
+            'total'             => WaCarakaConversation::whereNotIn('remote_number', $excludeNumbers)->count(),
+            'open'              => WaCarakaConversation::open()->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'pending'           => WaCarakaConversation::pending()->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'closed'            => WaCarakaConversation::closed()->whereNotIn('remote_number', $excludeNumbers)->count(),
+            'pendingHandovers'  => WaCarakaHandover::where('status', 'pending')->count(),
+            'myConversations'   => $myConversations,
         ];
     }
 

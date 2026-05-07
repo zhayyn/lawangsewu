@@ -45,7 +45,7 @@ class WaCarakaController extends Controller
                 'maxMediaBytes' => (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024),
             ],
             'messageStats' => $this->wa->messageStats(),
-            'convoStats' => $this->conversations->stats(),
+            'convoStats' => $this->conversations->stats(request()->user()),
             'ticketStats' => WaCarakaTicket::ticketStats(),
             'recentTickets' => WaCarakaTicket::recent(12),
         ]);
@@ -82,7 +82,7 @@ class WaCarakaController extends Controller
             'resolve-contacts' => $this->wa->resolveContactsMeta($request->input('jids', [])),
             'stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->stats()],
             'message-stats' => ['ok' => true, 'status' => 200, 'data' => $this->wa->messageStats()],
-            'convo-stats' => ['ok' => true, 'status' => 200, 'data' => $this->conversations->stats()],
+            'convo-stats' => ['ok' => true, 'status' => 200, 'data' => $this->conversations->stats($user)],
             'operator-stats' => ['ok' => true, 'status' => 200, 'data' => [
                 'generatedAt' => now()->toISOString(),
                 'operatorStats' => $this->buildReportStats()['operatorStats'] ?? [],
@@ -254,6 +254,7 @@ class WaCarakaController extends Controller
         $validated = $request->validate([
             'conversation_id' => 'required|string|max:255',
             'text'            => 'required|string|max:4096',
+            'quote_wa_id'     => 'nullable|string|max:255',
         ]);
 
         // Cari conversation berdasarkan conversation_id
@@ -277,6 +278,8 @@ class WaCarakaController extends Controller
             $validated['text'],
             $this->senderLabel($request->user()),
             $request->user()->id,
+            $request->user(),
+            $validated['quote_wa_id'] ?? null
         );
 
         if (!($result['ok'] ?? false)) {
@@ -319,6 +322,7 @@ class WaCarakaController extends Controller
             'file_name' => 'nullable|string|max:255',
             'caption' => 'nullable|string|max:4096',
             'ptt' => 'nullable|boolean',
+            'quote_wa_id' => 'nullable|string|max:255',
         ]);
 
         if ($request->hasFile('media_file')) {
@@ -740,28 +744,35 @@ class WaCarakaController extends Controller
             return [];
         }
 
-        $latestMessages = WaCarakaMessage::query()
-            ->with('user:id,name,alias')
-            ->whereIn('id', function ($query) {
-                $query->from('wa_caraka_messages')
-                    ->selectRaw('MAX(id)')
-                    ->groupBy('conversation_id');
-            })
-            ->get()
-            ->keyBy('conversation_id');
-
-        $marks = WaCarakaConversationMark::query()
-            ->where('user_id', $user->id)
-            ->get()
-            ->keyBy('wa_caraka_conversation_id');
-
         $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast', 'health-check', 'health_check'];
 
         $rows = WaCarakaConversation::query()
             ->whereNotIn('remote_number', $excludeNumbers)
             ->with(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias'])
             ->orderByDesc('last_activity_at')
+            ->limit(500)
             ->get();
+
+        $conversationIds = $rows->pluck('conversation_id')->filter()->unique()->values()->all();
+
+        $latestMessages = collect();
+        if (!empty($conversationIds)) {
+            $latestMessages = WaCarakaMessage::query()
+                ->with('user:id,name,alias')
+                ->whereIn('id', function ($query) use ($conversationIds) {
+                    $query->from('wa_caraka_messages')
+                        ->selectRaw('MAX(id)')
+                        ->whereIn('conversation_id', $conversationIds)
+                        ->groupBy('conversation_id');
+                })
+                ->get()
+                ->keyBy('conversation_id');
+        }
+
+        $marks = WaCarakaConversationMark::query()
+            ->where('user_id', $user->id)
+            ->get()
+            ->keyBy('wa_caraka_conversation_id');
 
         $deduped = $rows
             ->groupBy(fn (WaCarakaConversation $conversation) => $conversation->resolved_number ?: WaCarakaMessage::normalizeRemoteNumber((string) $conversation->remote_number))

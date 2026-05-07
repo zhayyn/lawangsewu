@@ -12,7 +12,7 @@ const props = defineProps({
     config:    { type: Object, default: () => ({}) },
     stats:     { type: Object, default: () => ({ total: 0, sent: 0, failed: 0, today: 0, lastSent: 'Belum ada' }) },
     messageStats: { type: Object, default: () => ({ totalMessages: 0, inbound: 0, outbound: 0, unreplied: 0, todayInbound: 0, todayOutbound: 0, conversations: 0 }) },
-    convoStats:   { type: Object, default: () => ({ total: 0, open: 0, pending: 0, closed: 0, pendingHandovers: 0 }) },
+    convoStats:   { type: Object, default: () => ({ total: 0, open: 0, pending: 0, closed: 0, pendingHandovers: 0, myConversations: 0 }) },
     reportStats:  { type: Object, default: () => ({ operatorStats: [], generatedAt: null }) },
     ticketStats:  { type: Object, default: () => ({ total: 0, open: 0, replied: 0, sent: 0, closed: 0, pengaduan: 0, konsultasi: 0, umum: 0, todayTotal: 0 }) },
     recentTickets:{ type: Array,  default: () => [] },
@@ -102,6 +102,10 @@ const handoverLoading = ref(false);
 const showHandoverModal = ref(false);
 const handoverEnabled = ref(true);
 const handoverToggling = ref(false);
+
+// ─── Message Context Menu (klik kanan pesan) ──────────
+const msgCtxMenu = ref({ isOpen: false, x: 0, y: 0, msg: null });
+const quotedMessage = ref(null); // pesan yang di-quote/reply
 
 // Status
 const statusText = ref('Memeriksa koneksi...');
@@ -485,9 +489,120 @@ const handleContextMenuTogglePin = async () => {
     }
 };
 
+// ─── Message Context Menu Handlers ───────────────────
+const openMsgContextMenu = (event, msg) => {
+    event.preventDefault();
+    const menuWidth = 200;
+    const menuHeight = 150;
+    let x = event.clientX;
+    let y = event.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 8;
+    msgCtxMenu.value = { isOpen: true, x, y, msg };
+};
+
+const closeMsgContextMenu = () => { msgCtxMenu.value.isOpen = false; };
+
+const quoteMessage = () => {
+    const msg = msgCtxMenu.value.msg;
+    closeMsgContextMenu();
+    if (!msg) return;
+    quotedMessage.value = msg;
+    replyTextareaRef.value?.focus();
+};
+
+const cancelQuote = () => { quotedMessage.value = null; };
+
+const deleteMessageForMe = async () => {
+    const msg = msgCtxMenu.value.msg;
+    closeMsgContextMenu();
+    if (!msg?.id) return;
+    if (!(await openConfirmModal('Hapus Pesan', 'Hapus pesan ini dari inbox? Pesan masih ada di WhatsApp penerima.'))) return;
+    try {
+        await callApi('delete-message', { method: 'post', data: { message_id: msg.id } });
+        await refreshConvoMessages();
+        await refreshStatsIfNeeded();
+        showToast('success', 'Pesan dihapus dari inbox');
+    } catch (err) {
+        showToast('error', err?.error || 'Gagal menghapus pesan');
+    }
+};
+
+const deleteMessageForEveryone = async () => {
+    const msg = msgCtxMenu.value.msg;
+    closeMsgContextMenu();
+    if (!msg) return;
+    if (!(await openConfirmModal('Hapus untuk Semua', 'Coba hapus pesan ini dari WhatsApp semua pihak? (Hanya berhasil jika dalam 60 menit pengiriman dan runtime mendukung.)'))) return;
+    try {
+        // Kirim pesan delete via runtime jika WA message ID tersedia
+        if (msg.waMessageId) {
+            await callApi('send-text', {
+                method: 'post',
+                data: {
+                    conversation_id: activeConvoId.value,
+                    text: '',
+                    delete_wa_id: msg.waMessageId,
+                },
+            }).catch(() => {}); // best effort
+        }
+        // Hapus dari DB lokal
+        if (msg.id) {
+            await callApi('delete-message', { method: 'post', data: { message_id: msg.id } });
+        }
+        await refreshConvoMessages();
+        showToast('success', 'Pesan dihapus');
+    } catch (err) {
+        showToast('error', err?.error || 'Gagal menghapus pesan');
+    }
+};
+
+// ─── Paste gambar dari clipboard ─────────────────────
+const onComposerPaste = async (event) => {
+    if (!activeConvo.value || !canReply.value) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            if (file.size > MAX_MEDIA_FILE_BYTES) {
+                showToast('warning', `Gambar terlalu besar. Maksimum ${Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024))} MB.`);
+                return;
+            }
+            try {
+                const initialDataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result || ''));
+                    reader.onerror = () => reject(new Error('Gagal membaca gambar'));
+                    reader.readAsDataURL(file);
+                });
+                const mime = file.type || 'image/png';
+                const finalDataUrl = await compressImageDataUrl(initialDataUrl, mime, MAX_MEDIA_FILE_BYTES);
+                const finalBlob = dataUrlToBlob(finalDataUrl, mime);
+                const ext = mime.split('/')[1] || 'png';
+                mediaAttachment.value = {
+                    name: `clipboard-image.${ext}`,
+                    size: finalBlob.size,
+                    mime,
+                    kind: 'image',
+                    dataUrl: finalDataUrl,
+                    blob: finalBlob,
+                };
+                showToast('info', 'Gambar dari clipboard siap dikirim', 'Lampiran');
+            } catch {
+                showToast('error', 'Gagal memproses gambar dari clipboard');
+            }
+            return; // hanya ambil 1 gambar
+        }
+    }
+};
+
 onMounted(() => {
     window.addEventListener('click', closeContextMenu);
+    window.addEventListener('click', closeMsgContextMenu);
     window.addEventListener('scroll', closeContextMenu, { passive: true });
+    window.addEventListener('scroll', closeMsgContextMenu, { passive: true });
 
     // Mobile responsive: detect screen size
     checkMobile();
@@ -519,7 +634,9 @@ onMounted(() => {
 });
 onUnmounted(() => {
     window.removeEventListener('click', closeContextMenu);
+    window.removeEventListener('click', closeMsgContextMenu);
     window.removeEventListener('scroll', closeContextMenu);
+    window.removeEventListener('scroll', closeMsgContextMenu);
     window.removeEventListener('resize', checkMobile);
     stopParticles();
     if (window._wacarakaThemeObserver) {
@@ -2423,8 +2540,10 @@ const replyToConversation = async () => {
     replyState.value = 'sending';
     replyProgress.value = media ? 1 : 0;
     const tempId = pushTempOutboundMessage(text, media);
+    const quotedWaId = quotedMessage.value?.waMessageId || null;
     replyText.value = '';
     clearMediaAttachment();
+    quotedMessage.value = null; // Clear quote
     composerRows();
 
     try {
@@ -2436,6 +2555,7 @@ const replyToConversation = async () => {
             mediaForm.append('file_name', media.name || '');
             mediaForm.append('caption', text || '');
             mediaForm.append('ptt', media.kind === 'audio' ? '1' : '0');
+            if (quotedWaId) mediaForm.append('quote_wa_id', quotedWaId);
 
             if (media.blob) {
                 mediaForm.append('media_file', media.blob, media.name || 'media.bin');
@@ -2443,6 +2563,9 @@ const replyToConversation = async () => {
                 mediaForm.append('media_url', media.dataUrl || '');
             }
         }
+
+        const payloadText = { conversation_id: activeConvoId.value, text };
+        if (quotedWaId) payloadText.quote_wa_id = quotedWaId;
 
         const result = media
             ? await callApiWithXhr('send-media', {
@@ -2452,7 +2575,7 @@ const replyToConversation = async () => {
                     replyProgress.value = Math.max(replyProgress.value, progress);
                 },
             })
-            : await callApi('reply', { method: 'post', data: { conversation_id: activeConvoId.value, text } });
+            : await callApi('reply', { method: 'post', data: payloadText });
         markTempMessageStatus(tempId, result?.queued ? 'queued' : 'sent');
         replyProgress.value = 100;
         replyState.value = 'sent';
@@ -2940,13 +3063,13 @@ onUnmounted(() => {
 
             <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
                 <article v-for="card in [
-                    { label: 'Aktif', value: latestConvoStats.open, color: 'text-emerald-300' },
-                    { label: 'Belum Dibalas', value: latestConvoStats.pending, color: latestConvoStats.pending === 0 ? 'text-emerald-300' : (latestConvoStats.pending > 10 ? 'text-rose-300' : 'text-amber-300') },
-                    { label: 'Pesan Masuk Baru', value: latestMsgStats.unreplied, color: 'text-cyan-300' },
-                    { label: 'Percakapan', value: latestConvoStats.total, color: 'text-sky-300' },
-                    { label: 'Selesai', value: latestConvoStats.closed, color: 'text-emerald-300' },
-                    { label: 'Pending Handover', value: latestConvoStats.pendingHandovers, color: latestConvoStats.pendingHandovers > 0 ? 'text-orange-300' : 'text-slate-400' },
-                ]" :key="`operator-summary-${card.label}`" class="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 backdrop-blur transition hover:bg-white/10">
+                    { label: 'Aktif', value: latestConvoStats.value?.open ?? 0, color: 'text-emerald-300' },
+                    { label: 'Pesan Masuk Baru', value: latestConvoStats.value?.pending ?? 0, color: (latestConvoStats.value?.pending ?? 0) === 0 ? 'text-emerald-300' : ((latestConvoStats.value?.pending ?? 0) > 10 ? 'text-rose-300' : 'text-amber-300'), title: 'Pesan masuk yang belum ditangani oleh operator (belum dibalas sama sekali)' },
+                    { label: 'Belum Dibalas', value: latestMsgStats.value?.unreplied ?? 0, color: 'text-cyan-300', title: 'Percakapan aktif yang memiliki pesan belum dibalas' },
+                    { label: 'Percakapan', value: latestConvoStats.value?.total ?? 0, color: 'text-sky-300' },
+                    { label: 'Selesai', value: latestConvoStats.value?.closed ?? 0, color: 'text-emerald-300', title: 'Total percakapan yang sudah ditandai selesai (semua operator)' },
+                    { label: 'Saya Tangani', value: latestConvoStats.value?.myConversations ?? 0, color: (latestConvoStats.value?.myConversations ?? 0) > 0 ? 'text-sky-300' : 'text-slate-400', title: 'Percakapan aktif yang sedang Anda tangani' },
+                ]" :key="`operator-summary-${card.label}`" :title="card.title || ''" class="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 backdrop-blur transition hover:bg-white/10 cursor-default">
                     <p class="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">{{ card.label }}</p>
                     <p class="mt-0.5 text-base font-black leading-none sm:text-[17px]" :class="card.color">{{ card.value ?? 0 }}</p>
                 </article>
@@ -3130,7 +3253,15 @@ onUnmounted(() => {
                         </div>
                     </button>
 
-                    <div v-if="filteredConversations.length === 0" class="px-5 py-10 text-center">
+                    <div v-if="isLoading && conversations.length === 0" class="flex flex-col items-center justify-center px-5 py-16">
+                        <div class="hourglass-loader opacity-80"></div>
+                        <p class="mt-6 text-[13px] font-bold text-[var(--text-1)]">Sedang memuat data...</p>
+                        <p class="mt-1 text-[11px] text-[var(--text-2)] text-center leading-relaxed">
+                            Sabar ya masnya dan mbaknya.. 😏<br/>
+                            <span class="opacity-70">Sistem sedang bekerja keras buat kamu.</span>
+                        </p>
+                    </div>
+                    <div v-else-if="filteredConversations.length === 0" class="px-5 py-10 text-center">
                         <p class="text-sm text-[var(--text-2)]">Belum ada percakapan.</p>
                         <p class="mt-1 text-xs text-[var(--text-2)]">Pesan akan muncul saat runtime mengirim webhook atau pull inbox berhasil.</p>
                     </div>
@@ -3345,20 +3476,21 @@ onUnmounted(() => {
 
 
 
-                    <div v-if="!activeConvo" class="grid min-h-[280px] place-items-center text-center text-sm text-[var(--text-2)]">
-                        <div>
-                            <p class="text-4xl mb-3">💬</p>
-                            <p>Pilih percakapan di sebelah kiri untuk memulai.</p>
+                    <div v-if="(isLoading && !activeConvo) || threadLoadingVisible" class="grid min-h-[280px] place-items-center text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="hourglass-loader opacity-80"></div>
+                            <p class="mt-6 text-[13px] font-bold text-[var(--text-1)]">Memuat percakapan...</p>
+                            <p class="mt-1 text-[11px] text-[var(--text-2)] text-center leading-relaxed">
+                                Sabar ya masnya dan mbaknya.. 😏<br/>
+                                <span class="opacity-70">Tarik napas dulu sebentar.</span>
+                            </p>
                         </div>
                     </div>
 
-                    <div v-else-if="threadLoadingVisible" class="grid min-h-[280px] place-items-center px-4 text-center">
-                        <div class="thread-loading-panel" role="status" aria-live="polite">
-                            <span class="thread-loading-spinner" aria-hidden="true"></span>
-                            <span class="text-sm font-extrabold text-[var(--text)]">Memuat percakapan...</span>
-                            <span class="max-w-[18rem] text-xs leading-relaxed text-[var(--text-2)]">
-                                Pesan sedang disinkronkan dari WA Caraka. Thread akan tampil otomatis setelah data siap.
-                            </span>
+                    <div v-else-if="!activeConvo" class="grid min-h-[280px] place-items-center text-center text-sm text-[var(--text-2)]">
+                        <div>
+                            <p class="text-4xl mb-3">💬</p>
+                            <p>Pilih percakapan di sebelah kiri untuk memulai.</p>
                         </div>
                     </div>
 
@@ -3372,7 +3504,8 @@ onUnmounted(() => {
                     <div v-else :class="threadGapClass" :style="threadMessageScaleStyle">
                         <div v-for="msg in conversationMessages" :key="msg.id || msg._tempId"
                              class="flex"
-                             :class="bubbleWrapClass(msg)">
+                             :class="bubbleWrapClass(msg)"
+                             @contextmenu.prevent="openMsgContextMenu($event, msg)">
 
                             <!-- Avatar inbound: tampilkan foto profil jika tersedia, fallback ke inisial berwarna -->
                             <div v-if="msg.direction === 'inbound'" class="mt-1 mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full overflow-hidden ring-1 ring-white/40 text-[10px] font-black text-white"
@@ -3388,8 +3521,9 @@ onUnmounted(() => {
                                 <span v-else>{{ msg.senderInitials }}</span>
                             </div>
 
-                            <article class="max-w-[92%] rounded-2xl px-3 py-2.5 shadow-sm transition-all duration-200 sm:max-w-[86%] sm:px-4 sm:py-3 xl:max-w-[78%]"
-                                     :class="bubbleCardClass(msg)">
+                            <article class="group max-w-[92%] rounded-2xl px-3 py-2.5 shadow-sm transition-all duration-200 sm:max-w-[86%] sm:px-4 sm:py-3 xl:max-w-[78%] cursor-context-menu"
+                                     :class="bubbleCardClass(msg)"
+                                     @contextmenu.stop.prevent="openMsgContextMenu($event, msg)">
 
                                 <div class="mb-1.5 flex items-center justify-between gap-4 text-[10px] font-semibold"
                                      :class="bubbleMetaClass(msg)">
@@ -3490,6 +3624,24 @@ onUnmounted(() => {
 
                 <!-- Reply Box -->
                 <div class="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] p-3 shadow-[var(--shadow)] sm:p-4 xl:rounded-[2rem] xl:p-5">
+
+                    <!-- Quote / Reply Preview -->
+                    <transition name="quote-slide">
+                        <div v-if="quotedMessage" class="mb-3 flex items-start gap-2 rounded-xl border-l-4 border-sky-400 bg-sky-50/80 dark:bg-sky-900/20 px-3 py-2">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[10px] font-black text-sky-600 dark:text-sky-300">
+                                    {{ quotedMessage.direction === 'outbound' ? (quotedMessage.senderDisplay || quotedMessage.operator || 'Anda') : (quotedMessage.senderDisplay || activeConvo?.remoteName || 'Kontak') }}
+                                </p>
+                                <p class="mt-0.5 truncate text-[11px] text-slate-600 dark:text-slate-300">
+                                    <span v-if="quotedMessage.type !== 'text'" class="mr-1 opacity-70">📎</span>
+                                    {{ quotedMessage.text || `[${quotedMessage.type || 'media'}]` }}
+                                </p>
+                            </div>
+                            <button @click="cancelQuote" class="flex-shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-200/80 hover:text-slate-600 transition" title="Batalkan reply">
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </transition>
                     <input
                         ref="mediaInputRef"
                         type="file"
@@ -3498,14 +3650,17 @@ onUnmounted(() => {
                         @change="onMediaFileChange"
                     />
                     <div class="flex flex-col gap-2 sm:gap-3 xl:flex-row">
-                        <textarea v-model="replyText"
-                                  ref="replyTextareaRef"
-                                  rows="3"
-                                  :disabled="!activeConvo || !canReply"
-                                  :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : `Balas ke ${activeConvo?.displayTitle}...` "
-                                  class="flex-1 resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[11px] text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-xs xl:text-sm"
-                                  @keydown.ctrl.enter="replyToConversation"
-                                  @keydown="handleReplyKeydown" />
+                        <div class="chat-input-wrapper flex-1 flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] transition" style="--input-radius: 16px; --wrapper-bg: var(--surface-2);">
+                            <textarea v-model="replyText"
+                                      ref="replyTextareaRef"
+                                      rows="3"
+                                      :disabled="!activeConvo || !canReply"
+                                      :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : (quotedMessage ? 'Ketik balasan...' : `Balas ke ${activeConvo?.displayTitle}...`)"
+                                      class="w-full flex-1 resize-none bg-transparent border-0 px-3 py-2.5 text-[11px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-2)] disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-xs xl:text-sm"
+                                      @keydown.ctrl.enter="replyToConversation"
+                                      @keydown="handleReplyKeydown"
+                                      @paste="onComposerPaste" />
+                        </div>
 
                         <div class="flex flex-col gap-2 xl:w-auto">
                             <div class="flex items-center gap-2 relative">
@@ -4022,6 +4177,43 @@ onUnmounted(() => {
             </div>
         </Teleport>
 
+        <!-- Message Context Menu (Klik Kanan Pesan) -->
+        <Teleport to="body">
+            <transition name="ctx-pop">
+                <div v-if="msgCtxMenu.isOpen"
+                     class="fixed z-[9998] w-52 overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-200/80"
+                     :style="{ top: msgCtxMenu.y + 'px', left: msgCtxMenu.x + 'px' }"
+                     @click.stop>
+                    <div class="border-b border-slate-100 bg-slate-50/80 px-3 py-2">
+                        <p class="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                            {{ msgCtxMenu.msg?.direction === 'outbound' ? 'Pesan Anda' : 'Pesan Masuk' }}
+                        </p>
+                        <p class="mt-0.5 truncate text-[11px] font-semibold text-slate-700">
+                            {{ msgCtxMenu.msg?.text || '[media]' }}
+                        </p>
+                    </div>
+                    <div class="py-1">
+                        <button @click.stop="quoteMessage"
+                            class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-sky-700 transition hover:bg-sky-50">
+                            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                            Reply / Quote
+                        </button>
+                        <div class="mx-3 my-1 border-t border-slate-100"></div>
+                        <button v-if="msgCtxMenu.msg?.id" @click.stop="deleteMessageForMe"
+                            class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            Hapus untuk Saya
+                        </button>
+                        <button @click.stop="deleteMessageForEveryone"
+                            class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50">
+                            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            Hapus untuk Semua
+                        </button>
+                    </div>
+                </div>
+            </transition>
+        </Teleport>
+
         <!-- Confirm Modal Elegan -->
         <Teleport to="body">
             <div v-if="confirmModal.isOpen" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm" @click.self="resolveConfirmModal(false)">
@@ -4180,6 +4372,68 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.hourglass-loader {
+    display: inline-block;
+    position: relative;
+    width: 40px;
+    height: 40px;
+}
+.hourglass-loader:after {
+    content: " ";
+    display: block;
+    border-radius: 50%;
+    width: 0;
+    height: 0;
+    margin: 4px;
+    box-sizing: border-box;
+    border: 16px solid #38bdf8;
+    border-color: #38bdf8 transparent #38bdf8 transparent;
+    animation: hourglass-anim 1.2s infinite;
+}
+@keyframes hourglass-anim {
+    0% {
+        transform: rotate(0);
+        animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    }
+    50% {
+        transform: rotate(900deg);
+        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+    }
+    100% {
+        transform: rotate(1800deg);
+    }
+}
+
+.ctx-pop-enter-active,
+.ctx-pop-leave-active {
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ctx-pop-enter-from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-5px);
+}
+.ctx-pop-leave-to {
+    opacity: 0;
+    transform: scale(0.95);
+}
+
+.quote-slide-enter-active,
+.quote-slide-leave-active {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 100px;
+    overflow: hidden;
+}
+.quote-slide-enter-from,
+.quote-slide-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
+    max-height: 0;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-width: 0 !important;
+}
+
 /* ─── Interkom Outer Wrapper ──────────────────────────── */
 .interkom-outer {
     align-items: flex-start;

@@ -253,9 +253,9 @@ class WaCarakaService
     /**
      * Send a single text message via runtime and log it.
      */
-    public function sendText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?\App\Models\User $user = null): array
+    public function sendText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?\App\Models\User $user = null, ?string $quoteWaId = null): array
     {
-        return $this->sendRuntimeText($to, $text, $sender, $userId);
+        return $this->sendRuntimeText($to, $text, $sender, $userId, $quoteWaId);
     }
 
     public function sendMedia(string $to, array $mediaPayload, ?string $sender = null, ?int $userId = null): array
@@ -434,14 +434,20 @@ class WaCarakaService
         ];
     }
 
-    protected function sendRuntimeText(string $to, string $text, ?string $sender = null, ?int $userId = null): array
+    protected function sendRuntimeText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?string $quoteWaId = null): array
     {
         $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
 
-        $response = $this->post('/send-text', [
+        $payload = [
             'to'   => $normalizedTo,
             'text' => $text,
-        ]);
+        ];
+        if ($quoteWaId) {
+            $payload['quote_wa_id'] = $quoteWaId;
+            $payload['quote'] = $quoteWaId; // Kompatibilitas dengan Node.js/Baileys jika nama variabel bervariasi
+        }
+
+        $response = $this->post('/send-text', $payload);
 
         $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
 
@@ -487,7 +493,7 @@ class WaCarakaService
         );
         $mediaUrl = isset($mediaPayload['media_url']) ? trim((string) $mediaPayload['media_url']) : null;
 
-        $response = $this->post('/send-media', [
+        $payload = [
             'to' => $normalizedTo,
             'media_kind' => $kind,
             'media_url' => $mediaUrl,
@@ -495,7 +501,14 @@ class WaCarakaService
             'file_name' => $fileName,
             'caption' => $caption,
             'ptt' => (bool) ($mediaPayload['ptt'] ?? false),
-        ]);
+        ];
+
+        if (!empty($mediaPayload['quote_wa_id'])) {
+            $payload['quote_wa_id'] = $mediaPayload['quote_wa_id'];
+            $payload['quote'] = $mediaPayload['quote_wa_id'];
+        }
+
+        $response = $this->post('/send-media', $payload);
 
         $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
 
@@ -1247,8 +1260,23 @@ class WaCarakaService
             return [$conversationId];
         }
 
-        $relatedIds = WaCarakaConversation::query()
-            ->get(['conversation_id', 'remote_number'])
+        $query = WaCarakaConversation::query()->select(['conversation_id', 'remote_number']);
+        
+        $baseSearch = preg_replace('/@(g\.us|lid)$/i', '', $normalizedRemote);
+        $baseSearch = preg_replace('/\D/', '', (string) $baseSearch);
+        $baseSearch = ltrim((string) $baseSearch, '0');
+        
+        if (str_starts_with($baseSearch, '62')) {
+            $baseSearch = substr($baseSearch, 2);
+        }
+
+        if ($baseSearch !== '') {
+            $query->where('remote_number', 'LIKE', '%' . $baseSearch . '%');
+        } else {
+            $query->where('remote_number', $normalizedRemote);
+        }
+
+        $relatedIds = $query->get()
             ->filter(fn (WaCarakaConversation $item) => WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedRemote)
             ->pluck('conversation_id')
             ->filter()

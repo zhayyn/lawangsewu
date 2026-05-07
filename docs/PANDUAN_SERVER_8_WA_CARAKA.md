@@ -4,22 +4,22 @@ Tanggal: 2026-04-23
 
 ## Ringkasan Singkat
 
-Ya, server `192.168.88.` sangat bisa dimanfaatkan.
+Ya, server `192.168.88.33` sangat bisa dimanfaatkan.
 
 Ada 2 model utama:
 
 1. `Model A - Dipisah`
-   Lawangsewu tetap di server sekarang, sedangkan `wa-runtime` pindah ke server `192.168.88.8`.
+   Lawangsewu tetap di server sekarang, sedangkan `wa-runtime` pindah ke server `192.168.88.33`.
 
-2. `Model B - Disatukan di server 8`
-   Seluruh Lawangsewu termasuk WA Caraka, Laravel, web server, dan `wa-runtime` dipindah ke `192.168.88.8`.
+2. `Model B - Disatukan di server 33`
+   Seluruh Lawangsewu termasuk WA Caraka, Laravel, web server, dan `wa-runtime` dipindah ke `192.168.88.33`.
 
 Rekomendasi saya:
 
 - Untuk stabilitas dan keamanan: pilih `Model A - Dipisah`.
 - Untuk sederhana dan hemat pengelolaan: `Model B` bisa dipakai, tapi perlu disiplin resource dan backup.
 
-Kalau server `192.168.88.8` punya:
+Kalau server `192.168.88.33` punya:
 
 - RAM `16 GB`
 - Xeon `X99`
@@ -77,7 +77,7 @@ Tapi risikonya:
 
 ## Perbandingan Dua Model
 
-| Aspek | Model A: Lawangsewu tetap, `wa-runtime` pindah ke `192.168.88.8` | Model B: semua pindah ke `192.168.88.8` |
+| Aspek | Model A: Lawangsewu tetap, `wa-runtime` pindah ke `192.168.88.33` | Model B: semua pindah ke `192.168.88.33` |
 |---|---|---|
 | Stabilitas web utama | Lebih tinggi | Sedang |
 | Isolasi gangguan WA | Sangat baik | Rendah |
@@ -86,7 +86,7 @@ Tapi risikonya:
 | Kemudahan maintenance | Baik | Baik di awal, lebih rumit saat beban naik |
 | Risiko single point of failure | Lebih kecil | Lebih besar |
 | Cocok untuk pertumbuhan trafik | Lebih cocok | Lebih terbatas |
-| Kebutuhan resource di server 8 | Ringan | Lebih berat |
+| Kebutuhan resource di server 33 | Ringan | Lebih berat |
 | Dampak Ollama ke sistem | Minimal | Lebih terasa |
 
 ## Rekomendasi Saya
@@ -103,7 +103,7 @@ Susunannya:
   - database utama
   - queue worker Laravel
 
-- Server `192.168.88.8`:
+- Server `192.168.88.33`:
   - `wa-runtime`
   - session WhatsApp
   - log runtime
@@ -132,7 +132,7 @@ Kalau Anda ingin sederhana dulu dan cepat migrasi, `Model B` masih bisa dipakai 
 
 `Cukup`, tapi konteksnya penting.
 
-### Kalau server 8 hanya untuk `wa-runtime`
+### Kalau server 33 hanya untuk `wa-runtime`
 
 `16 GB` sangat cukup.
 
@@ -144,7 +144,7 @@ Perkiraan kasar:
 
 Masih sangat longgar.
 
-### Kalau server 8 menampung semuanya
+### Kalau server 33 menampung semuanya
 
 Komponen yang berbagi RAM:
 
@@ -196,17 +196,17 @@ Kalau semua disatukan, bukan karena Ollama jahat, tapi karena pola kerjanya berb
 - kadang idle
 - tapi saat aktif, dia bisa menyedot RAM dan CPU cukup terasa
 
-Kalau `Ollama 3B` memang ingin tetap ada di server 8, maka saya makin menyarankan:
+Kalau `Ollama 3B` memang ingin tetap ada di server 33, maka saya makin menyarankan:
 
-- `server 8` fokus untuk WA runtime saja
+- `server 33` fokus untuk WA runtime saja
 - atau
-- kalau semua dipindah ke server 8, beri batas resource yang ketat ke Ollama
+- kalau semua dipindah ke server 33, beri batas resource yang ketat ke Ollama
 
 ## Rekomendasi Final Berdasarkan Kondisi Anda
 
 Dengan kondisi:
 
-- ada server Ubuntu lain di `192.168.88.8`
+- ada server Ubuntu lain di `192.168.88.33`
 - RAM `16 GB`
 - Xeon `X99`
 - sudah ada `Ollama 3B`
@@ -216,8 +216,8 @@ rekomendasi terbaik saya adalah:
 ### Opsi Terbaik
 
 - Biarkan Lawangsewu tetap di server sekarang.
-- Pindahkan hanya `wa-runtime` ke `192.168.88.8`.
-- Biarkan Ollama tetap di server 8 jika memang harus, tapi jangan gabungkan seluruh aplikasi Lawangsewu di sana.
+- Pindahkan hanya `wa-runtime` ke `192.168.88.33`.
+- Biarkan Ollama tetap di server 33 jika memang harus, tapi jangan gabungkan seluruh aplikasi Lawangsewu di sana.
 
 Ini memberi kombinasi terbaik antara:
 
@@ -228,7 +228,7 @@ Ini memberi kombinasi terbaik antara:
 
 ### Opsi "Boleh, tapi hati-hati"
 
-Pindahkan semua ke server 8 hanya jika:
+Pindahkan semua ke server 33 hanya jika:
 
 - Anda ingin konsolidasi mesin
 - beban user masih kecil sampai sedang
@@ -259,7 +259,7 @@ Database utama
    ->
 WA Caraka Controller / Service
    ->
-Private LAN 192.168.88.8:8790
+Private LAN 192.168.88.33:8790
    ->
 wa-runtime
    ->
@@ -267,7 +267,7 @@ WhatsApp device session
 
 Ollama 3B
    ->
-tetap di server 8, tapi terpisah dari jalur utama web
+tetap di server 33, tapi terpisah dari jalur utama web
 ```
 
 ### Model B - Bisa, tapi lebih padat
@@ -285,16 +285,16 @@ wa-runtime
    ->
 Ollama 3B
 
-semua hidup dalam satu mesin 192.168.88.8
+semua hidup dalam satu mesin 192.168.88.33
 ```
 
 ## Panduan Implementasi Lengkap untuk Model A
 
-## Tahap 1 - Siapkan server `192.168.88.8`
+## Tahap 1 - Siapkan server `192.168.88.33`
 
 Tujuan:
 
-- buat server 8 menjadi "ruang khusus WA"
+- buat server 33 menjadi "ruang khusus WA"
 
 Checklist:
 
@@ -318,15 +318,15 @@ sudo mkdir -p /opt/wacaraka/wa-runtime
 sudo chown -R wacaraka:wacaraka /opt/wacaraka
 ```
 
-## Tahap 2 - Salin `wa-runtime` ke server 8
+## Tahap 2 - Salin `wa-runtime` ke server 33
 
 Contoh dari server utama:
 
 ```bash
-rsync -avz /var/www/lawangsewu/wa-runtime/ user@192.168.88.8:/opt/wacaraka/wa-runtime/
+rsync -avz /var/www/lawangsewu/wa-runtime/ user@192.168.88.33:/opt/wacaraka/wa-runtime/
 ```
 
-Lalu di server 8:
+Lalu di server 33:
 
 ```bash
 cd /opt/wacaraka/wa-runtime
@@ -382,7 +382,7 @@ sudo systemctl start wacaraka-runtime
 sudo systemctl status wacaraka-runtime
 ```
 
-## Tahap 5 - Kunci firewall server 8
+## Tahap 5 - Kunci firewall server 33
 
 Analogi:
 
@@ -407,7 +407,7 @@ Ganti `IP_SERVER_LARAVEL` dengan IP LAN server utama.
 Edit `.env` di server Lawangsewu:
 
 ```env
-LW_WA_V2_BASE=http://192.168.88.8:8790
+LW_WA_V2_BASE=http://192.168.88.33:8790
 LW_WA_V2_TOKEN=ganti_dengan_token_yang_sama
 LW_WA_V2_TIMEOUT=20
 ```
@@ -424,7 +424,7 @@ php artisan optimize:clear
 Tes dari server utama:
 
 ```bash
-curl -H "X-WA-V2-Token: ganti_dengan_token_yang_sama" http://192.168.88.8:8790/health
+curl -H "X-WA-V2-Token: ganti_dengan_token_yang_sama" http://192.168.88.33:8790/health
 ```
 
 Kalau sehat, baru tes dari UI `/wa-caraka`.
@@ -483,7 +483,7 @@ Analogi:
 
 ## Panduan Implementasi Lengkap untuk Model B
 
-Kalau Anda tetap ingin semua pindah ke server 8, maka lakukan ini:
+Kalau Anda tetap ingin semua pindah ke server 33, maka lakukan ini:
 
 1. pasang Nginx
 2. pasang PHP + PHP-FPM
@@ -539,7 +539,7 @@ Sedikit tapi stabil lebih baik daripada banyak tapi saling berebut RAM.
 
 ## Kapan Harus Memilih Model B?
 
-Pilih semua pindah ke server 8 hanya jika:
+Pilih semua pindah ke server 33 hanya jika:
 
 - server lama mau dipensiunkan
 - ingin satu titik administrasi
@@ -566,8 +566,8 @@ Jadi sekali lagi, model terpisah adalah pilihan paling sehat.
 Saya akan lakukan ini:
 
 1. Server utama tetap jadi rumah Lawangsewu.
-2. Server `192.168.88.8` dijadikan rumah `wa-runtime`.
-3. Ollama tetap di server 8, tapi jangan dicampur jalur utama web.
+2. Server `192.168.88.33` dijadikan rumah `wa-runtime`.
+3. Ollama tetap di server 33, tapi jangan dicampur jalur utama web.
 4. Database tetap di server utama dulu.
 5. Setelah stabil, baru evaluasi apakah perlu migrasi penuh.
 
@@ -584,7 +584,7 @@ Kalau jawaban Anda lebih banyak "ya" di bawah ini, pilih `Model A`:
 
 - Apakah portal utama harus tetap jalan meski WA error?
 - Apakah Anda ingin risiko lebih kecil?
-- Apakah server 8 sudah tersedia?
+- Apakah server 33 sudah tersedia?
 - Apakah Ollama tetap ingin dipakai?
 
 Kalau jawaban Anda lebih banyak "ya" di bawah ini, `Model B` bisa dipertimbangkan:
@@ -598,9 +598,9 @@ Kalau jawaban Anda lebih banyak "ya" di bawah ini, `Model B` bisa dipertimbangka
 
 Kesimpulan final:
 
-- `192.168.88.8` sangat layak dimanfaatkan.
+- `192.168.88.33` sangat layak dimanfaatkan.
 - Untuk kondisi Anda, pilihan paling bijak adalah:
-  `pindahkan hanya wa-runtime ke server 8`.
+  `pindahkan hanya wa-runtime ke server 33`.
 - RAM `16 GB` cukup untuk itu dengan aman.
 - RAM `16 GB` juga masih bisa untuk semua digabung, tapi saya tidak merekomendasikannya sebagai pilihan pertama karena di sana juga sudah ada `Ollama 3B`.
 
@@ -612,4 +612,4 @@ Kalau ingin, langkah berikutnya yang paling masuk akal adalah saya bantu siapkan
 - checklist cutover
 - rollback plan
 
-agar Anda bisa langsung eksekusi migrasi ke server `192.168.88.8`.
+agar Anda bisa langsung eksekusi migrasi ke server `192.168.88.33`.

@@ -51,6 +51,7 @@ Route::get('/bridge-server10', [WidgetCompatController::class, 'html'])->default
 Route::get('/biaya-proses-berperkara', [WidgetCompatController::class, 'html'])->defaults('page', 'biaya-proses-berperkara');
 Route::get('/biaya-perkara', [WidgetCompatController::class, 'html'])->defaults('page', 'biaya-perkara');
 Route::get('/monitor-wa', [WidgetCompatController::class, 'html'])->defaults('page', 'monitor-wa');
+Route::get('/statistik-embed', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'statistik-embed');
 
 Route::get('/monitor-persidangan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'monitor-persidangan');
 Route::get('/monitor-antrian-sidang', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'monitor-antrian-sidang');

@@ -76,6 +76,7 @@ class WidgetCompatController extends Controller
             'info-persidangan'          => 'info-persidangan.php',
             'info-persidangan-hijautua' => 'info-persidangan-hijautua.php',
             'info-persidangan-stabilo'  => 'info-persidangan-stabilo.php',
+            'statistik-embed'           => 'statistik-embed.php',
         ];
 
         if (! isset($map[$page])) {

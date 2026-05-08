@@ -112,11 +112,13 @@ class WaCarakaController extends Controller
             'reject-handover' => $this->rejectHandover($request),
             'force-handover' => $this->forceHandover($request),
             'close' => $this->closeConversation($request),
+            'close-silent' => $this->closeConversationSilent($request),
             'reopen' => $this->reopenConversation($request),
             'mark-read' => $this->markRead($request),
             'mark-customer' => $this->markCustomer($request),
             'unmark-customer' => $this->unmarkCustomer($request),
             'delete-message' => $this->deleteMessage($request),
+            'unsend-message' => $this->unsendMessage($request),
             'clear-conversation' => $this->clearConversation($request),
             'clear-all-conversations' => $this->clearAllConversations(),
             'reset-state' => $this->resetState(),
@@ -507,17 +509,17 @@ class WaCarakaController extends Controller
 
         if ($result['ok']) {
             // Tandai semua pesan inbound yang belum dibalas sebagai 'selesai'
-            // agar tidak masuk ke hitungan "Pesan Masuk Baru"
             WaCarakaMessage::query()
                 ->where('conversation_id', $conversation->conversation_id)
                 ->where('direction', 'inbound')
                 ->whereNull('replied_at')
                 ->update(['replied_at' => now()]);
 
-            // Kirim pesan macro penutup SETELAH response dikembalikan ke browser
-            // (fire-and-forget) agar operator tidak perlu menunggu runtime WA.
+            // Kirim pesan macro penutup (ambil template dari Cache, atau gunakan default)
+            // fire-and-forget setelah response dikembalikan ke browser.
             if ($conversation->remote_number) {
-                $macroText = "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ";
+                $defaultTemplate = "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ";
+                $macroText     = Cache::get('wacaraka_closing_template', $defaultTemplate);
                 $remoteNumber  = $conversation->remote_number;
                 $senderLabel   = $this->senderLabel($request->user());
                 $userId        = $request->user()->id;
@@ -530,6 +532,31 @@ class WaCarakaController extends Controller
                     }
                 });
             }
+        }
+
+        return $result['ok']
+            ? ['ok' => true, 'status' => 200, 'data' => ['ok' => true]]
+            : ['ok' => false, 'status' => 403, 'error' => $result['error'] ?? 'Gagal menutup percakapan.'];
+    }
+
+    /**
+     * Tutup percakapan TANPA mengirimkan pesan salam penutup.
+     * Hanya menandai semua pesan inbound sebagai replied dan status menjadi closed.
+     */
+    private function closeConversationSilent(Request $request): array
+    {
+        $validated = $request->validate(['conversation_id' => 'required|string']);
+        $conversation = $this->findConversationOrFail($validated['conversation_id']);
+        $result = $this->conversations->closeConversation($conversation, $request->user());
+
+        if ($result['ok']) {
+            // Tandai semua pesan inbound yang belum dibalas sebagai 'selesai'
+            // tanpa mengirimkan pesan apapun ke pengguna WA.
+            WaCarakaMessage::query()
+                ->where('conversation_id', $conversation->conversation_id)
+                ->where('direction', 'inbound')
+                ->whereNull('replied_at')
+                ->update(['replied_at' => now()]);
         }
 
         return $result['ok']
@@ -636,6 +663,56 @@ class WaCarakaController extends Controller
         WaCarakaMessage::query()->whereKey($validated['message_id'])->delete();
 
         return ['ok' => true, 'status' => 200, 'data' => ['ok' => true]];
+    }
+
+    /**
+     * Recall a sent WhatsApp message from all parties ("delete for everyone").
+     *
+     * Requires:
+     *  - wa_message_id: the WA message ID (stored in wa_caraka_messages)
+     *  - jid: the remote JID (@c.us / @g.us / @lid)
+     *
+     * Permission: operator/admin (must own message or be admin).
+     * Time limit: 60 minutes from send time (enforced on bridge & pre-checked here).
+     */
+    private function unsendMessage(Request $request): array
+    {
+        $validated = $request->validate([
+            'wa_message_id' => 'required|string|max:255',
+            'jid'           => 'required|string|max:255',
+        ]);
+
+        $userId = $request->user()->id;
+
+        // Permission check: only operator who sent it, admin, or superadmin
+        if (WaCarakaDatabase::hasTable('wa_caraka_messages')) {
+            $msg = WaCarakaMessage::query()
+                ->where('wa_message_id', $validated['wa_message_id'])
+                ->first(['id', 'user_id', 'direction', 'created_at']);
+
+            if ($msg) {
+                $isOwner   = (int) $msg->user_id === $userId;
+                $isPriv    = $request->user()->isAdmin() || $request->user()->isSuperAdmin();
+
+                if (!$isOwner && !$isPriv) {
+                    return [
+                        'ok'     => false,
+                        'status' => 403,
+                        'error'  => 'Anda tidak memiliki izin untuk menghapus pesan ini.',
+                    ];
+                }
+
+                if ($msg->direction !== 'outbound') {
+                    return [
+                        'ok'     => false,
+                        'status' => 422,
+                        'error'  => 'Hanya pesan yang Anda kirim yang dapat di-recall.',
+                    ];
+                }
+            }
+        }
+
+        return $this->wa->unsendMessage($validated['jid'], $validated['wa_message_id'], $userId);
     }
 
     private function clearConversation(Request $request): array
@@ -1031,24 +1108,35 @@ class WaCarakaController extends Controller
                 ])->all()
             : [];
 
+        $todayStart = now()->startOfDay()->toDateTimeString();
+
         $operatorStats = WaCarakaDatabase::hasTable('wa_caraka_messages')
             ? WaCarakaMessage::query()
-                ->with('user:id,name,alias')
+                ->selectRaw('
+                    user_id, 
+                    COUNT(DISTINCT conversation_id) as conversations, 
+                    COUNT(id) as outboundMessages, 
+                    SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as outboundToday, 
+                    MAX(created_at) as lastReplyAt
+                ', [$todayStart])
                 ->where('direction', 'outbound')
                 ->whereNotNull('user_id')
-                ->get()
                 ->groupBy('user_id')
-                ->map(function (Collection $messages) {
-                    $user = $messages->first()?->user;
+                ->orderByDesc('outboundToday')
+                ->limit(8)
+                ->with('user:id,name,alias')
+                ->get()
+                ->map(function ($row) {
+                    $user = $row->user;
                     return [
+                        'id' => $row->user_id,
                         'name' => $user ? ($user->alias ?: $user->name) : 'Operator',
-                        'conversations' => $messages->pluck('conversation_id')->filter()->unique()->count(),
-                        'outboundMessages' => $messages->count(),
+                        'conversations' => (int) $row->conversations,
+                        'outboundMessages' => (int) $row->outboundMessages,
+                        'outboundToday' => (int) $row->outboundToday,
+                        'lastReplyAt' => $row->lastReplyAt ? Carbon::parse($row->lastReplyAt)->diffForHumans() : null,
                     ];
                 })
-                ->sortByDesc('outboundMessages')
-                ->values()
-                ->take(8)
                 ->all()
             : [];
 

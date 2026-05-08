@@ -42,6 +42,10 @@ class WaCarakaAdminController extends Controller
                 'loggingEnabled' => config('wa_caraka.logging_enabled', true),
                 'timeout'        => config('wa_caraka.timeout', 20),
                 'background'     => \Illuminate\Support\Facades\Cache::get('wacaraka_background'),
+                'closingTemplate' => \Illuminate\Support\Facades\Cache::get(
+                    'wacaraka_closing_template',
+                    "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ"
+                ),
             ],
         ]);
     }
@@ -85,7 +89,9 @@ class WaCarakaAdminController extends Controller
             $action === 'broadcast'     => $this->handleBroadcast($request, $sender, $userId),
 
             // Settings
-            $action === 'save-background' => $this->handleSaveBackground($request),
+            $action === 'save-background'         => $this->handleSaveBackground($request),
+            $action === 'save-closing-template'   => $this->handleSaveClosingTemplate($request),
+            $action === 'get-closing-template'    => $this->handleGetClosingTemplate(),
 
             default => ['ok' => false, 'status' => 404, 'error' => 'Aksi tidak valid.'],
         };
@@ -170,5 +176,26 @@ class WaCarakaAdminController extends Controller
         \Illuminate\Support\Facades\Cache::forever('wacaraka_background', $validated['background']);
 
         return ['ok' => true, 'status' => 200];
+    }
+
+    private function handleSaveClosingTemplate(Request $request): array
+    {
+        $validated = $request->validate([
+            'template' => 'nullable|string|max:2000',
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forever('wacaraka_closing_template', $validated['template'] ?: null);
+
+        return ['ok' => true, 'status' => 200];
+    }
+
+    private function handleGetClosingTemplate(): array
+    {
+        $default = "Baik, jika tidak ada pertanyaan lagi, kami tutup percakapan ini. Terima kasih,\n\nوَالسَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ";
+        return [
+            'ok'     => true,
+            'status' => 200,
+            'data'   => ['template' => \Illuminate\Support\Facades\Cache::get('wacaraka_closing_template', $default)],
+        ];
     }
 }

@@ -48,6 +48,9 @@ const broadcastResult = ref(null);
 // Settings
 const bgInput = ref(props.config.background || '');
 const bgSaving = ref(false);
+const closingTemplate = ref(props.config.closingTemplate || '');
+const closingTemplateSaving = ref(false);
+const closingTemplateSaved = ref(false);
 
 const isConnected = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
 
@@ -211,6 +214,21 @@ const saveBackground = async () => {
     }
 };
 
+const saveClosingTemplate = async () => {
+    closingTemplateSaving.value = true;
+    closingTemplateSaved.value = false;
+    try {
+        await callApi('save-closing-template', 'post', { template: closingTemplate.value });
+        closingTemplateSaved.value = true;
+        t.ok('Template tersimpan', 'Pesan salam penutup berhasil diperbarui.');
+        setTimeout(() => { closingTemplateSaved.value = false; }, 3000);
+    } catch (e) {
+        t.err('Gagal menyimpan template', e.message);
+    } finally {
+        closingTemplateSaving.value = false;
+    }
+};
+
 let qrPoll = null;
 
 const refreshQr = async () => {
@@ -328,11 +346,11 @@ onUnmounted(() => {
 
             <!-- Tab Nav -->
             <div class="flex gap-1 mb-6 bg-white rounded-xl border border-slate-200 p-1 shadow-sm w-fit">
-                <button v-for="tab in ['overview', 'device', 'send', 'broadcast', 'logs']" :key="tab"
+                <button v-for="tab in ['overview', 'device', 'send', 'broadcast', 'logs', 'settings']" :key="tab"
                         @click="activeTab = tab"
                         class="px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all"
                         :class="activeTab === tab ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:bg-slate-100'">
-                    {{ tab === 'overview' ? 'Ringkasan' : tab === 'device' ? 'Device' : tab === 'send' ? 'Kirim Pesan' : tab === 'broadcast' ? 'Broadcast' : 'Log Pesan' }}
+                    {{ tab === 'overview' ? 'Ringkasan' : tab === 'device' ? 'Device' : tab === 'send' ? 'Kirim Pesan' : tab === 'broadcast' ? 'Broadcast' : tab === 'logs' ? 'Log Pesan' : 'Pengaturan' }}
                 </button>
             </div>
 
@@ -495,6 +513,37 @@ onUnmounted(() => {
                     </div>
                 </div>
             </section>
+            <!-- Tab: Settings -->
+            <section v-if="activeTab === 'settings'" class="max-w-2xl space-y-6">
+                <!-- Chat Background -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1">Tampilan Chat (Background)</h3>
+                    <p class="text-xs text-slate-400 mb-4">URL gambar atau kode warna untuk latar belakang area chat operator.</p>
+                    <div class="flex gap-2">
+                        <input v-model="bgInput" type="text" placeholder="URL Gambar atau Warna (ex: #efeae2)" class="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-400">
+                        <button @click="saveBackground" :disabled="bgSaving" class="rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 transition-colors" :class="bgSaved ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'">{{ bgSaving ? 'Menyimpan...' : bgSaved ? '✓ Tersimpan' : 'Simpan' }}</button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">Kosongkan untuk menggunakan background default.</p>
+                </div>
+
+                <!-- Closing Template -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1">Template Pesan Salam Penutup</h3>
+                    <p class="text-xs text-slate-400 mb-4">Pesan ini akan dikirimkan secara otomatis ke kontak WA ketika operator menekan tombol <strong>"Selesai + Salam"</strong> saat menutup percakapan. Tombol <strong>"Selesai Saja"</strong> tidak akan mengirimkan pesan ini.</p>
+                    <textarea v-model="closingTemplate" rows="6" placeholder="Tulis template pesan penutup di sini..." class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 resize-none font-mono"></textarea>
+                    <div class="mt-3 flex items-center gap-3">
+                        <button @click="saveClosingTemplate" :disabled="closingTemplateSaving" class="rounded-xl px-5 py-2 text-xs font-bold disabled:opacity-50 transition-colors" :class="closingTemplateSaved ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'">
+                            {{ closingTemplateSaving ? 'Menyimpan...' : closingTemplateSaved ? '✓ Tersimpan' : 'Simpan Template' }}
+                        </button>
+                        <span class="text-[10px] text-slate-400">{{ closingTemplate.length }}/2000 karakter</span>
+                    </div>
+                    <div class="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Preview</p>
+                        <p class="whitespace-pre-wrap text-sm text-slate-700">{{ closingTemplate || '(template kosong)' }}</p>
+                    </div>
+                </div>
+            </section>
+
             </div>
         </div>
     </LawangsewuLayout>

@@ -528,33 +528,79 @@ const deleteMessageForMe = async () => {
     }
 };
 
+/**
+ * Cek apakah pesan masih bisa di-recall (< 60 menit sejak dikirim).
+ * sentAt = string ISO8601 dari field sentAt pada message object.
+ * Mengembalikan { ok: bool, minutesLeft: number }
+ */
+const canUnsend = (msg) => {
+    if (!msg?.sentAtRaw && !msg?.sentAt) return { ok: false, minutesLeft: 0 };
+    // Coba parse sentAtRaw (epoch ms) atau sentAt (formatted string)
+    const raw = msg.sentAtRaw || msg.createdAt;
+    const ts = raw ? new Date(raw) : null;
+    if (!ts || isNaN(ts.getTime())) return { ok: false, minutesLeft: 0 };
+    const diffMs = Date.now() - ts.getTime();
+    const diffMin = diffMs / 60000;
+    return { ok: diffMin < 60, minutesLeft: Math.max(0, Math.ceil(60 - diffMin)) };
+};
+
 const deleteMessageForEveryone = async () => {
     const msg = msgCtxMenu.value.msg;
     closeMsgContextMenu();
     if (!msg) return;
-    if (!(await openConfirmModal('Hapus untuk Semua', 'Coba hapus pesan ini dari WhatsApp semua pihak? (Hanya berhasil jika dalam 60 menit pengiriman dan runtime mendukung.)'))) return;
+
+    // Outbound-only + memerlukan wa_message_id
+    if (msg.direction !== 'outbound') {
+        showToast('warning', 'Hanya pesan yang Anda kirim yang dapat di-recall.');
+        return;
+    }
+
+    if (!msg.waMessageId) {
+        showToast('warning', 'Pesan ini tidak memiliki WA Message ID — tidak bisa di-recall.');
+        return;
+    }
+
+    // Client-side optimistic time check
+    const { ok: withinLimit, minutesLeft } = canUnsend(msg);
+    if (!withinLimit) {
+        showToast('error', 'Pesan sudah lebih dari 60 menit lalu — tidak bisa di-recall dari WA.');
+        return;
+    }
+
+    if (!(await openConfirmModal(
+        'Recall Pesan',
+        `Hapus pesan ini dari WhatsApp semua pihak (recall)? Sisa waktu: ${minutesLeft} menit. Tindakan ini tidak dapat dibatalkan.`
+    ))) return;
+
+    // Resolve JID — activeConvo.remoteNumber normalnya sudah dalam format @c.us / @g.us / @lid dari backend
+    const jid = activeConvo.value?.remoteNumber || '';
+    if (!jid) {
+        showToast('error', 'Tidak dapat menentukan JID tujuan. Coba refresh dan ulangi.');
+        return;
+    }
+
     try {
-        // Kirim pesan delete via runtime jika WA message ID tersedia
-        if (msg.waMessageId) {
-            await callApi('send-text', {
-                method: 'post',
-                data: {
-                    conversation_id: activeConvoId.value,
-                    text: '',
-                    delete_wa_id: msg.waMessageId,
-                },
-            }).catch(() => {}); // best effort
-        }
-        // Hapus dari DB lokal
+        // Panggil endpoint unsend-message yang memanggil /unsend-message di bridge
+        await callApi('unsend-message', {
+            method: 'post',
+            data: {
+                wa_message_id: msg.waMessageId,
+                jid,
+            },
+        });
+
+        // Hapus juga dari DB lokal agar hilang dari thread
         if (msg.id) {
-            await callApi('delete-message', { method: 'post', data: { message_id: msg.id } });
+            await callApi('delete-message', { method: 'post', data: { message_id: msg.id } }).catch(() => {});
         }
+
         await refreshConvoMessages();
-        showToast('success', 'Pesan dihapus');
+        showToast('success', 'Pesan berhasil di-recall dari WhatsApp semua pihak.');
     } catch (err) {
-        showToast('error', err?.error || 'Gagal menghapus pesan');
+        showToast('error', err?.error || 'Gagal me-recall pesan dari WA.');
     }
 };
+
 
 // ─── Paste gambar dari clipboard ─────────────────────
 const onComposerPaste = async (event) => {
@@ -1703,8 +1749,19 @@ const normalizeConversation = (raw = {}) => {
 };
 
 const normalizeMessage = (raw = {}) => {
+    // Cari convo yang sesuai
+    const targetConvoId = raw.conversationId || raw.conversation_id;
+    let targetConvo = null;
+    if (targetConvoId) {
+        targetConvo = conversations.value.find(c => c.conversationId === targetConvoId);
+    }
+    if (!targetConvo && raw.remoteNumber) {
+        targetConvo = conversations.value.find(c => c.remoteNumber === raw.remoteNumber);
+    }
+    targetConvo = targetConvo || activeConvo.value;
+
     const metadata = raw?.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
-    const remoteNumber = normalizeRemoteIdentifier(raw.remoteNumber || activeConvo.value?.remoteNumber || '');
+    const remoteNumber = normalizeRemoteIdentifier(raw.remoteNumber || targetConvo?.remoteNumber || '');
     const isGroup = Boolean(raw.isGroup) || isGroupByRemote(remoteNumber) || Boolean(metadata.isGroup);
     const media = metadata?.media && typeof metadata.media === 'object' ? metadata.media : {};
     const mediaKind = raw.mediaKind || media.kind || (raw.type === 'sticker' ? 'sticker' : (raw.type === 'image' ? 'image' : null));
@@ -1724,8 +1781,8 @@ const normalizeMessage = (raw = {}) => {
 
     // senderDisplay: untuk pesan inbound, prioritaskan nama kontak yang sudah dikenal.
     // Jangan tampilkan raw @lid atau @s.whatsapp.net — gunakan remoteName dari konversasi aktif.
-    const convoRemoteName = activeConvo.value?.remoteName || '';
-    const convoResolvedNumber = activeConvo.value?.resolvedNumber || '';
+    const convoRemoteName = targetConvo?.remoteName || '';
+    const convoResolvedNumber = targetConvo?.resolvedNumber || '';
     const senderDisplay = raw.direction === 'outbound'
         ? (raw.operator || props.authUser?.alias || props.authUser?.name || 'Anda')
         : (
@@ -1741,7 +1798,7 @@ const normalizeMessage = (raw = {}) => {
         remoteNumber,
         metadata,
         isGroup,
-        groupName: raw.groupName || metadata.groupName || metadata.groupSubject || (isGroup ? (activeConvo.value?.groupName || activeConvo.value?.remoteName) : null),
+        groupName: raw.groupName || metadata.groupName || metadata.groupSubject || (isGroup ? (targetConvo?.groupName || targetConvo?.remoteName) : null),
         mediaKind,
         mediaMime,
         mediaUrl,
@@ -2742,8 +2799,19 @@ const closeConvo = async () => {
     try {
         await callApi('close', { method: 'post', data: { conversation_id: activeConvoId.value } });
         await refreshInboxList();
-        showToast('success', 'Percakapan berhasil ditandai selesai', 'Berhasil');
+        showToast('success', 'Percakapan berhasil ditandai selesai (+ salam terkirim)', 'Berhasil');
     } catch (err) { 
+        showToast('error', err?.error || 'Gagal menyelesaikan percakapan', 'Gagal');
+    }
+};
+
+const closeConvoSilent = async () => {
+    if (!activeConvoId.value) return;
+    try {
+        await callApi('close-silent', { method: 'post', data: { conversation_id: activeConvoId.value } });
+        await refreshInboxList();
+        showToast('success', 'Percakapan ditandai selesai (tanpa salam)', 'Berhasil');
+    } catch (err) {
         showToast('error', err?.error || 'Gagal menyelesaikan percakapan', 'Gagal');
     }
 };
@@ -3063,12 +3131,12 @@ onUnmounted(() => {
 
             <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
                 <article v-for="card in [
-                    { label: 'Aktif', value: latestConvoStats.value?.open ?? 0, color: 'text-emerald-300' },
-                    { label: 'Pesan Masuk Baru', value: latestConvoStats.value?.pending ?? 0, color: (latestConvoStats.value?.pending ?? 0) === 0 ? 'text-emerald-300' : ((latestConvoStats.value?.pending ?? 0) > 10 ? 'text-rose-300' : 'text-amber-300'), title: 'Pesan masuk yang belum ditangani oleh operator (belum dibalas sama sekali)' },
-                    { label: 'Belum Dibalas', value: latestMsgStats.value?.unreplied ?? 0, color: 'text-cyan-300', title: 'Percakapan aktif yang memiliki pesan belum dibalas' },
-                    { label: 'Percakapan', value: latestConvoStats.value?.total ?? 0, color: 'text-sky-300' },
-                    { label: 'Selesai', value: latestConvoStats.value?.closed ?? 0, color: 'text-emerald-300', title: 'Total percakapan yang sudah ditandai selesai (semua operator)' },
-                    { label: 'Saya Tangani', value: latestConvoStats.value?.myConversations ?? 0, color: (latestConvoStats.value?.myConversations ?? 0) > 0 ? 'text-sky-300' : 'text-slate-400', title: 'Percakapan aktif yang sedang Anda tangani' },
+                    { label: 'Aktif', value: latestConvoStats?.open ?? 0, color: 'text-emerald-300' },
+                    { label: 'Pesan Masuk Baru', value: latestConvoStats?.pending ?? 0, color: (latestConvoStats?.pending ?? 0) === 0 ? 'text-emerald-300' : ((latestConvoStats?.pending ?? 0) > 10 ? 'text-rose-300' : 'text-amber-300'), title: 'Pesan masuk yang belum ditangani oleh operator (belum dibalas sama sekali)' },
+                    { label: 'Belum Dibalas', value: latestMsgStats?.unreplied ?? 0, color: 'text-cyan-300', title: 'Percakapan aktif yang memiliki pesan belum dibalas' },
+                    { label: 'Percakapan', value: latestConvoStats?.total ?? 0, color: 'text-sky-300' },
+                    { label: 'Selesai', value: latestConvoStats?.closed ?? 0, color: 'text-emerald-300', title: 'Total percakapan yang sudah ditandai selesai (semua operator)' },
+                    { label: 'Saya Tangani', value: latestConvoStats?.myConversations ?? 0, color: (latestConvoStats?.myConversations ?? 0) > 0 ? 'text-sky-300' : 'text-slate-400', title: 'Percakapan aktif yang sedang Anda tangani' },
                 ]" :key="`operator-summary-${card.label}`" :title="card.title || ''" class="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 backdrop-blur transition hover:bg-white/10 cursor-default">
                     <p class="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">{{ card.label }}</p>
                     <p class="mt-0.5 text-base font-black leading-none sm:text-[17px]" :class="card.color">{{ card.value ?? 0 }}</p>
@@ -3373,12 +3441,19 @@ onUnmounted(() => {
                         <!-- Actions -->
                         <div v-if="activeConvo" class="flex flex-wrap gap-1.5 sm:gap-2">
 
-                            <!-- Close (owner, admin, or unclaimed) -->
-                            <button v-if="(iMineConvo || isAdmin || activeConvo.ownership === 'unclaimed') && activeConvo.status !== 'closed'"
-                                    @click="closeConvo"
-                                    class="rounded-xl border border-slate-200 px-2 py-1.5 text-[10px] text-slate-600 hover:bg-slate-100 transition sm:px-3 sm:text-xs">
-                                ✓ Tandai Selesai
-                            </button>
+                            <!-- Close with greeting (owner, admin, or unclaimed) -->
+                            <template v-if="(iMineConvo || isAdmin || activeConvo.ownership === 'unclaimed') && activeConvo.status !== 'closed'">
+                                <button @click="closeConvo"
+                                        class="rounded-xl border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 transition sm:px-3 sm:text-xs"
+                                        title="Tutup percakapan dan kirimkan pesan salam penutup otomatis">
+                                    ✓ Selesai + Salam
+                                </button>
+                                <button @click="closeConvoSilent"
+                                        class="rounded-xl border border-slate-200 px-2 py-1.5 text-[10px] text-slate-600 hover:bg-slate-100 transition sm:px-3 sm:text-xs"
+                                        title="Tandai selesai tanpa mengirim pesan salam">
+                                    ✓ Selesai Saja
+                                </button>
+                            </template>
 
                             <!-- Reopen (Superadmin only) -->
                             <button v-if="isSuperAdmin && activeConvo.status === 'closed'"
@@ -3650,13 +3725,20 @@ onUnmounted(() => {
                         @change="onMediaFileChange"
                     />
                     <div class="flex flex-col gap-2 sm:gap-3 xl:flex-row">
-                        <div class="chat-input-wrapper flex-1 flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] transition" style="--input-radius: 16px; --wrapper-bg: var(--surface-2);">
+                        <div class="chat-input-wrapper relative z-0 flex flex-1 flex-col overflow-hidden rounded-[16px] bg-[var(--border)] p-[1px] transition-shadow focus-within:shadow-md focus-within:shadow-sky-500/10">
+                            <!-- Animating Glow Layer -->
+                            <div class="pointer-events-none absolute left-1/2 top-1/2 z-[-2] aspect-square w-[250%] -translate-x-1/2 -translate-y-1/2 animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0%,transparent_50%,#0ea5e9_90%,#7dd3fc_100%)] opacity-90 transition-opacity duration-500"
+                                 :class="{'opacity-0': !canReply || !activeConvo}"></div>
+                                 
+                            <!-- Inner Mask Background -->
+                            <div class="pointer-events-none absolute inset-[1px] z-[-1] rounded-[15px] bg-[var(--surface-2)] transition-colors"></div>
+                            
                             <textarea v-model="replyText"
                                       ref="replyTextareaRef"
                                       rows="3"
                                       :disabled="!activeConvo || !canReply"
                                       :placeholder="!activeConvo ? 'Pilih percakapan' : !canReply ? 'Tidak diizinkan membalas' : (quotedMessage ? 'Ketik balasan...' : `Balas ke ${activeConvo?.displayTitle}...`)"
-                                      class="w-full flex-1 resize-none bg-transparent border-0 px-3 py-2.5 text-[11px] text-[var(--text-1)] outline-none placeholder:text-[var(--text-2)] disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3 sm:text-xs xl:text-sm"
+                                      class="relative z-10 w-full flex-1 resize-none border-0 bg-transparent px-3 py-2.5 text-[11px] text-[var(--text-1)] outline-none focus:ring-0 placeholder:text-[var(--text-2)] disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-3 sm:text-xs xl:text-sm"
                                       @keydown.ctrl.enter="replyToConversation"
                                       @keydown="handleReplyKeydown"
                                       @paste="onComposerPaste" />
@@ -4204,12 +4286,25 @@ onUnmounted(() => {
                             <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             Hapus untuk Saya
                         </button>
-                        <button @click.stop="deleteMessageForEveryone"
-                            class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50">
-                            <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            Hapus untuk Semua
-                        </button>
+                        <!-- Recall (hapus untuk semua) — hanya outbound & dalam 60 menit -->
+                        <template v-if="msgCtxMenu.msg?.direction === 'outbound' && msgCtxMenu.msg?.waMessageId">
+                            <div class="mx-3 my-0.5 border-t border-slate-100"></div>
+                            <button @click.stop="deleteMessageForEveryone"
+                                :disabled="!canUnsend(msgCtxMenu.msg).ok"
+                                class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
+                                :class="canUnsend(msgCtxMenu.msg).ok ? 'text-rose-600 hover:bg-rose-50' : 'text-slate-400 hover:bg-slate-50'">
+                                <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>
+                                    Recall dari WA
+                                    <span v-if="canUnsend(msgCtxMenu.msg).ok" class="ml-1 text-[9px] font-normal opacity-70">
+                                        (sisa {{ canUnsend(msgCtxMenu.msg).minutesLeft }} mnt)
+                                    </span>
+                                    <span v-else class="ml-1 text-[9px] font-normal opacity-70">(kedaluwarsa)</span>
+                                </span>
+                            </button>
+                        </template>
                     </div>
+
                 </div>
             </transition>
         </Teleport>

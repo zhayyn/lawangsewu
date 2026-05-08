@@ -251,8 +251,86 @@ class WaCarakaService
     // ══════════════════════════════════════════════
 
     /**
-     * Send a single text message via runtime and log it.
+
+    /**
+     * Recall / unsend a WhatsApp message from the recipient's device.
+     *
+     * Calls the wa-bridge POST /unsend-message endpoint.
+     * Only works for messages sent within the last 60 minutes.
+     *
+     * @param  string   $jid       JID of the chat (628xxx@c.us, group@g.us, xxx@lid)
+     * @param  string   $messageId WA message ID from wa_caraka_messages.wa_message_id
+     * @param  int|null $userId    Operator user ID for audit logging
+     * @return array    Structured ['ok', 'status', 'data'|'error'] response
      */
+    public function unsendMessage(string $jid, string $messageId, ?int $userId = null): array
+    {
+        $jid       = trim($jid);
+        $messageId = trim($messageId);
+
+        // Input validation
+        if ($jid === '' || $messageId === '') {
+            Log::warning('[WaCaraka][Unsend] Validation failed — empty jid or messageId', [
+                'jid' => $jid, 'message_id' => $messageId, 'user_id' => $userId,
+            ]);
+            return $this->error('JID dan Message ID wajib diisi.', null, 422);
+        }
+
+        // JID format check
+        if (!preg_match('/@(c\.us|g\.us|s\.whatsapp\.net|lid)$/i', $jid) && !preg_match('/^\d+$/', $jid)) {
+            Log::warning('[WaCaraka][Unsend] Invalid JID format', ['jid' => $jid, 'user_id' => $userId]);
+            return $this->error('Format JID tidak valid. Gunakan format 628xxx@c.us atau 628xxx@g.us.', null, 422);
+        }
+
+        // Pre-check: cek umur pesan dari DB lokal sebelum memanggil bridge
+        if (WaCarakaDatabase::hasTable('wa_caraka_messages')) {
+            $localMsg = WaCarakaMessage::query()
+                ->where('wa_message_id', $messageId)
+                ->first(['id', 'created_at']);
+
+            if ($localMsg) {
+                $minutesAgo = now()->diffInMinutes($localMsg->created_at, true);
+                if ($minutesAgo > 60) {
+                    Log::info('[WaCaraka][Unsend] Rejected — older than 60 min', [
+                        'wa_message_id' => $messageId, 'minutes_ago' => $minutesAgo, 'user_id' => $userId,
+                    ]);
+                    return $this->error(
+                        sprintf('Pesan tidak dapat di-recall karena sudah %.0f menit lalu (batas 60 menit).', $minutesAgo),
+                        null, 400
+                    );
+                }
+            }
+        }
+
+        // Call bridge endpoint
+        Log::info('[WaCaraka][Unsend] Attempting unsend via bridge', [
+            'jid' => $jid, 'wa_message_id' => $messageId, 'user_id' => $userId,
+        ]);
+
+        $result = $this->post('/unsend-message', [
+            'to'         => $jid,
+            'message_id' => $messageId,
+        ]);
+
+        // Log result
+        $logCtx = [
+            'jid'           => $jid,
+            'wa_message_id' => $messageId,
+            'user_id'       => $userId,
+            'bridge_status' => $result['status'] ?? null,
+            'bridge_ok'     => $result['ok'] ?? false,
+            'bridge_error'  => $result['error'] ?? null,
+        ];
+
+        if ($result['ok']) {
+            Log::info('[WaCaraka][Unsend] Message recalled successfully', $logCtx);
+        } else {
+            Log::warning('[WaCaraka][Unsend] Bridge rejected unsend request', $logCtx);
+        }
+
+        return $result;
+    }
+
     public function sendText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?\App\Models\User $user = null, ?string $quoteWaId = null): array
     {
         return $this->sendRuntimeText($to, $text, $sender, $userId, $quoteWaId);
@@ -439,8 +517,9 @@ class WaCarakaService
         $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
 
         $payload = [
-            'to'   => $normalizedTo,
-            'text' => $text,
+            'to'    => $normalizedTo,
+            'text'  => $text,
+            'force' => true, // Bypass onWhatsApp check in runtime for masked/LID numbers
         ];
         if ($quoteWaId) {
             $payload['quote_wa_id'] = $quoteWaId;
@@ -494,13 +573,14 @@ class WaCarakaService
         $mediaUrl = isset($mediaPayload['media_url']) ? trim((string) $mediaPayload['media_url']) : null;
 
         $payload = [
-            'to' => $normalizedTo,
+            'to'         => $normalizedTo,
             'media_kind' => $kind,
-            'media_url' => $mediaUrl,
-            'mime_type' => $mimeType,
-            'file_name' => $fileName,
-            'caption' => $caption,
-            'ptt' => (bool) ($mediaPayload['ptt'] ?? false),
+            'media_url'  => $mediaUrl,
+            'mime_type'  => $mimeType,
+            'file_name'  => $fileName,
+            'caption'    => $caption,
+            'ptt'        => (bool) ($mediaPayload['ptt'] ?? false),
+            'force'      => true, // Bypass onWhatsApp check
         ];
 
         if (!empty($mediaPayload['quote_wa_id'])) {
@@ -1228,6 +1308,8 @@ class WaCarakaService
                     'sentAt'        => $msg->created_at
                         ? $msg->created_at->setTimezone('Asia/Jakarta')->format('d M H:i') . ' WIB'
                         : null,
+                    // ISO8601 for JS time calculations (e.g. 60-minute recall window)
+                    'sentAtRaw'     => $msg->created_at?->toISOString(),
                     'metadata'      => $metadata,
                     'isGroup'       => $context['is_group'],
                     'groupName'     => $context['group_name'],

@@ -16,6 +16,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^3.0",
+        "phpoffice/phpword": "^1.4",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {

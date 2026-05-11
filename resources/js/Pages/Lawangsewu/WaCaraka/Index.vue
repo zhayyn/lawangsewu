@@ -2003,6 +2003,27 @@ const conversationPreviewText = (conversation) => {
     return `${prefix}${conversation.lastMessagePreview || 'Belum ada pesan'}`;
 };
 
+// Ikon & label untuk media di inbox preview
+const inboxMediaIcon = (media) => {
+    if (!media) return { icon: '📎', label: 'Lampiran' };
+    const kind = media.kind || '';
+    const mime = media.mimeType || '';
+    if (kind === 'image' || mime.startsWith('image/')) return { icon: '🖼️', label: 'Gambar' };
+    if (kind === 'sticker')                             return { icon: '😊', label: 'Stiker' };
+    if (kind === 'video')                               return { icon: '🎥', label: 'Video' };
+    if (kind === 'audio' || kind === 'ptt')             return { icon: '🎵', label: 'Audio' };
+    if (kind === 'document') {
+        const fn = (media.fileName || '').toLowerCase();
+        if (fn.endsWith('.pdf') || mime === 'application/pdf') return { icon: '📄', label: 'PDF' };
+        if (fn.endsWith('.rtf'))                               return { icon: '📝', label: 'RTF' };
+        if (fn.match(/\.docx?$/))                             return { icon: '📝', label: 'Word' };
+        if (fn.match(/\.xlsx?$/) || fn.match(/\.csv$/))       return { icon: '📊', label: 'Excel' };
+        if (fn.match(/\.pptx?$/))                             return { icon: '📊', label: 'PPT' };
+        return { icon: '📎', label: 'Dokumen' };
+    }
+    return { icon: '📎', label: 'Lampiran' };
+};
+
 const syncMarkFormFromActive = () => {
     if (markEditorOpen.value && markDraftDirty.value && markState.value !== 'saving') {
         return;
@@ -3194,7 +3215,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <div ref="sidebarListEl" @scroll.passive="maybeExpandConversationWindow" class="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
+                <div ref="sidebarListEl" @scroll.passive="maybeExpandConversationWindow" class="relative flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
                     <button v-for="c in renderedConversations" :key="c.conversationId"
                             @click="selectConversation(c.conversationId)"
                             @contextmenu.prevent="openContextMenu($event, c)"
@@ -3255,6 +3276,7 @@ onUnmounted(() => {
                                     {{ conversationPreviewText(c) }}
                                 </p>
                                 <div v-if="inboxPreviewMedia(c)" class="mt-1.5 flex items-center gap-2">
+                                    <!-- Preview visual (gambar) -->
                                     <button v-if="hasInboxVisualPreview(c)"
                                             @click.stop="openMediaViewer(inboxPreviewMedia(c).url, { alt: `Preview ${inboxPreviewLabel(c)}`, fileName: inboxPreviewMedia(c).fileName })"
                                             class="overflow-hidden rounded-xl border border-slate-200/80 bg-white/80 transition hover:border-sky-300/70">
@@ -3264,14 +3286,29 @@ onUnmounted(() => {
                                              decoding="async"
                                              class="h-8 w-8 object-cover" />
                                     </button>
-                                    <div v-else class="inline-flex items-center rounded-full border border-slate-200 bg-white/85 px-2 py-1 font-bold text-slate-500 transition-all"
-                                         :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
-                                        {{ inboxPreviewLabel(c) }}
+
+                                    <!-- Ikon untuk media non-visual (dokumen, video, audio) -->
+                                    <div v-else class="flex items-center gap-1.5">
+                                        <div class="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white/85 text-sm">
+                                            {{ inboxMediaIcon(inboxPreviewMedia(c)).icon }}
+                                        </div>
+                                        <span class="text-[10px] font-semibold text-slate-500">
+                                            {{ inboxMediaIcon(inboxPreviewMedia(c)).label }}
+                                        </span>
                                     </div>
-                                    <p class="truncate text-[var(--text-2)] transition-all"
-                                       :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
-                                        {{ inboxPreviewMedia(c).fileName || `Lampiran ${inboxPreviewLabel(c)}` }}
-                                    </p>
+
+                                    <!-- Nama file & ukuran -->
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-[var(--text-2)] transition-all"
+                                           :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
+                                            {{ inboxPreviewMedia(c).fileName || `Lampiran ${inboxPreviewLabel(c)}` }}
+                                        </p>
+                                        <p v-if="humanFileSize(inboxPreviewMedia(c).fileSize)" class="text-[9px] text-[var(--text-2)]/70">
+                                            {{ humanFileSize(inboxPreviewMedia(c).fileSize) }}
+                                            <span v-if="inboxPreviewMedia(c).fileSize > MAX_MEDIA_FILE_BYTES"
+                                                  class="ml-1 font-semibold text-amber-500">⚠ Maks {{ humanFileSize(MAX_MEDIA_FILE_BYTES) }}</span>
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div class="mt-1 flex flex-wrap items-center gap-1">
@@ -3320,6 +3357,20 @@ onUnmounted(() => {
                             </div>
                         </div>
                     </button>
+
+                    <!-- Skeleton loader: muncul saat sedang loading, conversations sudah ada (agar tidak kosong) -->
+                    <div v-if="isLoading && conversations.length > 0"
+                         class="pointer-events-none absolute inset-0 z-10 overflow-hidden bg-[var(--surface-1)]/60 backdrop-blur-[2px]">
+                        <div class="space-y-1 px-3 pt-2">
+                            <div v-for="i in 6" :key="i" class="flex items-center gap-2.5 rounded-2xl px-2 py-2.5">
+                                <div class="thread-skeleton h-8 w-8 flex-shrink-0 rounded-full"></div>
+                                <div class="flex-1 space-y-1.5">
+                                    <div class="thread-skeleton h-2.5 rounded-full" :style="{ width: (55 + i * 7) % 80 + '%' }"></div>
+                                    <div class="thread-skeleton h-2 rounded-full" :style="{ width: (30 + i * 9) % 65 + '%' }"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div v-if="isLoading && conversations.length === 0" class="flex flex-col items-center justify-center px-5 py-16">
                         <div class="hourglass-loader opacity-80"></div>

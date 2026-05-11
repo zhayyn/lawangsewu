@@ -747,7 +747,6 @@ if (isset($_GET['format_jadwal'])) {
             if (this.readyState == 4 && this.status == 200) {
                 try {
                     var obj = JSON.parse(this.responseText);
-                    console.log("Status Sidang:", obj); // Untuk pantauan di F12
 
                     if (obj && parseInt(obj.jml_sidang) > 0) {
 

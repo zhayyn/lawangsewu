@@ -42,4 +42,12 @@ return [
         'analytics_id' => env('GOOGLE_ANALYTICS_ID'),
     ],
 
+    // ── PAK PP — Vertex AI (Gemini 2.5 Flash) ──────────────────────
+    'vertex_ai' => [
+        'project_id'                  => env('VERTEX_AI_PROJECT_ID'),
+        'location'                    => env('VERTEX_AI_LOCATION', 'us-central1'),
+        'model'                       => env('VERTEX_AI_MODEL', 'gemini-2.5-flash-preview-05-20'),
+        'service_account_json_base64' => env('VERTEX_AI_SERVICE_ACCOUNT_JSON_BASE64'),
+    ],
+
 ];

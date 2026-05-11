@@ -986,33 +986,55 @@ class WaCarakaController extends Controller
 
     private function lastMessageMedia(WaCarakaMessage $message): ?array
     {
-        $media = is_array($message->metadata['media'] ?? null) ? $message->metadata['media'] : null;
-        if (!$media) {
+        $meta  = is_array($message->metadata) ? $message->metadata : [];
+        $media = is_array($meta['media'] ?? null) ? $meta['media'] : null;
+
+        // Fallback: dokumen/image tanpa media object di metadata — gunakan message_type saja
+        $type  = $message->message_type;
+        $isMediaType = in_array($type, ['image', 'sticker', 'document', 'video', 'audio', 'ptt'], true);
+
+        if (!$media && !$isMediaType) {
             return null;
         }
 
-        $mime = $media['mimetype'] ?? null;
-        $kind = $media['kind'] ?? $message->message_type;
-        $url = $media['dataUrl'] ?? $media['url'] ?? null;
+        $mime     = $media['mimetype'] ?? $media['mimeType'] ?? null;
+        $kind     = $media['kind'] ?? ($isMediaType ? $type : null);
+        $fileSize = $media['fileSize'] ?? $media['length'] ?? null;
+        $fileName = $media['fileName'] ?? $media['filename'] ?? null;
+
+        // URL: prioritaskan previewDataUrl (thumbnail) → dataUrl → url sumber
+        $url = $media['previewDataUrl'] ?? $media['dataUrl'] ?? $media['url'] ?? null;
+
+        // Dokumen PDF/RTF/Office: tidak punya preview visual, tapi kita bisa
+        // tunjukkan ikon + nama file
+        $isVisualKind = in_array($kind, ['image', 'sticker'], true)
+            || Str::startsWith((string) $mime, 'image/');
 
         return [
-            'kind' => $kind,
-            'url' => $url,
-            'fileName' => $media['fileName'] ?? null,
-            'mimeType' => $mime,
-            'hasVisualPreview' => (bool) ($url && (in_array($kind, ['image', 'sticker'], true) || Str::startsWith((string) $mime, 'image/'))),
+            'kind'            => $kind,
+            'url'             => $url,
+            'fileName'        => $fileName,
+            'mimeType'        => $mime,
+            'fileSize'        => $fileSize,
+            'hasVisualPreview' => (bool) ($url && $isVisualKind),
+            // Flag untuk tampilkan ikon dokumen/video/audio di inbox
+            'isDocument'      => in_array($kind, ['document'], true) || (
+                $mime && !Str::startsWith((string) $mime, ['image/', 'video/', 'audio/'])
+            ),
+            'isVideo'         => $kind === 'video',
+            'isAudio'         => in_array($kind, ['audio', 'ptt'], true),
         ];
     }
 
     private function messageFallback(WaCarakaMessage $message): string
     {
         return match ($message->message_type) {
-            'image' => '[image]',
-            'sticker' => '[sticker]',
-            'document' => '[document]',
-            'video' => '[video]',
-            'audio' => '[audio]',
-            default => '[pesan kosong]',
+            'image'    => '📷 Gambar',
+            'sticker'  => '🎭 Stiker',
+            'document' => '📎 Dokumen',
+            'video'    => '🎥 Video',
+            'audio'    => '🎵 Pesan suara',
+            default    => '[pesan kosong]',
         };
     }
 

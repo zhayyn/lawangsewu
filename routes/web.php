@@ -16,6 +16,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TailscaleDashboardController;
 use App\Http\Controllers\WidgetCompatController;
 use App\Http\Controllers\TdmsController;
+use App\Http\Controllers\PakPpController;
 use App\Http\Controllers\WaCarakaController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,8 @@ Route::get('/tabel-radius-kecamatan', [WidgetCompatController::class, 'phpPublic
 Route::get('/info-persidangan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan');
 Route::get('/info-persidangan-hijautua', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan-hijautua');
 Route::get('/info-persidangan-stabilo', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'info-persidangan-stabilo');
+Route::get('/daftar-pip', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'daftar-pip');
+Route::get('/daftar-relaas-ghaib', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'daftar-relaas-ghaib');
 
 // Backward-compatible root endpoint used by some legacy embeds.
 Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik'])
@@ -152,6 +155,12 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
 });
 
 Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(function () {
+    // ── PAK PP — Personal Asisten Khusus Panitera Pengganti ──────────
+    Route::get('/pak-pp', [PakPpController::class, 'index'])->name('lawangsewu.pakpp.index');
+    Route::post('/pak-pp/api/generate', [PakPpController::class, 'generate'])->name('lawangsewu.pakpp.generate')->middleware('throttle:20,1');
+    Route::post('/pak-pp/api/review', [PakPpController::class, 'review'])->name('lawangsewu.pakpp.review')->middleware('throttle:20,1');
+    Route::post('/pak-pp/api/export-docx', [PakPpController::class, 'exportDocx'])->name('lawangsewu.pakpp.export-docx');
+    Route::post('/pak-pp/api/export-pdf', [PakPpController::class, 'exportPdf'])->name('lawangsewu.pakpp.export-pdf');
     Route::get('/buku-tamu/detail/{id}', [GuestbookController::class, 'detail'])->name('lawangsewu.guestbook.detail');
     Route::get('/buku-tamu/cetak/{id}', [GuestbookController::class, 'printCard'])->name('lawangsewu.guestbook.cetak');
     Route::match(['get', 'post'], '/buku-tamu/laporan', [GuestbookController::class, 'report'])->name('lawangsewu.guestbook.report');

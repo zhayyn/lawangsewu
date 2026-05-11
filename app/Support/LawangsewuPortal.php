@@ -124,6 +124,7 @@ class LawangsewuPortal
                     ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Ready'],
                     ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Ready'],
                     ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
+                    ['label' => 'PAK PP', 'short' => 'AK', 'routeKey' => 'pakpp', 'href' => self::routeOrNull('lawangsewu.pakpp.index'), 'badge' => 'AI'],
                 ],
             ],
             [

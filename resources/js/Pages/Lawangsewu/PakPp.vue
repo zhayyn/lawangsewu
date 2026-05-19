@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue'
 
@@ -18,6 +18,9 @@ const showReviewModal= ref(false)
 const reviewResult   = ref({ temuan: '', rekomendasi: '', versiPerbaikan: '' })
 const editorRef      = ref(null)
 
+const isRecording    = ref(false)
+let recognition      = null
+
 const JENIS_PERKARA_OPTIONS = [
     'Cerai Gugat', 'Cerai Talak', 'Harta Bersama', 'Hadhanah', 'Waris', 'Lainnya',
 ]
@@ -25,6 +28,67 @@ const JENIS_PERKARA_OPTIONS = [
 const isLoading = computed(() => ['generating', 'reviewing'].includes(statusEditor.value))
 const canExport = computed(() => narasiBas.value.trim().length > 20)
 const canReview = computed(() => canExport.value && statusEditor.value !== 'generating')
+
+// ── Speech Recognition (Voice to Text) ─────────────────────────────
+onMounted(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'id-ID';
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript + ' ';
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            if (finalTranscript) {
+                // Tambahkan spasi di akhir kalimat jika belum ada
+                const currentText = catatanKasar.value;
+                const prefix = currentText.length > 0 && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
+                catatanKasar.value += prefix + finalTranscript;
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error", event.error);
+            isRecording.value = false;
+        };
+
+        recognition.onend = () => {
+            isRecording.value = false;
+        };
+    }
+})
+
+onUnmounted(() => {
+    if (recognition && isRecording.value) {
+        recognition.stop();
+    }
+})
+
+function toggleDictation() {
+    if (!recognition) {
+        alert('Browser Anda tidak mendukung fitur Voice-to-Text. Gunakan Chrome atau Edge terbaru.');
+        return;
+    }
+
+    if (isRecording.value) {
+        recognition.stop();
+        isRecording.value = false;
+    } else {
+        recognition.start();
+        isRecording.value = true;
+    }
+}
 
 // ── Generate BAS ──────────────────────────────────────────────────
 async function generateBas() {
@@ -151,7 +215,6 @@ function clearAll() {
     <Head title="PAK PP — Asisten Panitera Pengganti" />
     <LawangsewuLayout current-route="pakpp" :appMeta="appMeta" :navGroups="navGroups">
 
-        <!-- ── Page Header ────────────────────────────────────────── -->
         <div class="px-4 sm:px-6 lg:px-8 py-6 max-w-screen-2xl mx-auto">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
@@ -166,7 +229,6 @@ function clearAll() {
                     </div>
                 </div>
 
-                <!-- ── Action Bar ─────────────────────────────────── -->
                 <div class="flex flex-wrap items-center gap-2">
                     <button
                         id="btn-review-ai"
@@ -211,16 +273,24 @@ function clearAll() {
                 </div>
             </div>
 
-            <!-- ── Split Panel ───────────────────────────────────── -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[70vh]">
 
-                <!-- Panel Kiri: Input ──────────────────────────── -->
                 <div class="flex flex-col gap-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm">
-                    <div class="flex items-center gap-2 pb-3 border-b border-slate-700/50">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
                         <span class="text-slate-400 text-sm font-semibold uppercase tracking-widest">Input Catatan Sidang</span>
+                        
+                        <!-- Voice Dictation Toggle -->
+                        <button
+                            @click="toggleDictation"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-xs border transition-all"
+                            :class="isRecording ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' : 'bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700'"
+                            title="Tekan untuk merekam suara (Dictation)"
+                        >
+                            <span v-if="isRecording">🎙️ Merekam Suara...</span>
+                            <span v-else>🎙️ Input Suara (Dikte)</span>
+                        </button>
                     </div>
 
-                    <!-- Jenis Perkara -->
                     <div>
                         <label for="select-jenis-perkara" class="block text-xs font-medium text-slate-400 mb-1.5">Jenis Perkara</label>
                         <select
@@ -233,48 +303,25 @@ function clearAll() {
                         </select>
                     </div>
 
-                    <!-- Textarea Catatan Kasar -->
                     <div class="flex-1 flex flex-col">
                         <label for="textarea-catatan" class="block text-xs font-medium text-slate-400 mb-1.5">
                             Catatan Kasar Sidang
-                            <span class="text-slate-600 font-normal ml-1">(singkatan, poin-poin, dll.)</span>
+                            <span class="text-slate-600 font-normal ml-1">(singkatan, poin-poin, atau didiktekan)</span>
                         </label>
                         <textarea
                             id="textarea-catatan"
                             v-model="catatanKasar"
                             :disabled="isLoading"
                             rows="14"
-                            placeholder="Contoh:
-S1 = Budi, 45 th, swasta, Smrg
-- kenal P dan T sejak 2015
-- P T sering bertengkar soal ekonomi
-- T jarang pulang sejak 2023
-- S tdk ada usaha rujuk dr T"
+                            placeholder="Ketik catatan kasar sidang di sini, atau tekan tombol Input Suara untuk mendikte..."
                             class="flex-1 w-full bg-slate-800/70 border border-slate-600 text-slate-100 text-sm rounded-xl px-4 py-3 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all resize-none font-mono leading-relaxed disabled:opacity-50"
+                            :class="isRecording ? 'ring-2 ring-rose-500/50 border-rose-500' : ''"
                         />
                         <div class="flex justify-between items-center mt-2">
                             <span class="text-xs text-slate-600">{{ catatanKasar.length }} karakter</span>
                             <span class="text-xs text-slate-600">Maks 8.000 karakter</span>
                         </div>
                     </div>
-
-                    <!-- Panduan Singkatan -->
-                    <details class="group">
-                        <summary class="text-xs text-slate-500 hover:text-slate-300 cursor-pointer select-none transition-colors list-none flex items-center gap-1">
-                            <span class="group-open:rotate-90 transition-transform inline-block">▶</span>
-                            Panduan singkatan yang dikenali
-                        </summary>
-                        <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-500 pl-4">
-                            <span><code class="text-violet-400">P</code> → Penggugat</span>
-                            <span><code class="text-violet-400">T</code> → Tergugat</span>
-                            <span><code class="text-violet-400">S</code> → Saksi</span>
-                            <span><code class="text-violet-400">Komp/KHI</code> → Kmpls. Hukum Islam</span>
-                            <span><code class="text-violet-400">Maj/MH</code> → Majelis Hakim</span>
-                            <span><code class="text-violet-400">PP</code> → Panitera Pengganti</span>
-                            <span><code class="text-violet-400">PA</code> → Pengadilan Agama</span>
-                            <span><code class="text-violet-400">MA</code> → Mahkamah Agung</span>
-                        </div>
-                    </details>
 
                     <!-- Tombol Generate -->
                     <button
@@ -289,16 +336,14 @@ S1 = Budi, 45 th, swasta, Smrg
                         <span v-if="statusEditor === 'generating'" class="animate-spin">⏳</span>
                         <span v-else>🚀</span>
                         <span v-if="statusEditor === 'generating'">Sedang Generate BAS...</span>
-                        <span v-else>Generate BAS</span>
+                        <span v-else>Generate Struktur BAS Otomatis</span>
                     </button>
                 </div>
 
-                <!-- Panel Kanan: Editor BAS ────────────────────── -->
                 <div class="flex flex-col gap-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-700/50">
-                        <span class="text-slate-400 text-sm font-semibold uppercase tracking-widest">Editor BAS</span>
+                        <span class="text-slate-400 text-sm font-semibold uppercase tracking-widest">Editor BAS SIPP-Format</span>
 
-                        <!-- Status Chip -->
                         <div class="flex items-center gap-2">
                             <span v-if="statusEditor === 'idle'" class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-500 border border-slate-700">
                                 ⬜ Siap
@@ -318,7 +363,6 @@ S1 = Budi, 45 th, swasta, Smrg
                         </div>
                     </div>
 
-                    <!-- Loading Overlay -->
                     <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center gap-4 min-h-64">
                         <div class="relative w-16 h-16">
                             <div class="absolute inset-0 rounded-full border-4 border-violet-500/20"></div>
@@ -328,11 +372,10 @@ S1 = Budi, 45 th, swasta, Smrg
                             <p class="text-slate-300 font-medium text-sm">
                                 {{ statusEditor === 'generating' ? 'PAK Drafter sedang menyusun narasi…' : 'PAK Reviewer sedang menelaah draf…' }}
                             </p>
-                            <p class="text-slate-600 text-xs mt-1">Harap tunggu, proses ini memerlukan beberapa detik</p>
+                            <p class="text-slate-600 text-xs mt-1">Harap tunggu, AI Agent sedang menyesuaikan template SIPP.</p>
                         </div>
                     </div>
 
-                    <!-- Error State -->
                     <div v-else-if="statusEditor === 'error'" class="flex-1 flex flex-col gap-4">
                         <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">
                             <div class="font-semibold mb-1">⚠️ Tidak dapat diproses</div>
@@ -350,19 +393,17 @@ S1 = Budi, 45 th, swasta, Smrg
                         </div>
                     </div>
 
-                    <!-- Empty State -->
                     <div v-else-if="!narasiBas && statusEditor === 'idle'" class="flex-1 flex flex-col items-center justify-center gap-3 min-h-64 border-2 border-dashed border-slate-700 rounded-xl">
                         <div class="text-4xl opacity-30">📜</div>
                         <p class="text-slate-600 text-sm text-center">
-                            Hasil narasi BAS akan muncul di sini.<br>
-                            <span class="text-slate-700">Masukkan catatan kasar di panel kiri, lalu tekan Generate BAS.</span>
+                            Hasil narasi BAS sesuai format SIPP akan muncul di sini.<br>
+                            <span class="text-slate-700">Masukkan/diktekan catatan di kiri, lalu tekan Generate.</span>
                         </p>
                     </div>
 
-                    <!-- Rich Text Editor -->
                     <div v-else-if="narasiBas" class="flex-1 flex flex-col gap-2">
                         <div class="flex items-center gap-2 text-xs text-slate-600">
-                            <span>✏️ Teks dapat diedit langsung di bawah ini</span>
+                            <span>✏️ Teks dapat diedit langsung di bawah ini (SIPP Standard Format)</span>
                         </div>
                         <div
                             ref="editorRef"
@@ -388,13 +429,12 @@ S1 = Budi, 45 th, swasta, Smrg
                 style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);"
             >
                 <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-                    <!-- Modal Header -->
                     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-gradient-to-r from-amber-500/10 to-transparent">
                         <div class="flex items-center gap-3">
                             <span class="text-xl">🔍</span>
                             <div>
                                 <h2 class="text-slate-100 font-semibold text-base">Hasil Review PAK Reviewer</h2>
-                                <p class="text-slate-500 text-xs">Ditelaah oleh Hakim Senior AI</p>
+                                <p class="text-slate-500 text-xs">Ditelaah oleh Hakim Senior AI berdasarkan standar SIPP</p>
                             </div>
                         </div>
                         <button
@@ -404,26 +444,21 @@ S1 = Budi, 45 th, swasta, Smrg
                         >✕</button>
                     </div>
 
-                    <!-- Modal Body -->
                     <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-                        <!-- Temuan -->
                         <div>
                             <div class="text-xs font-bold uppercase tracking-widest text-rose-400 mb-2">🔴 Temuan</div>
                             <div class="bg-rose-500/5 border border-rose-500/20 rounded-xl p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ reviewResult.temuan || 'Tidak ada temuan.' }}</div>
                         </div>
-                        <!-- Rekomendasi -->
                         <div>
                             <div class="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">🟡 Rekomendasi</div>
                             <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ reviewResult.rekomendasi || '-' }}</div>
                         </div>
-                        <!-- Versi Perbaikan -->
                         <div>
-                            <div class="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">🟢 Versi Perbaikan</div>
+                            <div class="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">🟢 Versi Perbaikan (Standar SIPP)</div>
                             <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-serif" style="line-height: 1.9;">{{ reviewResult.versiPerbaikan || '-' }}</div>
                         </div>
                     </div>
 
-                    <!-- Modal Footer -->
                     <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-900/80">
                         <button
                             id="btn-close-review"
@@ -443,5 +478,3 @@ S1 = Budi, 45 th, swasta, Smrg
 
     </LawangsewuLayout>
 </template>
-
-<!-- developed by dbprakom™ -->

@@ -74,24 +74,42 @@ class WaCarakaService
 
     protected function get(string $path, array $query = []): array
     {
-        try {
-            $response = $this->request()->get($this->baseUrl . $path, $query);
-            return $this->wrap($response);
-        } catch (\Exception $e) {
-            Log::error('[WaCaraka] GET failed', ['path' => $path, 'error' => $e->getMessage()]);
-            return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
+        $fallbackUrl = rtrim(config('wa_caraka.base_url_fallback', env('LW_WA_V2_BASE_FALLBACK', 'http://127.0.0.1:8791')), '/');
+        $urls = array_unique(array_filter([$this->baseUrl, $fallbackUrl]));
+
+        foreach (array_values($urls) as $i => $baseUrl) {
+            try {
+                $response = $this->request()->get($baseUrl . $path, $query);
+                return $this->wrap($response);
+            } catch (\Exception $e) {
+                if ($i === count($urls) - 1) {
+                    Log::error('[WaCaraka] GET failed on all runtimes', ['path' => $path, 'error' => $e->getMessage()]);
+                    return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
+                }
+                Log::warning('[WaCaraka] GET failed on primary, trying fallback', ['baseUrl' => $baseUrl, 'path' => $path]);
+            }
         }
+        return $this->error('Gagal terhubung ke WA runtime');
     }
 
     protected function post(string $path, array $data = []): array
     {
-        try {
-            $response = $this->request()->post($this->baseUrl . $path, $data);
-            return $this->wrap($response);
-        } catch (\Exception $e) {
-            Log::error('[WaCaraka] POST failed', ['path' => $path, 'error' => $e->getMessage()]);
-            return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
+        $fallbackUrl = rtrim(config('wa_caraka.base_url_fallback', env('LW_WA_V2_BASE_FALLBACK', 'http://127.0.0.1:8791')), '/');
+        $urls = array_unique(array_filter([$this->baseUrl, $fallbackUrl]));
+
+        foreach (array_values($urls) as $i => $baseUrl) {
+            try {
+                $response = $this->request()->post($baseUrl . $path, $data);
+                return $this->wrap($response);
+            } catch (\Exception $e) {
+                if ($i === count($urls) - 1) {
+                    Log::error('[WaCaraka] POST failed on all runtimes', ['path' => $path, 'error' => $e->getMessage()]);
+                    return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
+                }
+                Log::warning('[WaCaraka] POST failed on primary, trying fallback', ['baseUrl' => $baseUrl, 'path' => $path]);
+            }
         }
+        return $this->error('Gagal terhubung ke WA runtime');
     }
 
     private function wrap(\Illuminate\Http\Client\Response $response): array
@@ -1342,23 +1360,27 @@ class WaCarakaService
             return [$conversationId];
         }
 
-        $query = WaCarakaConversation::query()->select(['conversation_id', 'remote_number']);
-        
-        $baseSearch = preg_replace('/@(g\.us|lid)$/i', '', $normalizedRemote);
-        $baseSearch = preg_replace('/\D/', '', (string) $baseSearch);
-        $baseSearch = ltrim((string) $baseSearch, '0');
-        
-        if (str_starts_with($baseSearch, '62')) {
-            $baseSearch = substr($baseSearch, 2);
-        }
+        // Bangun semua kemungkinan format JID untuk nomor yang sama.
+        // Contoh: 6281234567890 bisa tersimpan sebagai:
+        //   6281234567890@c.us, 6281234567890@s.whatsapp.net, 6281234567890@lid, dll.
+        // Gunakan exact-match OR sehingga index remote_number tetap dipakai (bukan full scan).
+        $base = preg_replace('/@[^@]+$/', '', $normalizedRemote); // strip @suffix
+        $candidates = array_unique(array_filter([
+            $normalizedRemote,
+            $base,
+            $base . '@c.us',
+            $base . '@s.whatsapp.net',
+            $base . '@lid',
+        ]));
 
-        if ($baseSearch !== '') {
-            $query->where('remote_number', 'LIKE', '%' . $baseSearch . '%');
-        } else {
-            $query->where('remote_number', $normalizedRemote);
-        }
-
-        $relatedIds = $query->get()
+        $relatedIds = WaCarakaConversation::query()
+            ->select(['conversation_id', 'remote_number'])
+            ->where(function ($q) use ($candidates) {
+                foreach ($candidates as $c) {
+                    $q->orWhere('remote_number', $c);
+                }
+            })
+            ->get()
             ->filter(fn (WaCarakaConversation $item) => WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedRemote)
             ->pluck('conversation_id')
             ->filter()
@@ -1372,6 +1394,7 @@ class WaCarakaService
 
         return $relatedIds;
     }
+
 
     private function messageContext(WaCarakaMessage $message): array
     {

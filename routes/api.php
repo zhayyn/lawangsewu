@@ -41,3 +41,6 @@ Route::middleware([\App\Http\Middleware\SecureWaWebhook::class, 'throttle:500,1'
     Route::post('/wa-caraka/webhook/history-sync', [WaCarakaWebhookController::class, 'historySync'])
         ->name('wacaraka.webhook.history-sync');
 });
+
+use App\Http\Controllers\Omnichannel\WebHookController;
+Route::post('/omnichannel/web-chat', [WebHookController::class, 'receiveWebChat']);

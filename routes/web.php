@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\WaCarakaAdminController;
 use App\Http\Controllers\GuestbookController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PtspQueueController;
+use App\Http\Controllers\PelayananPtspController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SidangQueueController;
 use App\Http\Controllers\SippHubController;
@@ -149,6 +150,12 @@ Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin
     Route::post('/buku-tamu', [GuestbookController::class, 'store'])->name('lawangsewu.guestbook.store');
     Route::get('/buku-tamu/daftar/{period?}', [GuestbookController::class, 'listing'])->name('lawangsewu.guestbook.list');
     Route::get('/antrian-ptsp', [PtspQueueController::class, 'index'])->name('lawangsewu.ptsp.index');
+
+    // ── Pelayanan PTSP (modul mandiri, terhubung SIPP) ────────────────────
+    Route::get('/pelayanan-ptsp', [PelayananPtspController::class, 'index'])->name('lawangsewu.pelayananptsp.index');
+    Route::get('/pelayanan-ptsp/penyerahan-ac', [PelayananPtspController::class, 'indexPenyerahan'])->name('lawangsewu.pelayananptsp.penyerahan');
+    Route::get('/pelayanan-ptsp/laporan', [PelayananPtspController::class, 'laporan'])->name('lawangsewu.pelayananptsp.laporan');
+    Route::get('/pelayanan-ptsp/api/sipp-lookup', [PelayananPtspController::class, 'sippLookup'])->name('lawangsewu.pelayananptsp.sipp-lookup')->middleware('throttle:30,1');
     Route::get('/antrian-sidang-v2', [SidangQueueController::class, 'index'])->name('lawangsewu.sidang.index');
     Route::get('/pilar-smg', [PortalController::class, 'pilar'])->name('lawangsewu.pilar.index');
     Route::get('/sipp-hub', [SippHubController::class, 'index'])->name('lawangsewu.sipp.index');
@@ -197,7 +204,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::get('/tdms/qr/{token}', [TdmsController::class, 'assetQrDetail'])->name('lawangsewu.tdms.qr');
 });
 
-Route::middleware(['auth', 'verified', 'active'])->group(function () {
+Route::middleware(['auth', 'verified', 'active', 'role:operator,useradmin,admin'])->group(function () {
     Route::get('/wa-caraka/reports', [WaCarakaController::class, 'reports'])->name('lawangsewu.wacaraka.reports');
     Route::get('/wa-caraka/reports/data', [WaCarakaController::class, 'reportsData'])->name('lawangsewu.wacaraka.reports.data');
     Route::get('/wa-caraka/reports/pdf', [WaCarakaController::class, 'reportsPdf'])->name('lawangsewu.wacaraka.reports.pdf');
@@ -208,6 +215,13 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::post('/antrian-ptsp/{ticket}/call', [PtspQueueController::class, 'call'])->name('lawangsewu.ptsp.call');
     Route::post('/antrian-ptsp/{ticket}/serve', [PtspQueueController::class, 'serve'])->name('lawangsewu.ptsp.serve');
     Route::post('/antrian-ptsp/{ticket}/skip', [PtspQueueController::class, 'skip'])->name('lawangsewu.ptsp.skip');
+
+    // Pelayanan PTSP — operator actions
+    Route::post('/pelayanan-ptsp/antrian', [PelayananPtspController::class, 'storeAntrian'])->name('lawangsewu.pelayananptsp.antrian.store');
+    Route::post('/pelayanan-ptsp/antrian/{antrian}/call', [PelayananPtspController::class, 'callAntrian'])->name('lawangsewu.pelayananptsp.antrian.call');
+    Route::post('/pelayanan-ptsp/antrian/{antrian}/serve', [PelayananPtspController::class, 'serveAntrian'])->name('lawangsewu.pelayananptsp.antrian.serve');
+    Route::post('/pelayanan-ptsp/antrian/{antrian}/skip', [PelayananPtspController::class, 'skipAntrian'])->name('lawangsewu.pelayananptsp.antrian.skip');
+    Route::post('/pelayanan-ptsp/penyerahan-ac', [PelayananPtspController::class, 'storePenyerahan'])->name('lawangsewu.pelayananptsp.penyerahan.store');
 
     Route::post('/antrian-sidang-v2', [SidangQueueController::class, 'store'])->name('lawangsewu.sidang.store');
     Route::post('/antrian-sidang-v2/{ticket}/call', [SidangQueueController::class, 'call'])->name('lawangsewu.sidang.call');
@@ -286,3 +300,8 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
 });
 
 require __DIR__.'/auth.php';
+
+use App\Http\Controllers\Omnichannel\LeaderboardController;
+Route::middleware(['auth', 'verified', 'active', 'role:viewer,operator,useradmin,admin'])->group(function () {
+    Route::get('/omnichannel/leaderboard', [LeaderboardController::class, 'index'])->name('livechat.leaderboard');
+});

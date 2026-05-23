@@ -36,17 +36,22 @@ class WaCarakaController extends Controller
 
     public function index()
     {
+        $user = request()->user();
+
         return Inertia::render('Lawangsewu/WaCaraka/Index', [
-            'appMeta' => LawangsewuPortal::appMeta(),
-            'navGroups' => LawangsewuPortal::navGroups(),
-            'config' => [
-                'baseUrl' => $this->wa->baseUrl(),
-                'background' => Cache::get('wacaraka_background'),
+            'appMeta'      => LawangsewuPortal::appMeta(),
+            'navGroups'    => LawangsewuPortal::navGroups(),
+            'config'       => [
+                'baseUrl'       => $this->wa->baseUrl(),
+                'background'    => Cache::get('wacaraka_background'),
                 'maxMediaBytes' => (int) config('wa_caraka.max_media_bytes', 15 * 1024 * 1024),
             ],
-            'messageStats' => $this->wa->messageStats(),
-            'convoStats' => $this->conversations->stats(request()->user()),
-            'ticketStats' => WaCarakaTicket::ticketStats(),
+            // Cache stats berat selama 60 detik — tidak perlu real-time di setiap page load.
+            // Stats tetap akurat dalam 1 menit. Invalidasi manual dilakukan oleh
+            // action proxy 'message-stats' dan 'convo-stats' dari Vue jika perlu fresh.
+            'messageStats' => Cache::remember('wacaraka_msg_stats', 60, fn () => $this->wa->messageStats()),
+            'convoStats'   => Cache::remember('wacaraka_conv_stats_' . $user->id, 60, fn () => $this->conversations->stats($user)),
+            'ticketStats'  => WaCarakaTicket::ticketStats(),
             'recentTickets' => WaCarakaTicket::recent(12),
         ]);
     }
@@ -823,11 +828,12 @@ class WaCarakaController extends Controller
 
         $excludeNumbers = ['engine-health-check', 'tokenless-route-check', 'status@broadcast', 'health-check', 'health_check'];
 
+        // Limit 100 — cukup untuk inbox operasional. Dulu 500 tapi terlalu berat.
         $rows = WaCarakaConversation::query()
             ->whereNotIn('remote_number', $excludeNumbers)
             ->with(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias'])
             ->orderByDesc('last_activity_at')
-            ->limit(500)
+            ->limit(100)
             ->get();
 
         $conversationIds = $rows->pluck('conversation_id')->filter()->unique()->values()->all();
@@ -866,53 +872,56 @@ class WaCarakaController extends Controller
             ->values();
 
         // ── Batch-resolve profiles dari server runtime (server .33) ────────────
-        // Hanya resolve kontak yang profile-nya belum ada atau sudah expire (>23 jam)
-        $profileCacheTtl = 23 * 3600;
+        // PENTING: resolve dijalankan SETELAH response dikirim ke browser (fire-and-forget)
+        // agar tidak memblokir inbox saat runtime lambat/mati (dulu bisa +20 detik).
+        // Hanya resolve kontak yang profile-nya belum ada atau sudah expire (>7 hari).
+        $profileCacheTtl = 7 * 24 * 3600; // diperpanjang dari 23 jam → 7 hari
         $needsResolve = $deduped->filter(function (WaCarakaConversation $c) use ($profileCacheTtl) {
             if (!$c->profile_synced_at) return true;
             return $c->profile_synced_at->diffInSeconds(now()) > $profileCacheTtl;
         });
 
         if ($needsResolve->isNotEmpty()) {
-            $jids = $needsResolve->pluck('remote_number')->filter()->values()->all();
-            try {
-                $resolved = $this->wa->resolveContactsMeta($jids);
-                $resolvedItems = collect($resolved['data']['items'] ?? []);
+            $jids           = $needsResolve->pluck('remote_number')->filter()->values()->all();
+            $needsResolveCpy = $needsResolve->all();
+            $waService      = $this->wa;
 
-                foreach ($needsResolve as $convo) {
-                    $item = $resolvedItems->firstWhere('jid', $convo->remote_number);
-                    if (!$item) continue;
+            // Fire-and-forget: jalan setelah response HTTP dikirim ke browser.
+            // Jika runtime tidak terjangkau, exception ditangkap dan diabaikan.
+            app()->terminating(static function () use ($waService, $jids, $needsResolveCpy) {
+                try {
+                    $resolved      = $waService->resolveContactsMeta($jids);
+                    $resolvedItems = collect($resolved['data']['items'] ?? []);
 
-                    $updatePayload = [
-                        'profile_synced_at' => now(),
-                    ];
+                    foreach ($needsResolveCpy as $convo) {
+                        $item = $resolvedItems->firstWhere('jid', $convo->remote_number);
+                        if (!$item) continue;
 
-                    // Update foto profil (bisa null jika privat)
-                    if (array_key_exists('profilePhotoUrl', $item)) {
-                        $updatePayload['profile_photo_url'] = $item['profilePhotoUrl'];
+                        $updatePayload = ['profile_synced_at' => now()];
+
+                        if (array_key_exists('profilePhotoUrl', $item)) {
+                            $updatePayload['profile_photo_url'] = $item['profilePhotoUrl'];
+                        }
+
+                        $resolvedJid = $item['resolvedJid'] ?? null;
+                        if ($resolvedJid && $resolvedJid !== $convo->remote_number) {
+                            $resolvedPhone = preg_replace('/@s\.whatsapp\.net$/i', '', $resolvedJid);
+                            $updatePayload['resolved_number'] = $resolvedPhone;
+                        }
+
+                        $displayName = $item['displayName'] ?? null;
+                        if ($displayName && (!$convo->remote_name || is_numeric($convo->remote_name))) {
+                            $updatePayload['remote_name'] = $displayName;
+                        }
+
+                        $convo->update($updatePayload);
                     }
-
-                    // Simpan nomor HP terresolve dari @lid → nomor WA nyata
-                    $resolvedJid = $item['resolvedJid'] ?? null;
-                    if ($resolvedJid && $resolvedJid !== $convo->remote_number) {
-                        $resolvedPhone = preg_replace('/@s\.whatsapp\.net$/i', '', $resolvedJid);
-                        $updatePayload['resolved_number'] = $resolvedPhone;
-                    }
-
-                    // Update display name jika belum ada atau lebih baik
-                    $displayName = $item['displayName'] ?? null;
-                    if ($displayName && (!$convo->remote_name || is_numeric($convo->remote_name))) {
-                        $updatePayload['remote_name'] = $displayName;
-                        $convo->remote_name = $displayName;
-                    }
-
-                    $convo->update($updatePayload);
-                    $convo->profile_photo_url = $updatePayload['profile_photo_url'] ?? $convo->profile_photo_url;
-                    $convo->resolved_number = $updatePayload['resolved_number'] ?? $convo->resolved_number;
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('[WaCaraka] Background profile resolve failed (non-critical)', [
+                        'error' => $e->getMessage(),
+                    ]);
                 }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('[WaCaraka] Batch profile resolve failed', ['error' => $e->getMessage()]);
-            }
+            });
         }
 
         return $deduped->map(function (WaCarakaConversation $conversation) use ($latestMessages, $marks, $user) {
@@ -921,13 +930,13 @@ class WaCarakaController extends Controller
             $mark = $marks->get($conversation->id);
 
             return array_merge($formatted, [
-                'lastMessagePreview' => $message ? (trim((string) $message->message_text) !== '' ? $message->message_text : $this->messageFallback($message)) : 'Belum ada pesan',
-                'lastMessageType' => $message?->message_type ?? 'text',
-                'lastMessageDirection' => $message?->direction ?? 'inbound',
-                'lastActivityTs' => $message?->created_at?->timestamp ?? $conversation->last_activity_at?->timestamp ?? 0,
-                'lastMessageMedia' => $message ? $this->lastMessageMedia($message) : null,
-                'customerMark' => $mark ? $this->formatMark($mark) : null,
-                'hasUnreplied' => $message ? ($message->direction === 'inbound' && is_null($message->replied_at)) : false,
+                'lastMessagePreview'    => $message ? (trim((string) $message->message_text) !== '' ? $message->message_text : $this->messageFallback($message)) : 'Belum ada pesan',
+                'lastMessageType'       => $message?->message_type ?? 'text',
+                'lastMessageDirection'  => $message?->direction ?? 'inbound',
+                'lastActivityTs'        => $message?->created_at?->timestamp ?? $conversation->last_activity_at?->timestamp ?? 0,
+                'lastMessageMedia'      => $message ? $this->lastMessageMedia($message) : null,
+                'customerMark'          => $mark ? $this->formatMark($mark) : null,
+                'hasUnreplied'          => $message ? ($message->direction === 'inbound' && is_null($message->replied_at)) : false,
             ]);
         })->all();
     }

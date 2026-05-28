@@ -46,14 +46,14 @@ class OllamaService
             ]);
 
             if ($response->successful()) {
-                return $response->json('response') ?? 'Maaf, saya tidak dapat merespons saat ini.';
+                return $response->json('response') ?? 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
             }
 
             Log::error('[Ollama] Failed to generate reply', ['status' => $response->status(), 'body' => $response->body()]);
-            return 'Maaf, sistem AI kami sedang sibuk. Silakan coba beberapa saat lagi.';
+            return 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
         } catch (\Exception $e) {
             Log::error('[Ollama] Connection error', ['message' => $e->getMessage()]);
-            return 'Maaf, otak AI kami sedang beristirahat. Silakan hubungi admin.';
+            return 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
         }
     }
 }

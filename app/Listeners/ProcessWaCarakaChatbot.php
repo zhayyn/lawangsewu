@@ -32,10 +32,10 @@ class ProcessWaCarakaChatbot implements ShouldQueue
         // Jalankan chatbot service
         try {
             $chatbot = app(\App\Services\WaCarakaChatbotService::class);
-            $reply = $chatbot->processInbound($message->from, $message->body ?? '');
+            $reply = $chatbot->processInbound((string)$message->remote_number, $message->message_text ?? '');
             
             if ($reply) {
-                app(\App\Services\WaCarakaService::class)->sendText($message->from, $reply);
+                app(\App\Services\WaCarakaService::class)->sendText((string)$message->remote_number, $reply);
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('[ProcessWaCarakaChatbot] Error processing message', [

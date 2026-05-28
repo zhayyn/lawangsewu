@@ -12,8 +12,11 @@ class AiKnowledgeBaseController extends Controller
     public function index()
     {
         $knowledges = AiKnowledgeBase::latest()->get();
+        $trainingPairs = \App\Models\AiTrainingPair::latest()->limit(100)->get(); // Ambil max 100 log terbaru agar tidak berat
+
         return Inertia::render('Admin/AiKnowledgeBase', [
-            'knowledges' => $knowledges
+            'knowledges' => $knowledges,
+            'trainingPairs' => $trainingPairs
         ]);
     }
 

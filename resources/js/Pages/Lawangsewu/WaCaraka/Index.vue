@@ -3121,7 +3121,7 @@ onUnmounted(() => {
             </div>
             <h3 class="mb-2 text-xl font-semibold text-[var(--text-primary)]">Integrasi {{ omnichannelTabs.find(t => t.id === activeOmnichannelTab)?.name }} Segera Hadir</h3>
             <p class="max-w-md text-sm text-[var(--text-secondary)] leading-relaxed">
-                Pengembangan modul integrasi untuk platform ini sedang dalam tahap riset (R&D). Nantinya percakapan dari sini akan masuk ke dalam inbox Omnichannel yang sama dan dikendalikan oleh <strong>AI Pandanaran</strong>.
+                Pengembangan modul integrasi untuk platform ini sedang dalam tahap <em>TBD (To Be Determined)</em>. Nantinya percakapan dari sini akan masuk ke dalam inbox Omnichannel yang sama dan dikendalikan oleh <strong>AI Pandanaran</strong>.
             </p>
             <button @click="activeOmnichannelTab = 'whatsapp'" class="mt-6 rounded-lg bg-sky-500 px-5 py-2 text-sm font-semibold text-white hover:bg-sky-600 transition shadow-md shadow-sky-500/20">
                 Kembali ke WhatsApp

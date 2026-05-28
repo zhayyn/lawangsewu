@@ -245,6 +245,12 @@ Route::middleware(['auth', 'verified', 'active'])->prefix('admin')->name('admin.
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->name('users.update');
         Route::delete('/users/{user}', [UserAccessController::class, 'destroy'])->name('users.destroy');
     });
+
+    // AI Knowledge Base
+    Route::get('/ai-knowledge', [\App\Http\Controllers\Admin\AiKnowledgeBaseController::class, 'index'])->name('ai-knowledge.index');
+    Route::post('/ai-knowledge', [\App\Http\Controllers\Admin\AiKnowledgeBaseController::class, 'store'])->name('ai-knowledge.store');
+    Route::patch('/ai-knowledge/{knowledge}', [\App\Http\Controllers\Admin\AiKnowledgeBaseController::class, 'update'])->name('ai-knowledge.update');
+    Route::delete('/ai-knowledge/{knowledge}', [\App\Http\Controllers\Admin\AiKnowledgeBaseController::class, 'destroy'])->name('ai-knowledge.destroy');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function () {

@@ -10,8 +10,17 @@ class ChatOrchestrator
     public function handleIncoming(string $channel, array $payload)
     {
         // 1. Validasi Payload (WA, IG, FB, Web)
+        $messageText = $payload['message'] ?? '';
+        
         // 2. Simpan ke omni_conversations
         // 3. Simpan ke omni_messages
+        
+        // Contoh Penggunaan Ollama AI untuk membalas Live Chat otomatis:
+        if (!empty($messageText)) {
+            $aiReply = app(\App\Services\OllamaService::class)->generateReply($messageText);
+            // $this->sendOutgoing($payload['conversation_id'], $aiReply);
+        }
+
         // 4. Tembakkan Event (Broadcast ke Vue frontend via WebSockets)
     }
 

@@ -39,6 +39,12 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    :href="route('admin.ai-knowledge.index')"
+                                    :active="route().current('admin.ai-knowledge.index')"
+                                >
+                                    AI Knowledge
+                                </NavLink>
                             </div>
                         </div>
 
@@ -145,6 +151,12 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('dashboard')"
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('admin.ai-knowledge.index')"
+                            :active="route().current('admin.ai-knowledge.index')"
+                        >
+                            AI Knowledge
                         </ResponsiveNavLink>
                     </div>
 

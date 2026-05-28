@@ -123,7 +123,7 @@ class LawangsewuPortal
                     ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Ready'],
                     ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Ready'],
                     ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Ready'],
-                    ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
+                    ['label' => 'Omnichannel PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
                     ['label' => 'PAK PP', 'short' => 'AK', 'routeKey' => 'pakpp', 'href' => self::routeOrNull('lawangsewu.pakpp.index'), 'badge' => 'AI'],
                 ],
             ],
@@ -193,7 +193,7 @@ class LawangsewuPortal
             ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral', 'routeKey' => 'sidang'],
             ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral', 'routeKey' => 'pilar'],
             ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent', 'routeKey' => 'sipp'],
-            ['label' => 'WA Live PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent', 'routeKey' => 'wacaraka'],
+            ['label' => 'Omnichannel PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent', 'routeKey' => 'wacaraka'],
         ]);
     }
 
@@ -231,7 +231,7 @@ class LawangsewuPortal
             ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Ready', 'href' => route('lawangsewu.sidang.index'), 'routeKey' => 'sidang'],
             ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.pilar.index'), 'routeKey' => 'pilar'],
             ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Ready', 'href' => route('lawangsewu.sipp.index'), 'routeKey' => 'sipp'],
-            ['title' => 'WA Live PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'routeKey' => 'wacaraka'],
+            ['title' => 'Omnichannel PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'routeKey' => 'wacaraka'],
             ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Ready', 'href' => null],
             ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Ready', 'href' => null],

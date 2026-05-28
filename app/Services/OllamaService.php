@@ -10,7 +10,7 @@ class OllamaService
     /**
      * Generate a reply using local Ollama model qwen2.5:3b
      */
-    public function generateReply(string $prompt, string $context = "Kamu adalah Customer Service Pengadilan Agama Semarang bernama 'Pandanaran'. Tugasmu menjawab dengan bahasa Indonesia yang SANGAT BAKU, sopan, empatik, dan profesional. Sapa dengan 'Bapak/Ibu'. ATURAN PENTING: Jika pengguna menyebut kata 'kantor', 'instansi', atau 'pengadilan' tanpa nama spesifik, SELALU ASUMSIKAN yang dimaksud adalah Pengadilan Agama Semarang (PA Semarang) dan berikan jawaban yang sesuai (contoh: 'Terkait jam buka kantor PA Semarang...'). Jangan kaku menolak pertanyaan. Arahkan pembicaraan ke layanan PA Semarang. Jawab maksimal 2 kalimat singkat."): string
+    public function generateReply(string $prompt, string $context = "Kamu adalah Customer Service Pengadilan Agama Semarang bernama 'Pandanaran'. Tugasmu menjawab dengan bahasa Indonesia yang SANGAT BAKU, sopan, empatik, dan profesional. Sapa dengan 'Bapak/Ibu'. ATURAN PENTING: Jika pengguna menyebut kata 'kantor', 'instansi', atau 'pengadilan' tanpa nama spesifik, SELALU ASUMSIKAN yang dimaksud adalah Pengadilan Agama Semarang (PA Semarang). Arahkan pembicaraan ke layanan PA Semarang. Jawab maksimal 2 kalimat singkat."): ?string
     {
         // RAG: Ambil knowledge base yang aktif
         $knowledges = \App\Models\AiKnowledgeBase::where('is_active', true)->get();
@@ -29,6 +29,9 @@ class OllamaService
 
         if (!empty($ragContext)) {
             $prompt = "Informasi referensi: \n" . $ragContext . "\n\nBerdasarkan referensi di atas, jawab pertanyaan ini: " . $prompt;
+        } else {
+            // Jika tidak ada data RAG yang cocok, kita suruh AI menilai pesannya.
+            $prompt = "Pesan pengguna: '" . $prompt . "'\n\nInstruksi Khusus: Jika pesan pengguna hanya sekadar sapaan ringan (halo, assalamualaikum, min, ping) atau keluhan umum tanpa pertanyaan teknis, balas dengan ramah menanyakan detail keperluannya (misal: 'Waalaikumsalam Bapak/Ibu, ada yang bisa kami bantu terkait layanan PA Semarang?'). NAMUN, jika pesan ini adalah pertanyaan teknis, spesifik, atau panjang yang BUTUH JAWABAN PASTI, kamu WAJIB menjawab hanya dengan satu kata mutlak: SILENT_PASS";
         }
 
         try {
@@ -43,7 +46,16 @@ class OllamaService
             ]);
 
             if ($response->successful()) {
-                $aiReply = $response->json('response') ?? 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
+                $aiReply = $response->json('response') ?? '';
+                
+                // Jika AI memutuskan dia tidak bisa/tidak boleh menjawab
+                if (str_contains(strtoupper($aiReply), 'SILENT_PASS')) {
+                    return null;
+                }
+
+                if (empty(trim($aiReply))) {
+                    return null;
+                }
                 
                 // Post-processing regex untuk mengganti kata secara aman (agar AI 3B tidak bingung)
                 $aiReply = preg_replace('/\b(ya|iya)\b/i', 'nggih', $aiReply);
@@ -53,10 +65,10 @@ class OllamaService
             }
 
             Log::error('[Ollama] Failed to generate reply', ['status' => $response->status(), 'body' => $response->body()]);
-            return 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
+            return null;
         } catch (\Exception $e) {
             Log::error('[Ollama] Connection error', ['message' => $e->getMessage()]);
-            return 'Silahkan sampaikan keperluan dan keluhannya nggih, supaya kami segera bisa meresponnya.. Matursuwun..';
+            return null;
         }
     }
 }

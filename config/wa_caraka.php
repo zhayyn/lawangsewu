@@ -15,6 +15,10 @@ return [
     // Base URL of the local WA runtime (Node.js, e.g. Baileys-based server)
     'base_url' => env('LW_WA_V2_BASE', 'http://127.0.0.1:8790'),
 
+    // Fallback base URL if primary runtime cannot serve /internal/media/ (opsional)
+    // Contoh: 'http://192.168.88.33:8790' atau URL alternatif
+    'fallback_base_url' => env('LW_WA_V2_BASE_FALLBACK', null),
+
     // Static token for runtime authentication (leave empty if runtime has no auth)
     'token' => env('LW_WA_V2_TOKEN', ''),
 

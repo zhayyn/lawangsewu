@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -152,59 +153,89 @@ class WaCarakaController extends Controller
             abort(404);
         }
 
-        $token = strtolower($matches[1]);
-        $runtimePath = '/internal/media/' . $path;
+        $token    = strtolower($matches[1]);
+        $fileName = $request->query('fn') ?: (basename($path) ?: $token);
 
-        /** @var HttpResponse $response */
-        $response = Http::timeout((int) config('wa_caraka.timeout', 20))
+        // ── Lapisan 1: Cek storage lokal Laravel (wa-media/) ─────────────────
+        // Media yang sudah berhasil didownload saat webhook masuk disimpan di sini.
+        $localFiles = \Storage::disk('public')->files('wa-media/' . $token);
+        if (!empty($localFiles)) {
+            $localPath  = reset($localFiles);
+            $localFull  = \Storage::disk('public')->path($localPath);
+            $ext        = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+            $mime       = $this->mimeFromExt($ext);
+            $displayName = basename($localPath);
+            return response()->file($localFull, [
+                'Content-Type'        => $mime,
+                'Content-Disposition' => 'inline; filename="' . addslashes($displayName) . '"',
+                'Cache-Control'       => 'private, max-age=86400',
+            ]);
+        }
+
+        // ── Lapisan 2: Fetch dari primary runtime (server 33) ─────────────────
+        $runtimePath = '/internal/media/' . $path;
+        $response = Http::timeout((int) config('wa_caraka.timeout', 15))
             ->withHeaders($this->runtimeHeaders())
             ->get(rtrim($this->wa->baseUrl(), '/') . $runtimePath);
 
-        if ($response->failed()) {
-            abort($response->status() === 404 ? 404 : 502);
+        if ($response->successful() && !empty($response->body())) {
+            $contentType = $response->header('Content-Type', '');
+            if (!$contentType || $contentType === 'application/octet-stream') {
+                $ext         = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+                $contentType = $this->mimeFromExt($ext) ?? 'application/octet-stream';
+            }
+            return response($response->body(), 200, [
+                'Content-Type'        => $contentType,
+                'Content-Length'      => $response->header('Content-Length'),
+                'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+                'Cache-Control'       => 'private, max-age=3600',
+            ]);
         }
 
-        // Ambil nama file dari query parameter 'fn', lalu path, lalu token
-        $fileName = $request->query('fn');
-        if (!$fileName) {
-            $fileName = basename($path);
-            if (!$fileName || $fileName === $token) {
-                $fileName = $token;
+        // ── Lapisan 3: Fallback ke Baileys lokal (port 8791) ─────────────────
+        $fallbackBase = config('wa_caraka.fallback_base_url');
+        if ($fallbackBase) {
+            $fallbackResp = Http::timeout(10)
+                ->withHeaders(['X-WA-V2-Token' => config('wa_caraka.token', '')])
+                ->get(rtrim($fallbackBase, '/') . $runtimePath);
+
+            if ($fallbackResp->successful() && !empty($fallbackResp->body())) {
+                $contentType = $fallbackResp->header('Content-Type', 'application/octet-stream');
+                return response($fallbackResp->body(), 200, [
+                    'Content-Type'        => $contentType,
+                    'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+                    'Cache-Control'       => 'private, max-age=3600',
+                ]);
             }
         }
 
-        // Tentukan MIME type: prioritaskan dari runtime, lalu inferensi dari ekstensi
-        $contentType = $response->header('Content-Type', '');
-        if (!$contentType || $contentType === 'application/octet-stream') {
-            $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            $contentType = match ($ext) {
-                'docx'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'xlsx'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'pptx'  => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                'doc'   => 'application/msword',
-                'xls'   => 'application/vnd.ms-excel',
-                'ppt'   => 'application/vnd.ms-powerpoint',
-                'pdf'   => 'application/pdf',
-                'txt'   => 'text/plain',
-                'csv'   => 'text/csv',
-                'mp3'   => 'audio/mpeg',
-                'ogg', 'oga' => 'audio/ogg',
-                'm4a'   => 'audio/mp4',
-                'mp4'   => 'video/mp4',
-                'jpg', 'jpeg' => 'image/jpeg',
-                'png'   => 'image/png',
-                'gif'   => 'image/gif',
-                'webp'  => 'image/webp',
-                default => 'application/octet-stream',
-            };
-        }
+        abort(404);
+    }
 
-        return response($response->body(), 200, [
-            'Content-Type'        => $contentType,
-            'Content-Length'      => $response->header('Content-Length'),
-            'Content-Disposition' => 'attachment; filename="' . addslashes($fileName) . '"',
-            'Cache-Control'       => 'private, max-age=3600',
-        ]);
+    /**
+     * Inferensi MIME type dari ekstensi file.
+     */
+    private function mimeFromExt(string $ext): string
+    {
+        return match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png'         => 'image/png',
+            'gif'         => 'image/gif',
+            'webp'        => 'image/webp',
+            'heic'        => 'image/heic',
+            'mp4'         => 'video/mp4',
+            'mp3'         => 'audio/mpeg',
+            'ogg', 'oga'  => 'audio/ogg',
+            'm4a'         => 'audio/mp4',
+            'pdf'         => 'application/pdf',
+            'doc'         => 'application/msword',
+            'docx'        => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls'         => 'application/vnd.ms-excel',
+            'xlsx'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'csv'         => 'text/csv',
+            'txt'         => 'text/plain',
+            default       => 'application/octet-stream',
+        };
     }
 
 

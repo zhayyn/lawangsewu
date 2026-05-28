@@ -81,3 +81,7 @@
 [2026-05-19 08:42:56] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
 [2026-05-19 08:50:43] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
 [2026-05-21 02:37:36] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
+[2026-05-24 18:01:43] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
+[2026-05-24 18:01:46] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
+[2026-05-24 18:02:09] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
+[2026-05-24 18:02:45] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections

@@ -20,6 +20,11 @@ const createForm = useForm({
 });
 
 const saveFeedback = reactive({});
+const previewOpen = reactive({});
+
+const togglePreview = (cameraId) => {
+    previewOpen[cameraId] = !previewOpen[cameraId];
+};
 
 const cameraForms = reactive(
     props.cameras.reduce((acc, camera) => {
@@ -213,6 +218,50 @@ const saveCamera = (cameraId) => {
                         </button>
                     </div>
 
+                    <!-- Preview toggle button -->
+                    <div class="mb-4 flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-[0.15em] transition"
+                            :class="previewOpen[camera.id]
+                                ? 'border-cyan-500/30 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25'
+                                : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-3)] hover:border-cyan-500/20 hover:text-cyan-400'"
+                            @click="togglePreview(camera.id)"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            {{ previewOpen[camera.id] ? 'Sembunyikan Feed' : 'Pratinjau Feed' }}
+                        </button>
+                        <span v-if="previewOpen[camera.id]" class="text-[10px] font-semibold text-[var(--text-3)]">
+                            Verifikasi tampilan kamera sebelum menyimpan nama
+                        </span>
+                    </div>
+
+                    <!-- Live preview iframe (hanya dimuat saat tombol diklik) -->
+                    <Transition name="preview-slide">
+                        <div v-if="previewOpen[camera.id]" class="mb-5 overflow-hidden rounded-2xl border border-cyan-500/20 bg-black">
+                            <div class="flex items-center gap-2 border-b border-white/10 bg-black/70 px-4 py-2">
+                                <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Live Preview</span>
+                                <span class="ml-auto max-w-[60%] truncate text-[10px] text-slate-500">
+                                    {{ cameraForms[camera.id].iframe_src }}
+                                </span>
+                            </div>
+                            <div class="relative aspect-video w-full">
+                                <iframe
+                                    :src="cameraForms[camera.id].iframe_src"
+                                    :title="`Preview: ${cameraForms[camera.id].name}`"
+                                    class="h-full w-full border-0"
+                                    allow="autoplay; fullscreen"
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                                />
+                            </div>
+                        </div>
+                    </Transition>
+
                     <div class="grid gap-4 lg:grid-cols-6">
                         <div class="space-y-2 lg:col-span-2">
                             <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Nama Kamera</label>
@@ -270,3 +319,23 @@ const saveCamera = (cameraId) => {
         </div>
     </LawangsewuLayout>
 </template>
+
+<style scoped>
+.preview-slide-enter-active,
+.preview-slide-leave-active {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.preview-slide-enter-from,
+.preview-slide-leave-to {
+    opacity: 0;
+    max-height: 0;
+}
+
+.preview-slide-enter-to,
+.preview-slide-leave-from {
+    opacity: 1;
+    max-height: 700px;
+}
+</style>

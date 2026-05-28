@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * WaCarakaService
@@ -918,23 +920,44 @@ class WaCarakaService
         }
 
         $remoteNumber = WaCarakaMessage::normalizeRemoteNumber($remoteNumber);
+
+        // ── LID Resolution: coba recover nomor WA asli dari riwayat percakapan ──
+        // Jika remoteNumber masih berformat @lid (belum ada fromPn/resolvedFromJid),
+        // cari resolved_number dari konversasi sebelumnya dengan LID yang sama.
+        if (str_ends_with($remoteNumber, '@lid')) {
+            $existingResolved = \App\Models\WaCarakaConversation::query()
+                ->where('remote_number', $remoteNumber)
+                ->whereNotNull('resolved_number')
+                ->value('resolved_number');
+
+            if ($existingResolved) {
+                // Update senderAddress agar metadata tersimpan dengan nomor yang diketahui
+                Log::debug('[WaCaraka][LID] Resolved dari DB', [
+                    'lid'      => $remoteNumber,
+                    'resolved' => $existingResolved,
+                ]);
+                $payload['resolvedNumber'] = $existingResolved;
+            }
+        }
+
         $payload = $this->normalizePayloadMediaUrls($payload);
         $timestamp = $this->resolvePayloadTimestamp($payload);
 
         return [
-            'user_id' => null,
-            'direction' => $direction,
-            'remote_number' => $remoteNumber,
-            'local_number' => $payload['to'] ?? $payload['local'] ?? null,
-            'message_text' => $payload['text'] ?? $payload['body'] ?? $payload['message'] ?? null,
-            'message_type' => $payload['type'] ?? 'text',
-            'wa_message_id' => $payload['id'] ?? $payload['messageId'] ?? null,
-            'status' => $payload['status'] ?? ($direction === 'inbound' ? 'received' : 'sent'),
+            'user_id'         => null,
+            'direction'       => $direction,
+            'remote_number'   => $remoteNumber,
+            'local_number'    => $payload['to'] ?? $payload['local'] ?? null,
+            'message_text'    => $payload['text'] ?? $payload['body'] ?? $payload['message'] ?? null,
+            'message_type'    => $payload['type'] ?? 'text',
+            'wa_message_id'   => $payload['id'] ?? $payload['messageId'] ?? null,
+            'status'          => $payload['status'] ?? ($direction === 'inbound' ? 'received' : 'sent'),
             'conversation_id' => WaCarakaMessage::conversationIdFor($remoteNumber),
-            'metadata' => $this->compactMessageMetadata($payload),
-            'occurred_at' => $timestamp,
+            'metadata'        => $this->compactMessageMetadata($payload),
+            'occurred_at'     => $timestamp,
         ];
     }
+
 
     private function compactMessageMetadata(array $metadata): array
     {
@@ -1025,32 +1048,115 @@ class WaCarakaService
 
     private function normalizePayloadMediaUrls(array $payload): array
     {
-        $rawUrl = $payload['media']['url'] ?? null;
+        $media   = $payload['media'] ?? null;
+        $rawUrl  = is_string($media['url'] ?? null)     ? $media['url']     : null;
+        $bridgeUrl  = is_string($media['bridgeUrl'] ?? null) ? $media['bridgeUrl'] : null;
+        $proxyUrl   = is_string($media['proxyUrl'] ?? null)  ? $media['proxyUrl']  : null;
+        $rawDataUrl = is_string($media['dataUrl'] ?? null)   ? $media['dataUrl']   : null;
 
-        // ── Konversi URL internal runtime (/internal/media/{token}/filename) ──
-        // URL seperti http://192.168.88.33:8790/internal/media/57fc1e0f.../Doc1.docx
-        // TIDAK bisa diakses dari browser operator — harus diproxy lewat Laravel.
-        if (
-            is_string($rawUrl)
-            && !empty($rawUrl)
-            && empty($payload['media']['dataUrl'])
-        ) {
-            // Coba ekstrak token dari URL internal runtime
-            // Pattern: /internal/media/{hex32+}/{filename}
-            if (preg_match('~/internal/media/([a-f0-9]{32,})(?:/([^/?#]*))?~i', $rawUrl, $m)) {
-                $token    = strtolower($m[1]);
-                $filename = $m[2] ?? '';
-                $proxyPath = $filename !== '' ? $token . '/' . $filename : $token;
-                $proxyUrl = route('lawangsewu.wacaraka.media', ['path' => $proxyPath]);
-                $payload['media']['dataUrl'] = $proxyUrl;
-                $payload['media']['url']     = $proxyUrl;
-            } else {
-                // URL bukan URL internal runtime — salin apa adanya (gambar CDN, dsb)
-                $payload['media']['dataUrl'] = $rawUrl;
+        if (!$media) {
+            return $payload;
+        }
+
+        // ── Prioritas 0: mediaData base64 di dalam raw object (Baileys langsung) ──
+        // wa-bridge kadang menyertakan data:image/...;base64,... di raw.mediaData
+        $raw = is_array($payload['raw'] ?? null) ? $payload['raw'] : [];
+        $rawMediaData = $raw['mediaData'] ?? null;
+        if (is_string($rawMediaData) && str_starts_with($rawMediaData, 'data:') && strlen($rawMediaData) > 100) {
+            // Ekstrak token dari URL yang ada (atau buat dari id)
+            $tokenSrc = $rawUrl ?? $payload['id'] ?? uniqid();
+            preg_match('~/internal/media/([a-f0-9]{16,})~i', (string)$tokenSrc, $tm);
+            $token   = isset($tm[1]) ? strtolower($tm[1]) : substr(md5($tokenSrc), 0, 32);
+            $filename = basename(parse_url((string)($rawUrl ?? ''), PHP_URL_PATH)) ?: ($token . '.bin');
+
+            // Decode base64 dan simpan langsung
+            $localUrl = $this->storeBase64MediaLocally($rawMediaData, $token, $filename);
+            if ($localUrl !== null) {
+                $payload['media']['url']     = $localUrl;
+                $payload['media']['dataUrl'] = $localUrl;
+                return $payload;
             }
         }
 
-        // ── Konversi via mediaToken (cara lama, tetap didukung) ──────────────
+        // ── Prioritas 1: dataUrl sudah ada dan merupakan base64 ─────────────────
+        if (is_string($rawDataUrl) && str_starts_with($rawDataUrl, 'data:') && strlen($rawDataUrl) > 100) {
+            $tokenSrc = $rawUrl ?? $payload['id'] ?? uniqid();
+            preg_match('~/internal/media/([a-f0-9]{16,})~i', (string)$tokenSrc, $tm);
+            $token   = isset($tm[1]) ? strtolower($tm[1]) : substr(md5($tokenSrc), 0, 32);
+            $filename = basename(parse_url((string)($rawUrl ?? ''), PHP_URL_PATH)) ?: ($token . '.bin');
+
+            $localUrl = $this->storeBase64MediaLocally($rawDataUrl, $token, $filename);
+            if ($localUrl !== null) {
+                $payload['media']['url']     = $localUrl;
+                $payload['media']['dataUrl'] = $localUrl;
+                return $payload;
+            }
+        }
+
+        // ── Prioritas 2: URL /internal/media/{token}/filename dari wa-bridge ────
+        // Kumpulkan semua URL kandidat untuk dicoba secara berurutan
+        $internalPattern = '~/internal/media/([a-f0-9]{16,})(?:/([^/?#]*))?~i';
+        $primaryUrl = null;
+        $token = null;
+        $filename = '';
+
+        foreach (array_filter([$rawUrl, $bridgeUrl]) as $candidate) {
+            if (preg_match($internalPattern, (string)$candidate, $m)) {
+                $primaryUrl = $candidate;
+                $token      = strtolower($m[1]);
+                $filename   = $m[2] ?? '';
+                break;
+            }
+        }
+
+        if ($primaryUrl !== null && $token !== null) {
+            // Coba semua URL kandidat secara berurutan: rawUrl → bridgeUrl
+            $urlsToTry = array_unique(array_filter([$rawUrl, $bridgeUrl]));
+            $localUrl  = null;
+            foreach ($urlsToTry as $tryUrl) {
+                $localUrl = $this->downloadAndStoreInboundMedia((string)$tryUrl, $token, $filename);
+                if ($localUrl !== null) break;
+            }
+
+            if ($localUrl !== null) {
+                $payload['media']['url']     = $localUrl;
+                $payload['media']['dataUrl'] = $localUrl;
+            } else {
+                // Fallback ke proxy Laravel — file akan di-fetch saat user klik
+                $proxyPath = $filename !== '' ? $token . '/' . $filename : $token;
+                $laravelProxyUrl = route('lawangsewu.wacaraka.media', ['path' => $proxyPath]);
+                $payload['media']['url']     = $laravelProxyUrl;
+                $payload['media']['dataUrl'] = $laravelProxyUrl;
+            }
+
+            return $payload;
+        }
+
+        // ── Prioritas 3: URL HTTP biasa (CDN, dsb) ──────────────────────────────
+        $httpUrl = $rawUrl ?? $bridgeUrl;
+        if (is_string($httpUrl) && preg_match('#^https?://#i', $httpUrl)) {
+            $parsedPath = parse_url($httpUrl, PHP_URL_PATH);
+            $basename   = basename((string)$parsedPath);
+            $token      = substr(md5($httpUrl), 0, 32);
+            $localUrl   = $this->downloadAndStoreInboundMedia($httpUrl, $token, $basename);
+            if ($localUrl !== null) {
+                $payload['media']['url']     = $localUrl;
+                $payload['media']['dataUrl'] = $localUrl;
+                return $payload;
+            }
+            // Download gagal: gunakan URL apa adanya
+            $payload['media']['dataUrl'] = $httpUrl;
+            return $payload;
+        }
+
+        // ── Prioritas 4: proxyUrl dari bridge (sudah berformat Laravel proxy) ──
+        if (is_string($proxyUrl) && str_contains($proxyUrl, '/wa-caraka/media/')) {
+            $payload['media']['url']     = $proxyUrl;
+            $payload['media']['dataUrl'] = $proxyUrl;
+            return $payload;
+        }
+
+        // ── Prioritas 5: via mediaToken (cara lama, tetap didukung) ─────────────
         if (
             isset($payload['media']['mediaToken'])
             && empty($payload['media']['dataUrl'])
@@ -1064,6 +1170,146 @@ class WaCarakaService
         }
 
         return $payload;
+    }
+
+    /**
+     * Decode base64 dataUrl dan simpan ke storage lokal.
+     *
+     * @param  string  $dataUrl   Format: data:{mime};base64,{data}
+     * @param  string  $token     Token/hash unik untuk nama folder
+     * @param  string  $filename  Nama file opsional
+     * @return string|null        URL publik lokal, atau null jika gagal
+     */
+    private function storeBase64MediaLocally(string $dataUrl, string $token, string $filename = ''): ?string
+    {
+        try {
+            if (!preg_match('/^data:([^;]+);base64,(.+)$/s', $dataUrl, $parts)) {
+                return null;
+            }
+
+            $mime    = trim($parts[1]);
+            $binary  = base64_decode($parts[2], strict: false);
+
+            if ($binary === false || strlen($binary) < 10) {
+                return null;
+            }
+
+            $ext = $this->extFromMime($mime) ?? (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) ?: 'bin');
+            $safeName = $filename !== ''
+                ? preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($filename))
+                : $token . '.' . $ext;
+
+            $storagePath = 'wa-media/' . $token . '/' . $safeName;
+            Storage::disk('public')->put($storagePath, $binary);
+
+            return Storage::disk('public')->url($storagePath);
+        } catch (\Throwable $e) {
+            Log::debug('[WaCaraka Media] storeBase64 failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+
+    /**
+     * Download media dari runtime/CDN dan simpan ke Laravel storage.
+     *
+     * @param  string  $sourceUrl  URL sumber (dari runtime atau CDN)
+     * @param  string  $token      Token/hash unik untuk nama folder
+     * @param  string  $filename   Nama file opsional
+     * @return string|null         URL publik lokal, atau null jika download gagal
+     */
+    private function downloadAndStoreInboundMedia(string $sourceUrl, string $token, string $filename = ''): ?string
+    {
+        try {
+            $response = Http::timeout(15)
+                ->withHeaders($this->runtimeHeaders())
+                ->get($sourceUrl);
+
+            if ($response->failed()) {
+                Log::debug('[WaCaraka Media] Download HTTP gagal', [
+                    'url'    => $sourceUrl,
+                    'status' => $response->status(),
+                ]);
+                return null;
+            }
+
+            $body = $response->body();
+
+            if (empty($body)) {
+                Log::debug('[WaCaraka Media] Response body kosong', ['url' => $sourceUrl]);
+                return null;
+            }
+
+            // Tolak response HTML atau JSON error (bukan file media binary)
+            $first6 = strtolower(substr(ltrim($body), 0, 6));
+            if (str_starts_with($first6, '<!doc') || str_starts_with($first6, '<html')
+                || (str_starts_with($first6, '{"ok"') && !str_starts_with($body, "\xff\xd8"))
+            ) {
+                Log::debug('[WaCaraka Media] Response bukan media binary (HTML/JSON)', [
+                    'url'     => $sourceUrl,
+                    'preview' => substr($body, 0, 80),
+                ]);
+                return null;
+            }
+
+            // Tentukan ekstensi dari Content-Type atau nama file
+            $contentType = $response->header('Content-Type', 'application/octet-stream');
+            $ext = $this->extFromMime($contentType) ?? (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) ?: 'bin');
+            $safeName = $filename !== ''
+                ? preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($filename))
+                : $token . '.' . $ext;
+
+            // Simpan ke storage/app/public/wa-media/{token}/{safeName}
+            $storagePath = 'wa-media/' . $token . '/' . $safeName;
+            Storage::disk('public')->put($storagePath, $body);
+
+            Log::debug('[WaCaraka Media] Berhasil disimpan lokal', [
+                'url'   => $sourceUrl,
+                'path'  => $storagePath,
+                'bytes' => strlen($body),
+            ]);
+
+            // Return URL publik
+            return Storage::disk('public')->url($storagePath);
+        } catch (\Throwable $e) {
+            Log::debug('[WaCaraka Media] Exception download: ' . $e->getMessage(), [
+                'url' => $sourceUrl,
+            ]);
+            return null;
+        }
+    }
+
+
+    /**
+     * Ekstrak ekstensi file dari MIME type.
+     */
+    private function extFromMime(string $mime): ?string
+    {
+        $mime = strtolower(trim($mime));
+        // Potong parameter (misal charset=utf-8)
+        $mime = explode(';', $mime)[0];
+        return match ($mime) {
+            'image/jpeg'    => 'jpg',
+            'image/png'     => 'png',
+            'image/gif'     => 'gif',
+            'image/webp'    => 'webp',
+            'image/heic'    => 'heic',
+            'image/heif'    => 'heif',
+            'image/bmp'     => 'bmp',
+            'image/svg+xml' => 'svg',
+            'video/mp4'     => 'mp4',
+            'video/quicktime' => 'mov',
+            'audio/mpeg'    => 'mp3',
+            'audio/ogg'     => 'ogg',
+            'audio/mp4'     => 'm4a',
+            'audio/webm'    => 'webm',
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            default         => null,
+        };
     }
 
 
@@ -1896,6 +2142,19 @@ class WaCarakaService
                     $updateData['remote_name'] = $convo->remote_name;
                 }
 
+                // ── Foto profil: cache lokal jika ada URL baru dari payload ───────────
+                // Prioritas: payload profilePhotoUrl > yang sudah ada di DB
+                $payloadPhotoUrl = $metadata['profilePhotoUrl'] ?? $metadata['raw']['profilePhotoUrl'] ?? null;
+                if (is_string($payloadPhotoUrl) && str_starts_with($payloadPhotoUrl, 'http')) {
+                    $localPhotoUrl = $this->cacheProfilePhotoLocally($payloadPhotoUrl, $canonicalRemote);
+                    if ($localPhotoUrl) {
+                        $updateData['profile_photo_url'] = $localPhotoUrl;
+                    } elseif (!$convo->profile_photo_url) {
+                        // Simpan URL CDN saja jika caching gagal (akan expire tapi tetap berguna sebentar)
+                        $updateData['profile_photo_url'] = $payloadPhotoUrl;
+                    }
+                }
+
                 if ($message->direction === 'inbound') {
                     // Increment unread only for newly created messages
                     if ($message->wasRecentlyCreated) {
@@ -1947,6 +2206,65 @@ class WaCarakaService
                 'conversation_id' => $message->conversation_id,
                 'error'           => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Download foto profil dari CDN WhatsApp dan simpan ke storage lokal.
+     * URL WhatsApp CDN (pps.whatsapp.net) expire dalam ~1-2 jam, sehingga
+     * harus dicache di storage Laravel agar tetap bisa ditampilkan.
+     *
+     * @param  string  $cdnUrl       URL CDN WhatsApp (https://pps.whatsapp.net/...)
+     * @param  string  $remoteNumber JID kontak (digunakan sebagai nama file)
+     * @return string|null           URL lokal storage, atau null jika gagal
+     */
+    private function cacheProfilePhotoLocally(string $cdnUrl, string $remoteNumber): ?string
+    {
+        try {
+            $safeRemote = preg_replace('/[^a-zA-Z0-9_-]/', '_', $remoteNumber);
+            $storagePath = 'wa-profiles/' . $safeRemote . '.jpg';
+
+            // Cek apakah sudah ada dan masih fresh (< 7 hari)
+            if (Storage::disk('public')->exists($storagePath)) {
+                $lastModified = Storage::disk('public')->lastModified($storagePath);
+                if ((time() - $lastModified) < 7 * 24 * 3600) {
+                    return Storage::disk('public')->url($storagePath);
+                }
+            }
+
+            // Download dari CDN (URL WhatsApp CDN adalah public signed URL)
+            $response = Http::timeout(8)
+                ->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; WhatsApp/2.24)'])
+                ->get($cdnUrl);
+
+            if ($response->failed() || empty($response->body())) {
+                return null;
+            }
+
+            $body = $response->body();
+
+            // Validasi magic bytes — harus JPEG (FFD8FF) atau PNG (89504E47)
+            $magic  = substr($body, 0, 4);
+            $isJpeg = str_starts_with($magic, "\xFF\xD8\xFF");
+            $isPng  = $magic === "\x89PNG";
+            if (!$isJpeg && !$isPng) {
+                return null;
+            }
+
+            $ext         = $isPng ? 'png' : 'jpg';
+            $storagePath = 'wa-profiles/' . $safeRemote . '.' . $ext;
+            Storage::disk('public')->put($storagePath, $body);
+
+            Log::debug('[WaCaraka] Profile photo cached lokal', [
+                'remote' => $remoteNumber,
+                'path'   => $storagePath,
+                'bytes'  => strlen($body),
+            ]);
+
+            return Storage::disk('public')->url($storagePath);
+        } catch (\Throwable $e) {
+            Log::debug('[WaCaraka] Profile photo cache gagal: ' . $e->getMessage());
+            return null;
         }
     }
 

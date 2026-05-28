@@ -66,13 +66,25 @@ php artisan config:clear             # Config bersih
 - [ ] Hanya field yang dibutuhkan yang dikirim ke frontend
 - [ ] Sensitive data di-mask di log (jangan log password/token)
 
+**Media & File Handling (WaCaraka, CCTV, TDMS):**
+- [ ] Semua file upload di-validasi: mime type, ekstensi whitelist, ukuran max
+- [ ] Path traversal protection: jangan gunakan user-input langsung sebagai path
+- [ ] Media yang di-serve publik tidak expose file di luar `storage/app/public/`
+- [ ] URL media eksternal (CDN WA) tidak di-proxy tanpa validasi domain
+- [ ] `v-html` di Vue hanya digunakan untuk konten yang sudah di-sanitize
+
+**WebSocket (Reverb):**
+- [ ] Private channel dilindungi via `BroadcastServiceProvider` channel auth
+- [ ] Event payload tidak expose data sensitif user lain
+- [ ] Channel naming mengikuti pola: `lawangsewu.[modul].[id]`
+
 ### Layer 4: TEST EXECUTION
 
 ```bash
 # Jalankan seluruh test suite
 php artisan test
 
-# Baseline: 74+ pass, 0 regresi baru
+# Baseline aktual: 100+ tests, 1 pre-existing fail (ProfileTest — bukan blocker)
 # Jika ada test gagal:
 #   1. Cek apakah pre-existing (ProfileTest boleh gagal)
 #   2. Jika test baru gagal → FIX di tempat
@@ -137,3 +149,6 @@ Jika ditemukan bug:
 - ✅ **WAJIB** jalankan test suite dan report hasilnya
 - ✅ **WAJIB** fix setiap bug yang ditemukan (kecuali butuh arsitektur change)
 - ✅ **WAJIB** report ke user jika ada issue yang butuh keputusan desain
+- ✅ **WAJIB** cek modul baru: WaCaraka media, TDMS file handling, Omnichannel LiveChat
+
+<!-- developed by dbprakom™ -->

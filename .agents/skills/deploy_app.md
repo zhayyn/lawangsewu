@@ -96,7 +96,8 @@ php artisan rbac:verify
 # Jalankan test
 php artisan test
 
-# Target: 74+ pass, 0 regresi
+# Baseline aktual: 100+ tests, 1 pre-existing fail (ProfileTest)
+# Target: 0 regresi baru
 ```
 
 #### Service Health
@@ -185,3 +186,6 @@ Setelah deployment, @devops WAJIB menyajikan laporan:
 - ✅ **WAJIB** backup database sebelum migration production (`mysqldump`)
 - ✅ **WAJIB** clear cache sebelum dan sesudah deployment
 - ✅ **WAJIB** report URL akses setelah deployment selesai
+- ✅ **WAJIB** restart supervisor: `lawangsewu-reverb` dan `lawangsewu-queue`
+
+<!-- developed by dbprakom™ -->

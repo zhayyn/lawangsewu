@@ -1,9 +1,13 @@
 <script setup>
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
 import InterkomPanel from '@/Components/lawangsewu/InterkomPanel.vue';
+import WaCarakaInboxSidebar from '@/Components/wacaraka/WaCarakaInboxSidebar.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import 'emoji-picker-element';
+import { useWaToast }          from '@/composables/useWaToast.js';
+import { useNetworkParticles } from '@/composables/useNetworkParticles.js';
+import { useWaConfirm }        from '@/composables/useWaConfirm.js';
 
 const props = defineProps({
     appMeta:   { type: Object, default: () => ({}) },
@@ -19,8 +23,9 @@ const props = defineProps({
 });
 
 // ─── State ────────────────────────────────────────────
-const isLoading      = ref(false);
-const isBusy        = ref(false);
+const isLoading              = ref(false);
+const isBackgroundRefreshing = ref(false); // silent bg refresh — tidak trigger skeleton
+const isBusy                 = ref(false);
 const autoRefresh   = ref(true);
 const pollRef       = ref(null);
 const activeThreadRequestId = ref(0);
@@ -55,7 +60,7 @@ const threadLoading         = ref(false);
 const threadLoadingVisible  = ref(false);
 const activeConvo           = computed(() => conversations.value.find(c => c.conversationId === activeConvoId.value) || null);
 const threadEl              = ref(null);
-const particleCanvasRef     = ref(null);
+// particleCanvasRef dikelola oleh composable useNetworkParticles (lihat baris import di atas)
 const sidebarListEl         = ref(null);
 const replyTextareaRef      = ref(null);
 const mediaViewer           = ref(null);
@@ -79,6 +84,11 @@ const mediaInputRef = ref(null);
 const mediaAttachment = ref(null);
 const sendTo     = ref('');
 const sendText   = ref('');
+
+// Drag-and-Drop state
+const isDraggingFile = ref(false);
+let dragLeaveTimer = null;
+
 
 const showEmojiPicker = ref(false);
 const toggleEmojiPicker = () => { showEmojiPicker.value = !showEmojiPicker.value; };
@@ -111,54 +121,11 @@ const quotedMessage = ref(null); // pesan yang di-quote/reply
 const statusText = ref('Memeriksa koneksi...');
 const statusTone = ref('warn');
 
-// ─── Toast Notification System (replaces native alert) ───
-const toast = ref({
-    isOpen: false,
-    type: 'error',    // 'success' | 'error' | 'warning' | 'info'
-    title: '',
-    message: '',
-    timer: null,
-});
+// ─── Toast Notification System ────────────────────────
+const { toast, toastIcons, toastTitles, showToast, dismissToast } = useWaToast();
 
-const toastIcons = {
-    success: '✦',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
-};
-
-const toastTitles = {
-    success: 'Berhasil',
-    error: 'Gagal',
-    warning: 'Perhatian',
-    info: 'Info',
-};
-
-const showToast = (type, message, title = null, duration = 4500) => {
-    if (toast.value.timer) clearTimeout(toast.value.timer);
-    toast.value = {
-        isOpen: true,
-        type,
-        title: title || toastTitles[type] || 'Notifikasi',
-        message,
-        timer: setTimeout(() => dismissToast(), duration),
-    };
-};
-
-const dismissToast = () => {
-    if (toast.value.timer) clearTimeout(toast.value.timer);
-    toast.value.isOpen = false;
-};
-
-// Dialog Konfirmasi
-const confirmModal = ref({ isOpen: false, title: '', message: '', resolve: null });
-const openConfirmModal = (title, message) => {
-    return new Promise((resolve) => confirmModal.value = { isOpen: true, title, message, resolve });
-};
-const resolveConfirmModal = (val) => {
-    if (confirmModal.value.resolve) confirmModal.value.resolve(val);
-    confirmModal.value.isOpen = false;
-};
+// ─── Dialog Konfirmasi ────────────────────────────────
+const { confirmModal, openConfirmModal, resolveConfirmModal } = useWaConfirm();
 
 // ─── Interkom Panel (Sidebar Kanan) ───────────────────
 // Default: tersembunyi. Hanya terbuka jika user sebelumnya sudah membukanya.
@@ -210,8 +177,13 @@ const hasRealtime = computed(() => {
 });
 const myId = computed(() => props.authUser?.id);
 
+// ─── Dark Mode Detection ──────────────────────────────
 // Deteksi dark mode dari DOM (sinkron dengan LawangsewuLayout)
 const isDark = ref(typeof window !== 'undefined' && localStorage.getItem('lawangsewu-theme') === 'dark');
+
+// ─── Network Constellation Particle System ────────────
+// Dikelola oleh composable useNetworkParticles
+const { particleCanvasRef, startParticles, stopParticles } = useNetworkParticles(isDark);
 
 // ─── Mobile Responsive ───────────────────────────────
 // On mobile (< 640px), show either inbox or thread, not both
@@ -239,146 +211,6 @@ const threadSurfaceDarkStyle = computed(() => isDark.value ? {
         'radial-gradient(ellipse at 80% 100%, rgba(111,66,193,0.12) 0%, transparent 50%)',
     ].join(', '),
 } : {});
-
-// ─── Network Constellation Particle System ───────────
-let particleAnimFrame  = null;
-let particleCtx        = null;
-let particleCanvas_    = null;    // cache canvas ref untuk RAF
-let _lastFrameTime     = 0;
-const NET_COUNT        = 38;      // jumlah node — cukup untuk efek, ringan
-const NET_LINK_DIST    = 130;     // jarak max antar node untuk ditarik garis
-const NET_FPS_CAP      = 30;      // frame per detik maksimal
-const NET_FRAME_MS     = 1000 / NET_FPS_CAP;
-let netNodes           = [];
-
-// Palet warna node: biru & hijau-teal seperti di gambar referensi
-const NET_NODE_COLORS = [
-    { r: 59,  g: 130, b: 246, w: 6 },  // blue-500
-    { r: 125, g: 211, b: 252, w: 3 },  // sky-300
-    { r: 34,  g: 197, b: 94,  w: 2 },  // green-500 (aksen)
-    { r: 56,  g: 189, b: 248, w: 4 },  // sky-400
-];
-
-const pickNodeColor = () => {
-    const totalW = NET_NODE_COLORS.reduce((s, c) => s + c.w, 0);
-    let rnd = Math.random() * totalW;
-    for (const c of NET_NODE_COLORS) { rnd -= c.w; if (rnd <= 0) return c; }
-    return NET_NODE_COLORS[0];
-};
-
-const createNetNode = (canvas) => {
-    const color = pickNodeColor();
-    return {
-        x:      Math.random() * canvas.width,
-        y:      Math.random() * canvas.height,
-        r:      Math.random() * 1.6 + 0.7,
-        vx:     (Math.random() - 0.5) * 0.28,
-        vy:     (Math.random() - 0.5) * 0.28,
-        color,
-        opacity: Math.random() * 0.55 + 0.35,
-    };
-};
-
-const drawNetwork = (ts) => {
-    particleAnimFrame = requestAnimationFrame(drawNetwork);
-
-    // Frame-rate cap
-    if (ts - _lastFrameTime < NET_FRAME_MS) return;
-    _lastFrameTime = ts;
-
-    const canvas = particleCanvas_;
-    const ctx    = particleCtx;
-    if (!canvas || !ctx) return;
-
-    const W = canvas.width;
-    const H = canvas.height;
-
-    ctx.clearRect(0, 0, W, H);
-
-    // Gerak + wrap
-    for (const n of netNodes) {
-        n.x += n.vx;
-        n.y += n.vy;
-        if (n.x < -10) n.x = W + 10;
-        if (n.x > W + 10) n.x = -10;
-        if (n.y < -10) n.y = H + 10;
-        if (n.y > H + 10) n.y = -10;
-    }
-
-    // Gambar garis koneksi
-    for (let i = 0; i < netNodes.length; i++) {
-        const a = netNodes[i];
-        for (let j = i + 1; j < netNodes.length; j++) {
-            const b    = netNodes[j];
-            const dx   = a.x - b.x;
-            const dy   = a.y - b.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > NET_LINK_DIST) continue;
-
-            // Opacity garis: makin dekat makin terang, max 0.28
-            const lineOpacity = (1 - dist / NET_LINK_DIST) * 0.28;
-            const { r, g, b: bc } = a.color;
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(${r},${g},${bc},${lineOpacity})`;
-            ctx.lineWidth   = 0.7;
-            ctx.stroke();
-        }
-    }
-
-    // Gambar node (titik)
-    for (const n of netNodes) {
-        const { r, g, b: bc } = n.color;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r},${g},${bc},${n.opacity})`;
-        ctx.fill();
-
-        // Glow ring kecil di sekitar node
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r * 2.4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r},${g},${bc},0.06)`;
-        ctx.fill();
-    }
-};
-
-const startParticles = () => {
-    const canvas = particleCanvasRef.value;
-    if (!canvas || !isDark.value) return;
-    const parent = canvas.parentElement;
-    if (!parent) return;
-
-    // DPR-aware sizing (tajam di retina, tapi cap di 1.5x agar ringan)
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const W   = parent.offsetWidth  || 800;
-    const H   = parent.offsetHeight || 500;
-    canvas.width  = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width  = `${W}px`;
-    canvas.style.height = `${H}px`;
-
-    particleCtx   = canvas.getContext('2d');
-    particleCtx.scale(dpr, dpr);
-    particleCanvas_ = { width: W, height: H };   // pakai ukuran CSS (sudah di-scale)
-
-    netNodes = Array.from({ length: NET_COUNT }, () => createNetNode(particleCanvas_));
-
-    if (particleAnimFrame) cancelAnimationFrame(particleAnimFrame);
-    _lastFrameTime = 0;
-    particleAnimFrame = requestAnimationFrame(drawNetwork);
-};
-
-const stopParticles = () => {
-    if (particleAnimFrame) { cancelAnimationFrame(particleAnimFrame); particleAnimFrame = null; }
-    if (particleCtx && particleCanvasRef.value) {
-        particleCtx.clearRect(0, 0, particleCanvasRef.value.width, particleCanvasRef.value.height);
-    }
-    particleCtx     = null;
-    particleCanvas_ = null;
-    netNodes        = [];
-};
-
 
 
 // Ownership (display-only — everyone can reply)
@@ -643,6 +475,83 @@ const onComposerPaste = async (event) => {
         }
     }
 };
+
+/**
+ * ── Drag-and-Drop File ke Area Chat ──────────────────────────────────────────
+ * User bisa drag file dari download bar Chrome / file explorer langsung ke
+ * area thread atau composer. File akan diproses sama seperti "+ Media".
+ */
+const processDroppedFile = async (file) => {
+    if (!file) return;
+    if (!activeConvo.value || !canReply.value) {
+        showToast('warning', 'Pilih percakapan dulu sebelum mengirim file.');
+        return;
+    }
+    if (file.size > MAX_MEDIA_FILE_BYTES) {
+        showToast('warning', `File terlalu besar. Maksimum ${Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024))} MB.`);
+        return;
+    }
+    try {
+        const initialDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Gagal membaca file'));
+            reader.readAsDataURL(file);
+        });
+        const kind = detectMediaKindFromFile(file);
+        const mime = inferMimeTypeFromFile(file);
+        const finalDataUrl = kind === 'image'
+            ? await compressImageDataUrl(initialDataUrl, mime, MAX_MEDIA_FILE_BYTES)
+            : initialDataUrl;
+        const finalByteLength = dataUrlByteLength(finalDataUrl);
+        if (finalByteLength > MAX_MEDIA_FILE_BYTES) {
+            showToast('warning', `File masih terlalu besar setelah diproses. Maksimum ${Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024))} MB.`);
+            return;
+        }
+        const finalBlob = dataUrlToBlob(finalDataUrl, mime);
+        mediaAttachment.value = {
+            name: file.name,
+            size: finalBlob.size || finalByteLength || file.size,
+            mime,
+            kind,
+            dataUrl: finalDataUrl,
+            blob: finalBlob,
+        };
+        showToast('info', `${file.name} siap dikirim`, 'Lampiran ditambahkan');
+        // Fokus ke textarea agar user langsung bisa ketik caption
+        nextTick(() => replyTextareaRef.value?.focus());
+    } catch {
+        showToast('error', 'Gagal memproses file yang di-drop');
+    }
+};
+
+const onChatDragOver = (event) => {
+    // Hanya aktifkan jika ada file yang di-drag (bukan text selection)
+    const hasFiles = Array.from(event.dataTransfer?.types || []).includes('Files');
+    if (!hasFiles) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null; }
+    isDraggingFile.value = true;
+};
+
+const onChatDragLeave = (event) => {
+    // Debounce agar overlay tidak berkedip saat hover pindah antar elemen child
+    dragLeaveTimer = setTimeout(() => {
+        isDraggingFile.value = false;
+    }, 80);
+};
+
+const onChatDrop = async (event) => {
+    event.preventDefault();
+    isDraggingFile.value = false;
+    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null; }
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    // Hanya proses file pertama
+    await processDroppedFile(files[0]);
+};
+
 
 onMounted(() => {
     window.addEventListener('click', closeContextMenu);
@@ -2374,16 +2283,24 @@ const pullInbox = async () => {
     } catch { /* silent */ }
 };
 
-const refreshAll = async () => {
+const refreshAll = async (opts = {}) => {
+    const silent = opts.silent ?? false; // true = background refresh, tidak trigger skeleton/overlay
     if (isLoading.value) return;
-    isLoading.value = true;
+
+    if (silent) {
+        // Background refresh: hanya tampilkan dot kecil, TIDAK skeleton overlay
+        isBackgroundRefreshing.value = true;
+    } else {
+        isLoading.value = true;
+    }
+
     try {
         await refreshHealth();
 
         if (!operatorLiteMode.value) {
             await Promise.all([refreshStats(), refreshHistory(), refreshLidMappings(), refreshOperatorStats()]);
         }
-        
+
         // Only attempt heavier calls if connected or at least has health response
         if (runtimeHealth.value?.status) {
             // Pull inbox dinonaktifkan dari loop berkala untuk mencegah blocking/OOM.
@@ -2403,6 +2320,7 @@ const refreshAll = async () => {
         appendLog('Error sinkronisasi', { message: err?.error || err?.message || 'Unknown' });
     } finally {
         isLoading.value = false;
+        isBackgroundRefreshing.value = false;
         scheduleNextRefresh();
     }
 };
@@ -2469,7 +2387,8 @@ const scheduleNextRefresh = () => {
     const delay = wsActive
         ? (operatorLiteMode.value ? 30_000 : 25_000)
         : (operatorLiteMode.value ? 12_000 :  8_000);
-    pollRef.value = setTimeout(refreshAll, delay);
+    // Auto-poll selalu silent agar tidak trigger skeleton overlay
+    pollRef.value = setTimeout(() => refreshAll({ silent: true }), delay);
 };
 
 // ─── Actions ──────────────────────────────────────────
@@ -3172,228 +3091,43 @@ onUnmounted(() => {
         <section class="min-w-0 flex-1 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(230px,37%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(380px,30%,460px),minmax(0,1fr)] xl:gap-5">
 
             <!-- Sidebar: Conversation List -->
-            <aside
-                class="flex min-w-0 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-1)] shadow-[var(--shadow)] max-h-[calc(100vh-1rem)] xl:sticky xl:top-2 xl:rounded-[2rem]"
-                :class="{ 'hidden': isMobile && mobileView !== 'inbox', 'sm:flex': true }"
-            >
-                <div class="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2.5 flex-shrink-0 sm:px-4 sm:py-3 xl:px-5">
-                    <div>
-                        <h2 class="text-sm font-black text-[var(--text-1)] sm:text-base">Inbox</h2>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-2)] sm:px-2.5 sm:text-[10px]">{{ filteredConversations.length }}/{{ conversations.length }}</span>
-                    </div>
-                </div>
-
-                <p class="px-3 py-1.5 text-[9px] text-[var(--text-2)] flex-shrink-0 sm:px-4 sm:text-[10px] xl:px-5">{{ inboxSyncText }}</p>
-
-                <div class="grid gap-1.5 border-b border-[var(--border)] px-3 pb-2.5 sm:px-4 xl:px-5">
-                    <input
-                        v-model="conversationSearch"
-                        type="text"
-                        placeholder="Cari nama, nomor, alias, preview..."
-                        class="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[11px] text-[var(--text-1)] outline-none transition placeholder:text-[var(--text-2)] focus:border-sky-400/60"
-                    />
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            v-for="filter in [
-                                { value: 'all', label: 'Semua' },
-                                { value: 'unread', label: 'Belum Dibaca' },
-                                { value: 'unreplied', label: 'Belum Dibalas' },
-                                { value: 'mine', label: 'Milik Saya' },
-                                { value: 'group', label: 'Grup' },
-                            ]"
-                            :key="filter.value"
-                            @click="conversationFilter = filter.value"
-                            class="rounded-full border px-2 py-1 text-[9px] font-bold transition"
-                            :class="conversationFilter === filter.value
-                                ? 'border-sky-400/50 bg-sky-500/12 text-sky-600'
-                                : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)] hover:border-sky-400/40 hover:text-sky-500'"
-                        >
-                            {{ filter.label }}
-                        </button>
-                    </div>
-                </div>
-
-                <div ref="sidebarListEl" @scroll.passive="maybeExpandConversationWindow" class="relative flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border)]">
-                    <button v-for="c in renderedConversations" :key="c.conversationId"
-                            @click="selectConversation(c.conversationId)"
-                            @contextmenu.prevent="openContextMenu($event, c)"
-                            @mouseenter="prefetchConversation(c.conversationId)"
-                            @focus="prefetchConversation(c.conversationId)"
-                            @touchstart.passive="prefetchConversation(c.conversationId)"
-                            class="group w-full px-2 py-1.5 text-left transition-all duration-200 sm:px-2.5 sm:py-1.5 xl:px-3 xl:py-2"
-                            :class="[
-                                activeConvoId === c.conversationId ? 'conversation-active bg-sky-500/10 border-l-2 border-sky-400' : 'hover:bg-[var(--surface-2)] border-l-2 border-transparent',
-                                isConversationRecentlyUpdated(c.conversationId) ? 'conversation-fresh' : '',
-                            ]">
-                        <div class="flex items-start gap-2 sm:gap-2.5">
-                            <div class="mt-0.5 h-7 w-7 flex-shrink-0 overflow-hidden rounded-full ring-1 ring-white/40 sm:h-7.5 sm:w-7.5 xl:h-8 xl:w-8">
-                                <img
-                                    v-if="c.profilePhotoUrl"
-                                    :src="c.profilePhotoUrl"
-                                    alt="Foto profil WA"
-                                    class="h-full w-full object-cover"
-                                    referrerpolicy="no-referrer"
-                                    @error="onProfileImageError(c.conversationId)"
-                                />
-                                <div v-else class="flex h-full w-full items-center justify-center text-[9px] font-black text-white sm:text-[10px] xl:text-[11px]"
-                                     :class="avatarToneClassFor(c.conversationId || c.remoteNumber)">
-                                    {{ initialsFromName(c.displayTitle) }}
-                                </div>
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="flex min-w-0 items-baseline gap-1.5 font-bold text-[var(--text-1)] transition-all"
-                                       :class="!showInterkom ? 'text-[13px] sm:text-[14px] xl:text-[15px]' : 'text-[11px] sm:text-[12px] xl:text-[13px]'">
-                                        <span class="truncate">
-                                            <span v-if="c.isGroup" class="mr-1">👥</span>{{ c.displayTitle }}
-                                        </span>
-                                        <span class="shrink-0 font-mono text-[var(--text-2)] transition-all font-normal opacity-80"
-                                              :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
-                                            {{ primaryContactNumber(c.remoteNumber, c.resolvedNumber) }}
-                                        </span>
-                                    </p>
-                                    <!-- Unread badge -->
-                                    <span v-if="c.unreadCount > 0" class="unread-pill flex-shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 font-black text-white transition-all"
-                                          :class="!showInterkom ? 'text-[10px] sm:px-2.5 sm:text-[11px]' : 'text-[9px] sm:px-2 sm:text-[10px]'">
-                                        {{ c.unreadCount }}
-                                    </span>
-                                </div>
-
-                                <p v-if="c.remoteName && !c.isGroup" class="mt-0.5 truncate text-[var(--text-2)] transition-all"
-                                   :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
-                                    Nama WA: <span class="font-semibold">{{ c.remoteName }}</span>
-                                </p>
-                                <p v-if="c.groupName && c.isGroup" class="mt-0.5 truncate text-[var(--text-2)] transition-all"
-                                   :class="!showInterkom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9px]'">
-                                    Nama Group: <span class="font-semibold">{{ c.groupName }}</span>
-                                </p>
-
-                                <p class="mt-0.5 line-clamp-1 text-[var(--text-2)] transition-all"
-                                   :class="!showInterkom ? 'text-[11px] sm:text-[12px]' : 'text-[9px] sm:text-[10px]'">
-                                    {{ conversationPreviewText(c) }}
-                                </p>
-                                <div v-if="inboxPreviewMedia(c)" class="mt-1.5 flex items-center gap-2">
-                                    <!-- Preview visual (gambar) -->
-                                    <button v-if="hasInboxVisualPreview(c)"
-                                            @click.stop="openMediaViewer(inboxPreviewMedia(c).url, { alt: `Preview ${inboxPreviewLabel(c)}`, fileName: inboxPreviewMedia(c).fileName })"
-                                            class="overflow-hidden rounded-xl border border-slate-200/80 bg-white/80 transition hover:border-sky-300/70">
-                                        <img :src="inboxPreviewMedia(c).url"
-                                             :alt="`Preview ${inboxPreviewLabel(c)}`"
-                                             loading="lazy"
-                                             decoding="async"
-                                             class="h-8 w-8 object-cover" />
-                                    </button>
-
-                                    <!-- Ikon untuk media non-visual (dokumen, video, audio) -->
-                                    <div v-else class="flex items-center gap-1.5">
-                                        <div class="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white/85 text-sm">
-                                            {{ inboxMediaIcon(inboxPreviewMedia(c)).icon }}
-                                        </div>
-                                        <span class="text-[10px] font-semibold text-slate-500">
-                                            {{ inboxMediaIcon(inboxPreviewMedia(c)).label }}
-                                        </span>
-                                    </div>
-
-                                    <!-- Nama file & ukuran -->
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-[var(--text-2)] transition-all"
-                                           :class="!showInterkom ? 'text-[10px]' : 'text-[9px]'">
-                                            {{ inboxPreviewMedia(c).fileName || `Lampiran ${inboxPreviewLabel(c)}` }}
-                                        </p>
-                                        <p v-if="humanFileSize(inboxPreviewMedia(c).fileSize)" class="text-[9px] text-[var(--text-2)]/70">
-                                            {{ humanFileSize(inboxPreviewMedia(c).fileSize) }}
-                                            <span v-if="inboxPreviewMedia(c).fileSize > MAX_MEDIA_FILE_BYTES"
-                                                  class="ml-1 font-semibold text-amber-500">⚠ Maks {{ humanFileSize(MAX_MEDIA_FILE_BYTES) }}</span>
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="mt-1 flex flex-wrap items-center gap-1">
-                                    <span class="rounded-full px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
-                                          :class="{
-                                              'bg-emerald-500/15 text-emerald-600': c.status === 'open',
-                                              'bg-amber-500/15 text-amber-600': c.status === 'pending',
-                                              'bg-slate-500/15 text-slate-500': c.status === 'closed',
-                                          }">
-                                        {{ conversationStatusLabel(c.status) }}
-                                    </span>
-                                    <span v-if="c.customerMark" class="rounded-full border px-1.5 py-0.5 text-[8px] font-bold sm:px-2 sm:text-[9px]"
-                                          :class="markToneClass(c.customerMark.tone)">
-                                        {{ c.customerMark.label }}
-                                    </span>
-                                    <span v-if="c.customerMark?.isPinned" class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-50 shadow-sm ring-1 ring-amber-200/50">
-                                        <span class="text-[10px]">📌</span>
-                                    </span>
-                                    <span v-if="c.ownership === 'mine'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 sm:px-2 sm:text-[9px]">
-                                        aktif kamu
-                                    </span>
-                                    <span v-if="c.owner" class="rounded-full bg-blue-500/12 px-1.5 py-0.5 text-[8px] font-semibold text-blue-600 sm:px-2 sm:text-[9px]">
-                                        {{ c.owner?.alias || c.owner?.name }}
-                                    </span>
-                                    <span v-if="c.justClaimed" class="rounded-full bg-violet-500/12 px-1.5 py-0.5 text-[8px] font-bold text-violet-600 sm:px-2 sm:text-[9px]">
-                                        baru takeover
-                                    </span>
-                                    <span v-if="c.ownerPresence === 'active'" class="rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[8px] font-bold text-emerald-600 sm:px-2 sm:text-[9px]">
-                                        aktif sekarang
-                                    </span>
-                                    <span v-else-if="c.ownerPresence === 'standby'" class="rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 sm:px-2 sm:text-[9px]">
-                                        standby
-                                    </span>
-                                    <span v-else-if="c.ownerPresence === 'idle'" class="rounded-full bg-slate-500/12 px-1.5 py-0.5 text-[8px] font-bold text-slate-500 sm:px-2 sm:text-[9px]">
-                                        idle
-                                    </span>
-                                    <span v-if="c.pendingHandover" class="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[8px] font-bold text-orange-600 sm:px-2 sm:text-[9px]">
-                                        handover ⏳
-                                    </span>
-                                </div>
-
-                                <p class="mt-1 text-[7px] text-[var(--text-2)] sm:mt-1 sm:text-[8px]">
-                                    {{ c.lastActivityAt || '—' }}
-                                    <span v-if="c.claimedAt" class="ml-1 text-[var(--text-2)]/80">· diklaim {{ c.claimedAt }}</span>
-                                </p>
-                            </div>
-                        </div>
-                    </button>
-
-                    <!-- Skeleton loader: muncul saat sedang loading, conversations sudah ada (agar tidak kosong) -->
-                    <div v-if="isLoading && conversations.length > 0"
-                         class="pointer-events-none absolute inset-0 z-10 overflow-hidden bg-[var(--surface-1)]/60 backdrop-blur-[2px]">
-                        <div class="space-y-1 px-3 pt-2">
-                            <div v-for="i in 6" :key="i" class="flex items-center gap-2.5 rounded-2xl px-2 py-2.5">
-                                <div class="thread-skeleton h-8 w-8 flex-shrink-0 rounded-full"></div>
-                                <div class="flex-1 space-y-1.5">
-                                    <div class="thread-skeleton h-2.5 rounded-full" :style="{ width: (55 + i * 7) % 80 + '%' }"></div>
-                                    <div class="thread-skeleton h-2 rounded-full" :style="{ width: (30 + i * 9) % 65 + '%' }"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="isLoading && conversations.length === 0" class="flex flex-col items-center justify-center px-5 py-16">
-                        <div class="hourglass-loader opacity-80"></div>
-                        <p class="mt-6 text-[13px] font-bold text-[var(--text-1)]">Sedang memuat data...</p>
-                        <p class="mt-1 text-[11px] text-[var(--text-2)] text-center leading-relaxed">
-                            Sabar ya masnya dan mbaknya.. 😏<br/>
-                            <span class="opacity-70">Sistem sedang bekerja keras buat kamu.</span>
-                        </p>
-                    </div>
-                    <div v-else-if="filteredConversations.length === 0" class="px-5 py-10 text-center">
-                        <p class="text-sm text-[var(--text-2)]">Belum ada percakapan.</p>
-                        <p class="mt-1 text-xs text-[var(--text-2)]">Pesan akan muncul saat runtime mengirim webhook atau pull inbox berhasil.</p>
-                    </div>
-
-                    <div v-else-if="renderedConversations.length < filteredConversations.length" class="px-4 py-4 text-center">
-                        <button @click="visibleConversationCount = Math.min(filteredConversations.length, visibleConversationCount + 30)"
-                                class="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[10px] font-bold text-[var(--text-2)] transition hover:border-sky-400/40 hover:text-sky-500">
-                            Muat {{ Math.min(30, filteredConversations.length - renderedConversations.length) }} chat lagi
-                        </button>
-                    </div>
-                </div>
-
-            </aside>
+            <!-- Inbox Sidebar: daftar percakapan -->
+            <WaCarakaInboxSidebar
+                :conversations="conversations"
+                :filtered-conversations="filteredConversations"
+                :rendered-conversations="renderedConversations"
+                :active-convo-id="activeConvoId"
+                :conversation-search="conversationSearch"
+                :conversation-filter="conversationFilter"
+                :is-loading="isLoading"
+                :is-background-refreshing="isBackgroundRefreshing"
+                :inbox-sync-text="inboxSyncText"
+                :is-mobile="isMobile"
+                :mobile-view="mobileView"
+                :show-interkom="showInterkom"
+                :max-media-bytes="MAX_MEDIA_FILE_BYTES"
+                :avatar-tone-class-for="avatarToneClassFor"
+                :initials-from-name="initialsFromName"
+                :primary-contact-number="primaryContactNumber"
+                :conversation-preview-text="conversationPreviewText"
+                :conversation-status-label="conversationStatusLabel"
+                :mark-tone-class="markToneClass"
+                :inbox-preview-media="inboxPreviewMedia"
+                :has-inbox-visual-preview="hasInboxVisualPreview"
+                :inbox-preview-label="inboxPreviewLabel"
+                :inbox-media-icon="inboxMediaIcon"
+                :human-file-size="humanFileSize"
+                :is-conversation-recently-updated="isConversationRecentlyUpdated"
+                :on-profile-image-error="onProfileImageError"
+                :open-media-viewer="openMediaViewer"
+                @select-conversation="selectConversation"
+                @context-menu="openContextMenu"
+                @prefetch-conversation="prefetchConversation"
+                @update:conversation-search="conversationSearch = $event"
+                @update:conversation-filter="conversationFilter = $event"
+                @load-more="visibleConversationCount = Math.min(filteredConversations.length, visibleConversationCount + 30)"
+                @scroll="maybeExpandConversationWindow"
+            />
 
             <!-- Main: Thread + Reply -->
             <div
@@ -3586,11 +3320,48 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Thread Messages -->
+                <!-- Thread Messages — drop zone aktif di sini -->
                  <div ref="threadEl"
-                     class="flex-1 overflow-y-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--shadow)] scroll-smooth sm:p-4 xl:rounded-[2rem] xl:p-5"
+                     class="relative flex-1 overflow-y-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--shadow)] scroll-smooth sm:p-4 xl:rounded-[2rem] xl:p-5"
                      :class="[activeConvo && !customBackgroundStyle ? 'thread-surface' : '', isDark && activeConvo && !customBackgroundStyle ? 'thread-surface-dark' : '']"
-                     :style="[threadViewportStyle, activeConvo && !customBackgroundStyle ? threadSurfaceDarkStyle : {}, activeConvo && customBackgroundStyle ? customBackgroundStyle : {}]">
+                     :style="[threadViewportStyle, activeConvo && !customBackgroundStyle ? threadSurfaceDarkStyle : {}, activeConvo && customBackgroundStyle ? customBackgroundStyle : {}]"
+                     @dragover="onChatDragOver"
+                     @dragleave="onChatDragLeave"
+                     @drop="onChatDrop">
+
+                    <!-- Drop Overlay — muncul saat ada file yang di-drag masuk -->
+                    <transition
+                        enter-active-class="transition-opacity duration-150"
+                        enter-from-class="opacity-0"
+                        enter-to-class="opacity-100"
+                        leave-active-class="transition-opacity duration-200"
+                        leave-from-class="opacity-100"
+                        leave-to-class="opacity-0"
+                    >
+                        <div
+                            v-if="isDraggingFile"
+                            class="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center rounded-[1.5rem] xl:rounded-[2rem] backdrop-blur-[2px]"
+                            :class="isDark
+                                ? 'bg-slate-900/80 border-2 border-dashed border-sky-400/60'
+                                : 'bg-white/80 border-2 border-dashed border-sky-500/60'"
+                        >
+                            <div class="flex flex-col items-center gap-3 select-none">
+                                <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-500/10 ring-2 ring-sky-400/30">
+                                    <svg class="h-8 w-8 text-sky-500 animate-bounce" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                                    </svg>
+                                </div>
+                                <p class="text-base font-bold"
+                                   :class="isDark ? 'text-sky-300' : 'text-sky-700'">
+                                    Lepas untuk melampirkan file
+                                </p>
+                                <p class="text-xs"
+                                   :class="isDark ? 'text-slate-400' : 'text-slate-500'">
+                                    Gambar, video, dokumen · maks {{ Math.round(MAX_MEDIA_FILE_BYTES / (1024 * 1024)) }} MB
+                                </p>
+                            </div>
+                        </div>
+                    </transition>
 
                     <!-- Particle Canvas (dark mode only) -->
                     <canvas
@@ -4830,6 +4601,17 @@ onUnmounted(() => {
     transform: translateX(-100%);
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
     animation: skeletonSweep 1.25s ease-in-out infinite;
+}
+
+/* ── fade-dot: transisi smooth untuk indikator background sync ── */
+.fade-dot-enter-active,
+.fade-dot-leave-active {
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.fade-dot-enter-from,
+.fade-dot-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
 }
 
 .send-btn {

@@ -12,7 +12,8 @@ const props = defineProps({
 
 const page = usePage();
 const isSuperAdmin = computed(() => page.props.auth.isSuperAdmin);
-const canViewMultiple = computed(() => isSuperAdmin.value || page.props.auth.user?.role === 'security');
+// Semua user melihat preview ringan di grid; expanded modal = resolusi penuh
+const canViewMultiple = computed(() => true);
 
 const STORAGE_KEY = 'lawangsewu-cctv-zone';
 const IDLE_TIMEOUT = 10 * 60 * 1000;
@@ -421,10 +422,12 @@ watch(selectedZone, (value) => {
                         @click="expandCamera(index)"
                     >
                         <iframe
-                            v-if="canViewMultiple"
                             :src="iframeState[camera.key] === undefined ? '' : camera.iframeSrc"
                             :title="camera.name"
-                            class="absolute inset-0 h-full w-full border-0 opacity-90 transition-opacity group-hover:opacity-100"
+                            :class="[
+                                'absolute inset-0 h-full w-full border-0 opacity-90 transition-opacity group-hover:opacity-100',
+                                isFullscreen ? 'iframe-fullres' : 'iframe-preview',
+                            ]"
                             loading="lazy"
                             allow="autoplay; fullscreen; picture-in-picture"
                             referrerpolicy="no-referrer-when-downgrade"
@@ -432,21 +435,6 @@ watch(selectedZone, (value) => {
                             @load="onIframeLoad(camera.key)"
                             @error="onIframeError(camera.key)"
                         />
-
-                        <!-- Placeholder for non-superadmin to prevent multiple stream bandwidth usage -->
-                        <div
-                            v-else
-                            class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900/80 to-black"
-                        >
-                            <div class="flex flex-col items-center gap-3 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:text-cyan-400/70">
-                                <div class="rounded-2xl border border-white/5 bg-white/5 p-4 shadow-xl backdrop-blur-sm">
-                                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <span class="text-[9px] font-black uppercase tracking-[0.25em] opacity-40">Tap to Monitor</span>
-                            </div>
-                        </div>
 
                         <!-- Overlay: loading saat belum ada event -->
                         <div
@@ -609,5 +597,23 @@ watch(selectedZone, (value) => {
 .fullscreen-camera-tile {
     aspect-ratio: 16 / 9;
     min-height: calc((100vh - 7.75rem) / 4);
+}
+
+/*
+  Preview ringan di grid: batasi render quality hint agar browser
+  tidak upscale/memproses lebih dari yang diperlukan untuk tile kecil.
+  Fullscreen: tampilkan di resolusi penuh tanpa batasan.
+*/
+.iframe-preview {
+    image-rendering: auto;
+    will-change: auto;
+    /* Paksa browser render di ukuran tile saja (hemat resource) */
+    contain: strict;
+}
+
+.iframe-fullres {
+    image-rendering: auto;
+    will-change: transform;
+    contain: none;
 }
 </style>

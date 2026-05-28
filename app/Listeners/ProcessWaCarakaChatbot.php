@@ -29,6 +29,11 @@ class ProcessWaCarakaChatbot implements ShouldQueue
             return;
         }
 
+        // [TESTING MODE] Hanya merespons nomor 081317361689
+        if (!str_contains((string)$message->remote_number, '81317361689')) {
+            return;
+        }
+
         // Jalankan chatbot service
         try {
             $chatbot = app(\App\Services\WaCarakaChatbotService::class);

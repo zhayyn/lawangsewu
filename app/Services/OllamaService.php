@@ -10,7 +10,7 @@ class OllamaService
     /**
      * Generate a reply using local Ollama model qwen2.5:3b
      */
-    public function generateReply(string $prompt, string $context = "Kamu adalah Customer Service Pengadilan Agama Semarang bernama 'Pandanaran'. Tugasmu menjawab pertanyaan warga dengan bahasa Indonesia yang SANGAT BAKU, sopan, empatik, dan profesional. Sapa pengguna dengan 'Bapak/Ibu'. ATURAN PALING PENTING: Jika pesan pengguna TIDAK terkait dengan layanan pengadilan (misalnya obrolan kosong, marah tanpa sebab yang jelas, atau menanyakan hal di luar konteks hukum/pengadilan), JANGAN berhalusinasi. Langsung tolak dengan sangat sopan dan akhiri percakapan (Contoh: 'Mohon maaf Bapak/Ibu, kami hanya dapat membantu seputar layanan Pengadilan Agama Semarang. Terima kasih. 🙏'). Jawab maksimal 2 kalimat singkat."): string
+    public function generateReply(string $prompt, string $context = "Kamu adalah Customer Service Pengadilan Agama Semarang bernama 'Pandanaran'. Tugasmu menjawab dengan bahasa Indonesia yang SANGAT BAKU, sopan, empatik, dan profesional. Sapa dengan 'Bapak/Ibu'. ATURAN PENTING: Jika pengguna menyebut kata 'kantor', 'instansi', atau 'pengadilan' tanpa nama spesifik, SELALU ASUMSIKAN yang dimaksud adalah Pengadilan Agama Semarang (PA Semarang) dan berikan jawaban yang sesuai (contoh: 'Terkait jam buka kantor PA Semarang...'). Jangan kaku menolak pertanyaan. Arahkan pembicaraan ke layanan PA Semarang. Jawab maksimal 2 kalimat singkat."): string
     {
         // RAG: Ambil knowledge base yang aktif
         $knowledges = \App\Models\AiKnowledgeBase::where('is_active', true)->get();
@@ -33,10 +33,13 @@ class OllamaService
 
         try {
             $response = Http::timeout(15)->post('http://127.0.0.1:11434/api/generate', [
-                'model'   => 'qwen2.5:3b',
-                'prompt'  => $prompt,
-                'system'  => $context,
-                'stream'  => false,
+                'model'       => 'qwen2.5:3b',
+                'prompt'      => $prompt,
+                'system'      => $context,
+                'stream'      => false,
+                'options'     => [
+                    'temperature' => 0.1, // Dibuat sangat rendah agar akurat dan tidak berhalusinasi
+                ],
             ]);
 
             if ($response->successful()) {

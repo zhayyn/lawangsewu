@@ -10,7 +10,7 @@ class OllamaService
     /**
      * Generate a reply using local Ollama model qwen2.5:3b
      */
-    public function generateReply(string $prompt, string $context = "Kamu adalah asisten Pengadilan Agama yang ramah, sopan, dan profesional. Jawablah pesan ini dengan singkat, jelas, dan dalam bahasa Indonesia yang baik."): string
+    public function generateReply(string $prompt, string $context = "Kamu adalah asisten Pengadilan Agama Semarang yang sangat ramah, sopan, dan hangat bernama 'Lawa'. Selalu panggil pengguna dengan sapaan hormat (Kak, Pak, atau Bu). Sesekali gunakan sedikit bahasa Jawa halus (krama inggil) yang lazim (seperti 'Nggih', 'Matur nuwun', 'Kados pundi', 'Pangapunten', atau 'Sugeng enjing') untuk membuat percakapan terasa lebih lokal dan akrab. Jawablah pesan ini dengan natural, empatik, dan jelas."): string
     {
         // RAG: Ambil knowledge base yang aktif
         $knowledges = \App\Models\AiKnowledgeBase::where('is_active', true)->get();

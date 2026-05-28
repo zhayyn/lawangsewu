@@ -137,6 +137,20 @@ const showInterkom = ref(
 const unreadInterkom = ref(0);
 const interkomRef = ref(null);
 
+const updateUnreadInterkom = (count) => {
+    unreadInterkom.value = count;
+};
+
+// ─── Omnichannel Tabs ──────────────────────────────────
+const activeOmnichannelTab = ref('whatsapp');
+const omnichannelTabs = [
+    { id: 'whatsapp', name: 'WhatsApp', icon: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z', color: 'text-emerald-500' },
+    { id: 'website', name: 'Webchat', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z', color: 'text-sky-500' },
+    { id: 'instagram', name: 'Instagram', icon: 'M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M12,7.25A4.75,4.75 0 1,1 7.25,12A4.75,4.75 0 0,1 12,7.25M12,9A3,3 0 1,0 15,12A3,3 0 0,0 12,9M17.25,5.5A1.25,1.25 0 1,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5Z', color: 'text-fuchsia-500' },
+    { id: 'facebook', name: 'Facebook', icon: 'M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z', color: 'text-blue-500' },
+    { id: 'tiktok', name: 'TikTok', icon: 'M12.525.025c-3.309.006-6.002 2.698-6.008 6.007v7.653c0 2.21-1.792 4-4 4v2.001a6.007 6.007 0 0 0 6-6V2.025h2.008a4.015 4.015 0 0 0 4 4V8.04c-3.309 0-6-2.69-6-6h4Z', color: 'text-slate-900 dark:text-white' }
+];
+
 const toggleInterkom = () => {
     showInterkom.value = !showInterkom.value;
     if (typeof window !== 'undefined') {
@@ -3032,17 +3046,18 @@ onUnmounted(() => {
             <div class="absolute -right-10 -top-10 h-52 w-52 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
             <div class="absolute -bottom-12 left-1/3 h-44 w-44 rounded-full bg-cyan-400/8 blur-3xl pointer-events-none" />
 
-            <div class="relative z-10 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <p class="text-[10px] font-black uppercase tracking-[0.3em] text-sky-300/90">WA Caraka • Operator Desk</p>
-                </div>
-                
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="statusClass">
-                        <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
-                        {{ statusText }}
-                    </span>
-                    <button v-if="isSuperAdmin" @click="toggleHandoverEnabled" :disabled="handoverToggling" class="rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="handoverEnabled ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : 'border-rose-400/40 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20'" :title="handoverEnabled ? 'Fitur alih chat sedang aktif' : 'Fitur alih chat sedang dinonaktifkan'">
+            <div class="relative z-10 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.3em] text-sky-300/90">Omnichannel • Operator Desk</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="statusClass">
+                            <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
+                            {{ statusText }}
+                        </span>
+                        <button v-if="isSuperAdmin" @click="toggleHandoverEnabled" :disabled="handoverToggling" class="rounded-full border px-3 py-1 text-[11px] font-bold transition" :class="handoverEnabled ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20' : 'border-rose-400/40 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20'" :title="handoverEnabled ? 'Fitur alih chat sedang aktif' : 'Fitur alih chat sedang dinonaktifkan'">
                         {{ handoverToggling ? '⏳' : (handoverEnabled ? '✓' : '✕') }} Alih Chat
                     </button>
                     <button v-if="isAdmin" @click="openReportsPage" class="rounded-full border border-violet-300/40 bg-violet-300/10 px-3 py-1 text-[11px] font-bold text-violet-100 hover:bg-violet-300/20 transition">
@@ -3068,8 +3083,9 @@ onUnmounted(() => {
                     </button>
                 </div>
             </div>
+        </div>
 
-            <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+        <div v-if="!operatorLiteMode" class="relative z-10 mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
                 <article v-for="card in [
                     { label: 'Aktif', value: latestConvoStats?.open ?? 0, color: 'text-emerald-300' },
                     { label: 'Pesan Masuk Baru', value: latestConvoStats?.pending ?? 0, color: (latestConvoStats?.pending ?? 0) === 0 ? 'text-emerald-300' : ((latestConvoStats?.pending ?? 0) > 10 ? 'text-rose-300' : 'text-amber-300'), title: 'Pesan masuk yang belum ditangani oleh operator (belum dibalas sama sekali)' },
@@ -3082,10 +3098,38 @@ onUnmounted(() => {
                     <p class="mt-0.5 text-base font-black leading-none sm:text-[17px]" :class="card.color">{{ card.value ?? 0 }}</p>
                 </article>
             </div>
+            
+            <!-- Omnichannel Tabs UI -->
+            <div class="mt-4 flex overflow-x-auto space-x-2 border-b border-white/10 pb-0 scrollbar-hide relative z-10">
+                <button v-for="tab in omnichannelTabs" :key="tab.id" @click="activeOmnichannelTab = tab.id" 
+                        class="flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-all"
+                        :class="activeOmnichannelTab === tab.id ? 'bg-white/10 text-white border-b-2 border-sky-400' : 'text-gray-400 hover:text-white hover:bg-white/5'">
+                    <svg class="w-4 h-4" :class="tab.color" viewBox="0 0 24 24" fill="currentColor">
+                        <path :d="tab.icon" />
+                    </svg>
+                    {{ tab.name }}
+                </button>
+            </div>
         </section>
 
+        <!-- Placeholder for Non-WhatsApp Tabs -->
+        <div v-if="activeOmnichannelTab !== 'whatsapp'" class="flex h-[60vh] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--accent-border)] bg-[var(--bg-layer-1)] text-center p-8 shadow-2xl">
+            <div class="mb-4 rounded-full bg-slate-100 p-4 dark:bg-slate-800">
+                <svg class="h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+            </div>
+            <h3 class="mb-2 text-xl font-semibold text-[var(--text-primary)]">Integrasi {{ omnichannelTabs.find(t => t.id === activeOmnichannelTab)?.name }} Segera Hadir</h3>
+            <p class="max-w-md text-sm text-[var(--text-secondary)] leading-relaxed">
+                Pengembangan modul integrasi untuk platform ini sedang dalam tahap riset (R&D). Nantinya percakapan dari sini akan masuk ke dalam inbox Omnichannel yang sama dan dikendalikan oleh <strong>AI Pandanaran</strong>.
+            </p>
+            <button @click="activeOmnichannelTab = 'whatsapp'" class="mt-6 rounded-lg bg-sky-500 px-5 py-2 text-sm font-semibold text-white hover:bg-sky-600 transition shadow-md shadow-sky-500/20">
+                Kembali ke WhatsApp
+            </button>
+        </div>
+
         <!-- ░░ Main: Inbox + Thread + Interkom ░░ -->
-        <div class="interkom-outer flex min-w-0 gap-3 sm:gap-4 xl:gap-5">
+        <div v-show="activeOmnichannelTab === 'whatsapp'" class="interkom-outer flex min-w-0 gap-3 sm:gap-4 xl:gap-5">
 
         <!-- Inbox + Thread grid -->
         <section class="min-w-0 flex-1 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(230px,37%),minmax(0,1fr)] sm:gap-4 xl:grid-cols-[clamp(380px,30%,460px),minmax(0,1fr)] xl:gap-5">

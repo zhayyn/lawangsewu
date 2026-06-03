@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\CctvCameraController;
 use App\Http\Controllers\Admin\LaporanController;
+use App\Http\Controllers\Admin\NetworkMonitorController;
 use App\Http\Controllers\Admin\PendopoAdminController;
 use App\Http\Controllers\Admin\SystemMonitorController;
 use App\Http\Controllers\Admin\UserAccessController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\TailscaleDashboardController;
 use App\Http\Controllers\WidgetCompatController;
 use App\Http\Controllers\TdmsController;
 use App\Http\Controllers\PakPpController;
+use App\Http\Controllers\TvMediaController;
 use App\Http\Controllers\WaCarakaController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -84,6 +86,10 @@ Route::get('/daftar-relaas-ghaib', [WidgetCompatController::class, 'phpPublic'])
 // Backward-compatible root endpoint used by some legacy embeds.
 Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class, 'apiStatistik'])
     ->middleware('throttle:60,1');
+
+// ── TV Media Slideshow — public, tanpa autentikasi ─────────────────────────
+Route::get('/tvmedia', [TvMediaController::class, 'index'])->name('lawangsewu.tvmedia');
+Route::get('/tvmedia/config', [TvMediaController::class, 'config'])->name('lawangsewu.tvmedia.config');
 
 Route::prefix('lawangsewu')->group(function () {
     Route::get('/pengumuman-peradilan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan');
@@ -181,16 +187,18 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::patch('/buku-tamu/kelola/{id}/update-info', [GuestbookController::class, 'updateInfo'])->name('lawangsewu.guestbook.update-info');
 
     // WA Caraka Dashboard & Operator Tools
-    Route::get('/wa-caraka', [WaCarakaController::class, 'index'])->name('lawangsewu.wacaraka.index');
+    Route::get('/wa-caraka', [WaCarakaController::class, 'index'])->name('lawangsewu.wacaraka.index')->middleware('feature:nav.wacaraka');
     Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaController::class, 'proxy'])
         ->where('action', '.*')
-        ->name('lawangsewu.wacaraka.api');
+        ->name('lawangsewu.wacaraka.api')
+        ->middleware('feature:nav.wacaraka');
     
     // WA Caraka Media Download (proxied from bridge)
     // Supports: /wa-caraka/media/{token}, /wa-caraka/media/{token}.ext, /wa-caraka/media/{token}/{filename}
     Route::get('/wa-caraka/media/{path}', [WaCarakaController::class, 'downloadMedia'])
         ->where('path', '.+')
-        ->name('lawangsewu.wacaraka.media');
+        ->name('lawangsewu.wacaraka.media')
+        ->middleware('feature:nav.wacaraka');
 
     // ── TDMS — Tech Device Management System ──────────────────────
     Route::get('/tdms', [TdmsController::class, 'index'])->name('lawangsewu.tdms.index');
@@ -204,7 +212,7 @@ Route::middleware(['auth', 'verified', 'active', 'role:operator,admin'])->group(
     Route::get('/tdms/qr/{token}', [TdmsController::class, 'assetQrDetail'])->name('lawangsewu.tdms.qr');
 });
 
-Route::middleware(['auth', 'verified', 'active', 'role:operator,useradmin,admin'])->group(function () {
+Route::middleware(['auth', 'verified', 'active', 'role:operator,useradmin,admin', 'feature:nav.wacaraka'])->group(function () {
     Route::get('/wa-caraka/reports', [WaCarakaController::class, 'reports'])->name('lawangsewu.wacaraka.reports');
     Route::get('/wa-caraka/reports/data', [WaCarakaController::class, 'reportsData'])->name('lawangsewu.wacaraka.reports.data');
     Route::get('/wa-caraka/reports/pdf', [WaCarakaController::class, 'reportsPdf'])->name('lawangsewu.wacaraka.reports.pdf');
@@ -272,6 +280,11 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
 
     Route::middleware('permission:admin.system-monitor')->group(function () {
         Route::get('/system-monitor', [SystemMonitorController::class, 'index'])->name('system-monitor.index');
+    });
+
+    Route::middleware('permission:admin.network-monitor')->group(function () {
+        Route::get('/network-monitor', [NetworkMonitorController::class, 'index'])->name('network-monitor.index');
+        Route::get('/network-monitor/api', [NetworkMonitorController::class, 'api'])->name('network-monitor.api');
     });
 
     Route::middleware('permission:admin.laporan')->group(function () {

@@ -94,6 +94,29 @@ $y = (int)date('Y');
         .tv-mode .tv-slide { display: none; }
         .tv-mode .tv-slide.active { display: block; }
         .tv-mode .table-wrap.active { max-height: 72vh; }
+        /* ── TV/Kiosk mode override (dipanggil via ?tvmode=1 dari tvmedia) ── */
+        body.tvkiosk { overflow: hidden; }
+        body.tvkiosk .container { margin: 10px auto 10px; padding: 0 10px; }
+        body.tvkiosk .head { padding: 12px 16px; border-radius: 10px; }
+        body.tvkiosk .head h1 { font-size: 20px; }
+        body.tvkiosk .head p { font-size: 12px; }
+        body.tvkiosk .cards { gap: 7px; margin-top: 8px; }
+        body.tvkiosk .card { padding: 8px; border-radius: 8px; }
+        body.tvkiosk .card .value { font-size: 20px; }
+        body.tvkiosk .card .label { font-size: 11px; }
+        body.tvkiosk .kpi-strip { gap: 7px; margin-top: 7px; }
+        body.tvkiosk .kpi { padding: 7px 10px; border-radius: 8px; }
+        body.tvkiosk .kpi .v { font-size: 17px; }
+        body.tvkiosk .panel { margin-top: 8px; border-radius: 10px; }
+        body.tvkiosk .toolbar { padding: 8px 10px; }
+        body.tvkiosk .grid { padding: 8px; gap: 8px; }
+        body.tvkiosk .chart-box { padding: 6px; }
+        body.tvkiosk .chart-box h3 { font-size: 12px; margin-bottom: 5px; }
+        body.tvkiosk .table-wrap { max-height: 52vh; }
+        body.tvkiosk th, body.tvkiosk td { padding: 6px 8px; font-size: 12px; }
+        body.tvkiosk .footnote { margin: 6px 0 8px; font-size: 11px; }
+        body.tvkiosk .tools .btn-tv,
+        body.tvkiosk .tools #tvDuration { display: none !important; }
         @media (max-width: 980px) { .cards, .kpi-strip { grid-template-columns: repeat(2, 1fr);} .grid { grid-template-columns: 1fr; } .input{min-width:180px;} }
         @media (max-width: 640px) { .container { padding: 0 10px; } .card .value { font-size: 20px; } .tools{ width:100%; } .input{ min-width: 0; flex:1; } }
     </style>
@@ -616,7 +639,14 @@ function startDataAutoRefresh() {
 
 document.addEventListener('DOMContentLoaded', () => {
     tvSlides.forEach(slide => slide.classList.add('active'));
-    loadData().then(startDataAutoRefresh);
+    // Auto-start TV mode + kiosk layout jika dipanggil dari tvmedia (?tvmode=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('tvmode') === '1') {
+        document.body.classList.add('tvkiosk');
+        loadData().then(() => { startTvMode(); startDataAutoRefresh(); });
+    } else {
+        loadData().then(startDataAutoRefresh);
+    }
 });
 </script>
 </body>

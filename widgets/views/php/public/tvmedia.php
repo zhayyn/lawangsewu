@@ -342,18 +342,29 @@
 /* TV Media Slideshow Engine — developed by zhayyn™
  * Ringan: tanpa library eksternal, ES5-compatible untuk Smart TV lama */
 
-var SK = 'tvmedia_playlist_v2';
+var SK = 'tvmedia_playlist_v4'; /* v4: info-persidangan slide */
 var DEF = [
-    {id:'canva-1', type:'iframe', label:'Laporan Kesekretariatan',
-     src:'https://www.canva.com/design/DAG0-00Eyxs/J3FKI2cNofXjehT42hq6KA/view?embed',
-     duration:30000, fallback:'Konten Canva tidak dapat dimuat. Pastikan design sudah di-set ke mode Publik di Canva.'},
+    {
+        id:'canva-1', type:'iframe', label:'Laporan Kesekretariatan',
+        /* autoplay=1: Canva mungkin mengaktifkan auto-advance native */
+        src:'https://www.canva.com/design/DAG0-00Eyxs/J3FKI2cNofXjehT42hq6KA/view?embed&autoplay=1',
+        /* slideCount x slideIntervalSec = durasi otomatis (30 x 4 = 120 dtk) */
+        slideCount: 30,
+        slideIntervalSec: 4,
+        /* duration dihitung otomatis dari slideCount x slideIntervalSec */
+        duration: 120000,
+        fallback:'Konten Canva tidak dapat dimuat. Pastikan design diset Publik di Canva.'
+    },
     {id:'statistik-perkara', type:'widget', label:'Statistik Perkara',
-     src:'/statistik-perkara?tvmode=1', duration:25000, fallback:null},
-    {id:'monitor-sidang', type:'widget', label:'Monitor Antrian Sidang',
-     src:'/monitor-antrian-sidang', duration:20000, fallback:null}
+     src:'/statistik-perkara?tvmode=1', duration:10000, fallback:null},
+    {id:'info-persidangan', type:'widget', label:'Info Persidangan',
+     src:'/info-persidangan', duration:10000, fallback:null}
 ];
 
 var pl=[], cur=0, tmr=null, paused=false, isAdm=false;
+/* ── Iframe slide-advance state ────────────────────────────── */
+var ifrAdvTmr=null;   /* timer postMessage per-interval ke iframe */
+var curIfrEl=null;    /* referensi elemen iframe yang sedang aktif */
 
 /* ── Init ───────────────────────────────────────────────────── */
 function init(){
@@ -483,10 +494,51 @@ function updDots(){
     if(t&&pl[cur]) t.textContent=pl[cur].label||'';
 }
 
+/* ── Duration helper ─────────────────────────────────────────── */
+/* Hitung durasi: jika slide punya slideCount + slideIntervalSec,
+   gunakan slideCount × slideIntervalSec (dalam ms). */
+function calcDur(s){
+    if(s&&s.slideCount&&s.slideIntervalSec){
+        return Math.max(1000, s.slideCount * s.slideIntervalSec * 1000);
+    }
+    return (s&&s.duration)||15000;
+}
+
+/* ── Iframe advance (best-effort postMessage) ─────────────────── */
+/* Canva dan beberapa iframe eksternal mungkin merespons postMessage
+   atau keyboard event. Ini upaya terbaik — cross-origin memang
+   membatasi kontrol penuh dari luar. */
+function stopIfrAdv(){
+    if(ifrAdvTmr){ clearInterval(ifrAdvTmr); ifrAdvTmr=null; }
+    curIfrEl=null;
+}
+
+function tryAdvCanva(fr){
+    if(!fr||!fr.contentWindow) return;
+    /* Format 1 — Arrow key via postMessage */
+    try{ fr.contentWindow.postMessage({type:'keydown',key:'ArrowRight',keyCode:39,which:39},'*'); }catch(e){}
+    /* Format 2 — Canva presentation next */
+    try{ fr.contentWindow.postMessage(JSON.stringify({type:'next'}),'*'); }catch(e){}
+    /* Format 3 — generic */
+    try{ fr.contentWindow.postMessage({action:'next'},'https://www.canva.com'); }catch(e){}
+}
+
+function startIfrAdv(fr, intervalMs){
+    stopIfrAdv();
+    curIfrEl=fr;
+    /* Tembak pertama kali setelah iframe sedikit settled */
+    setTimeout(function(){ tryAdvCanva(fr); }, 2000);
+    ifrAdvTmr=setInterval(function(){ tryAdvCanva(fr); }, intervalMs);
+}
+
 /* ── Navigation ─────────────────────────────────────────────── */
 function goTo(idx){
     if(!pl.length) return;
     idx=((idx%pl.length)+pl.length)%pl.length;
+
+    /* Hentikan iframe advance dari slide sebelumnya */
+    stopIfrAdv();
+
     var prev=document.getElementById('sl-'+cur);
     if(prev&&idx!==cur){
         prev.classList.remove('active');
@@ -496,6 +548,14 @@ function goTo(idx){
     cur=idx;
     var next=document.getElementById('sl-'+cur);
     if(next) next.classList.add('active');
+
+    /* Jika slide baru adalah iframe dengan slideCount, mulai advance timer */
+    var s=pl[cur];
+    if(s&&s.type==='iframe'&&s.slideCount&&s.slideIntervalSec){
+        var fr=next&&next.querySelector('iframe');
+        if(fr) startIfrAdv(fr, s.slideIntervalSec*1000);
+    }
+
     updDots();
     schedule();
 }
@@ -505,7 +565,8 @@ function nextSlide(){ goTo((cur+1)%pl.length); }
 function schedule(){
     if(tmr){ clearTimeout(tmr); tmr=null; }
     if(paused) return;
-    var dur=(pl[cur]&&pl[cur].duration)||15000;
+    /* Gunakan calcDur agar slideCount × intervalSec dipakai jika ada */
+    var dur=calcDur(pl[cur]);
     var fill=document.getElementById('tv-progress-fill');
     fill.style.transition='none';
     fill.style.width='0%';
@@ -540,6 +601,7 @@ function tgAdmin(){
     paused=opening;
     if(opening){
         if(tmr){clearTimeout(tmr);tmr=null;}
+        stopIfrAdv(); /* hentikan iframe advance saat admin panel dibuka */
         document.getElementById('tv-progress-fill').style.width='0%';
         renderAdmList();
     } else { schedule(); }
@@ -551,15 +613,39 @@ function renderAdmList(){
     var html='';
     for(var i=0;i<pl.length;i++){
         var s=pl[i];
+        var effDur=Math.round(calcDur(s)/1000);
+        /* Untuk iframe dengan slideCount: tampilkan field jumlah slide + detik/slide */
+        var slideFields='';
+        if(s.type==='iframe'){
+            var sc=s.slideCount||'';
+            var si=s.slideIntervalSec||'';
+            slideFields='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+                +'<div style="font-size:9px;color:#475569;text-align:center">Slide<br>'
+                +'<input type="number" value="'+sc+'" min="1" max="500" placeholder="jml"'
+                +' style="width:48px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);'
+                +'border-radius:5px;color:#f1f5f9;font-size:11px;padding:3px 4px;text-align:center"'
+                +' onchange="updSlideCount('+i+',this.value)">'
+                +'</div>'
+                +'<div style="font-size:9px;color:#475569;text-align:center">Dtk/slide<br>'
+                +'<input type="number" value="'+si+'" min="1" max="60" placeholder="dtk"'
+                +' style="width:44px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);'
+                +'border-radius:5px;color:#f1f5f9;font-size:11px;padding:3px 4px;text-align:center"'
+                +' onchange="updSlideInterval('+i+',this.value)">'
+                +'</div>'
+                +'</div>';
+        }
         html+='<div class="adm-card">'
             +'<span class="adm-badge '+esc(s.type)+'">'+esc(s.type).toUpperCase()+'</span>'
             +'<div class="adm-body">'
             +'<div class="adm-lbl">'+esc(s.label||'(tanpa judul)')+'</div>'
             +'<div class="adm-src">'+esc(s.src||'')+'</div>'
             +'</div>'
+            +slideFields
             +'<div class="adm-dur">'
-            +'<input type="number" value="'+Math.round((s.duration||15000)/1000)+'"'
-            +' min="3" max="300" onchange="updDur('+i+',this.value)">'
+            +'<input type="number" id="dur-inp-'+i+'" value="'+effDur+'"'
+            +' min="3" max="3600" '
+            +(s.slideCount&&s.slideIntervalSec?'readonly style="opacity:.5;cursor:not-allowed" title="Dihitung otomatis dari jumlah slide × detik/slide"':'')
+            +' onchange="updDur('+i+',this.value)">'
             +'<span>dtk</span></div>'
             +'<button class="adm-del" onclick="delSlide('+i+')">✕</button>'
             +'</div>';
@@ -567,7 +653,35 @@ function renderAdmList(){
     list.innerHTML=html;
 }
 
-function updDur(i,v){ if(pl[i]) pl[i].duration=Math.max(3,parseInt(v)||15)*1000; }
+function updDur(i,v){
+    if(!pl[i]) return;
+    /* Hanya update manual jika tidak ada slideCount (auto-calc) */
+    if(!pl[i].slideCount){
+        pl[i].duration=Math.max(3,parseInt(v)||15)*1000;
+    }
+}
+
+function updSlideCount(i,v){
+    if(!pl[i]) return;
+    pl[i].slideCount=Math.max(1,parseInt(v)||1);
+    /* Recalc duration otomatis */
+    if(pl[i].slideIntervalSec){
+        pl[i].duration=pl[i].slideCount*pl[i].slideIntervalSec*1000;
+        var inp=document.getElementById('dur-inp-'+i);
+        if(inp) inp.value=Math.round(pl[i].duration/1000);
+    }
+}
+
+function updSlideInterval(i,v){
+    if(!pl[i]) return;
+    pl[i].slideIntervalSec=Math.max(1,parseInt(v)||4);
+    /* Recalc duration otomatis */
+    if(pl[i].slideCount){
+        pl[i].duration=pl[i].slideCount*pl[i].slideIntervalSec*1000;
+        var inp=document.getElementById('dur-inp-'+i);
+        if(inp) inp.value=Math.round(pl[i].duration/1000);
+    }
+}
 
 function delSlide(i){
     if(!confirm('Hapus slide ini?')) return;

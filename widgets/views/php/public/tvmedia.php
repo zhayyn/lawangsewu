@@ -342,12 +342,12 @@
 /* TV Media Slideshow Engine — developed by zhayyn™
  * Ringan: tanpa library eksternal, ES5-compatible untuk Smart TV lama */
 
-var SK = 'tvmedia_playlist_v4'; /* v4: info-persidangan slide */
+var SK = 'tvmedia_playlist_v5'; /* v5: update canva link */
 var DEF = [
     {
         id:'canva-1', type:'iframe', label:'Laporan Kesekretariatan',
         /* autoplay=1: Canva mungkin mengaktifkan auto-advance native */
-        src:'https://www.canva.com/design/DAG0-00Eyxs/J3FKI2cNofXjehT42hq6KA/view?embed&autoplay=1',
+        src:'https://www.canva.com/design/DAHLiKEH7OE/dBR2-4mnDt47h0bHEs7Piw/view?embed&autoplay=1',
         /* slideCount x slideIntervalSec = durasi otomatis (30 x 4 = 120 dtk) */
         slideCount: 30,
         slideIntervalSec: 4,

@@ -79,6 +79,7 @@ class WidgetCompatController extends Controller
             'statistik-embed'           => 'statistik-embed.php',
             'daftar-pip'                => 'daftar-pip.php',
             'daftar-relaas-ghaib'       => 'daftar-relaas-ghaib.php',
+            'daftar-pegawai'            => 'daftar-pegawai.php',
         ];
 
         if (! isset($map[$page])) {

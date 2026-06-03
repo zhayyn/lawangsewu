@@ -342,7 +342,7 @@
 /* TV Media Slideshow Engine — developed by zhayyn™
  * Ringan: tanpa library eksternal, ES5-compatible untuk Smart TV lama */
 
-var SK = 'tvmedia_playlist_v7'; /* v7: revert to embed link */
+var SK = 'tvmedia_playlist_v8'; /* v8: daftar pegawai widget */
 var DEF = [
     {
         id:'canva-1', type:'iframe', label:'Laporan Kesekretariatan',
@@ -358,7 +358,9 @@ var DEF = [
     {id:'statistik-perkara', type:'widget', label:'Statistik Perkara',
      src:'/statistik-perkara?tvmode=1', duration:10000, fallback:null},
     {id:'info-persidangan', type:'widget', label:'Info Persidangan',
-     src:'/info-persidangan', duration:10000, fallback:null}
+     src:'/info-persidangan', duration:10000, fallback:null},
+    {id:'daftar-pegawai', type:'widget', label:'Profil Pegawai SIKEP',
+     src:'/daftar-pegawai', duration:20000, fallback:null}
 ];
 
 var pl=[], cur=0, tmr=null, paused=false, isAdm=false;

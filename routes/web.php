@@ -61,6 +61,7 @@ Route::get('/monitor-persidangan', [WidgetCompatController::class, 'phpPublic'])
 Route::get('/monitor-antrian-sidang', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'monitor-antrian-sidang');
 Route::get('/antrian-persidangan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'antrian-persidangan');
 Route::get('/antrian-sidang', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'antrian-sidang');
+Route::get('/daftar-pegawai', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'daftar-pegawai');
 Route::get('/dashboard-perkara', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'dashboard-perkara');
 Route::get('/statistik-perkara', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'statistik-perkara');
 Route::get('/dashboard-ecourt', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'dashboard-ecourt');
@@ -297,6 +298,10 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::patch('/pendopo/settings', [PendopoAdminController::class, 'updateSettings'])->name('pendopo.settings.update');
     Route::post('/pendopo/sync-legacy', [PendopoAdminController::class, 'syncLegacy'])->name('pendopo.sync');
     Route::delete('/pendopo/entries/{entry}', [PendopoAdminController::class, 'destroyEntry'])->name('pendopo.entries.destroy');
+
+    // SIKEP Sync Admin
+    Route::get('/sikep-sync', [\App\Http\Controllers\Admin\SikepSyncController::class, 'index'])->name('sikep-sync.index');
+    Route::post('/sikep-sync', [\App\Http\Controllers\Admin\SikepSyncController::class, 'sync'])->name('sikep-sync.store');
 
     Route::middleware('permission:admin.cctv')->group(function () {
         Route::get('/cctv', [CctvCameraController::class, 'index'])->name('cctv.index');

@@ -28,6 +28,10 @@ class CctvCameraController extends Controller
                     'name' => $camera->name,
                     'zone' => $camera->zone,
                     'iframe_src' => $camera->iframe_src,
+                    'primary_sd_src' => $camera->primary_sd_src,
+                    'primary_hd_src' => $camera->primary_hd_src,
+                    'fallback_src' => $camera->fallback_src,
+                    'stream_provider' => $camera->stream_provider,
                     'sort_order' => $camera->sort_order,
                     'is_active' => $camera->is_active,
                     'is_featured' => $camera->is_featured,
@@ -53,6 +57,10 @@ class CctvCameraController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'zone' => ['nullable', 'string', 'max:255'],
             'iframe_src' => ['required', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'primary_sd_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'primary_hd_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'fallback_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'stream_provider' => ['nullable', 'string', 'max:40'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['required', 'boolean'],
             'is_featured' => ['required', 'boolean'],
@@ -63,6 +71,10 @@ class CctvCameraController extends Controller
             'name' => $payload['name'],
             'zone' => $payload['zone'] ?? null,
             'iframe_src' => $payload['iframe_src'],
+            'primary_sd_src' => $payload['primary_sd_src'] ?? null,
+            'primary_hd_src' => $payload['primary_hd_src'] ?? null,
+            'fallback_src' => $payload['fallback_src'] ?? $payload['iframe_src'],
+            'stream_provider' => $payload['stream_provider'] ?? 'custom',
             'sort_order' => $payload['sort_order'] ?? 0,
             'is_active' => $payload['is_active'],
             'is_featured' => $payload['is_featured'],
@@ -86,10 +98,17 @@ class CctvCameraController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'zone' => ['nullable', 'string', 'max:255'],
             'iframe_src' => ['required', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'primary_sd_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'primary_hd_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'fallback_src' => ['nullable', 'string', 'max:2000', 'starts_with:https://,http://'],
+            'stream_provider' => ['nullable', 'string', 'max:40'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['required', 'boolean'],
             'is_featured' => ['required', 'boolean'],
         ]);
+
+        $payload['fallback_src'] = $payload['fallback_src'] ?? $payload['iframe_src'];
+        $payload['stream_provider'] = $payload['stream_provider'] ?? $camera->stream_provider ?? 'custom';
 
         $camera->update($payload);
 

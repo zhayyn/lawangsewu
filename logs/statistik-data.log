@@ -85,3 +85,4 @@
 [2026-05-24 18:01:46] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
 [2026-05-24 18:02:09] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
 [2026-05-24 18:02:45] API error hal=perkara: SQLSTATE[08004] [1040] Too many connections
+[2026-06-01 03:46:48] API error hal=perkara: SQLSTATE[HY000] [2002] No route to host

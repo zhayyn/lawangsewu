@@ -413,14 +413,6 @@ onMounted(() => {
 
                                 <div class="hidden items-center gap-2 md:flex">
                                     <Link
-                                        v-if="isSuperAdmin"
-                                        :href="route('admin.users.index')"
-                                        class="secondary-button"
-                                    >
-                                        Kelola User
-                                    </Link>
-
-                                    <Link
                                         :href="route('logout')"
                                         method="post"
                                         as="button"
@@ -479,14 +471,6 @@ onMounted(() => {
 
                     <div class="space-y-5 border-b border-[var(--border)] pb-5">
                         <div class="space-y-2">
-                            <Link
-                                v-if="isSuperAdmin"
-                                :href="route('admin.users.index')"
-                                class="secondary-button w-full"
-                                @click="isSidebarOpen = false"
-                            >
-                                Kelola User
-                            </Link>
                             <Link
                                 :href="route('logout')"
                                 method="post"

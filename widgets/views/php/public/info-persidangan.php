@@ -69,6 +69,9 @@ if (isset($_GET['format_jadwal'])) {
     $buildRows = function (array $rawRows): array {
         $rows = array();
         $no = 1;
+        
+        $currentHour = (int)date('H');
+        $defaultStatus = ($currentHour < 9) ? 'Terjadwal' : 'Menunggu Sidang';
 
         foreach ($rawRows as $rawRow) {
             $noPerkara = trim((string) ($rawRow['noPerkara'] ?? $rawRow['nomor_perkara'] ?? ''));
@@ -78,15 +81,18 @@ if (isset($_GET['format_jadwal'])) {
 
             $agenda = trim((string) ($rawRow['agenda'] ?? ''));
             $ruangSidang = trim((string) ($rawRow['ruangSidang'] ?? $rawRow['ruang_sidang'] ?? ''));
-            // Check both 'status' and 'keterangan' fields, prioritize 'status' if present
+            
             $keterangan = trim((string) ($rawRow['status'] ?? $rawRow['keterangan'] ?? ''));
+            if ($keterangan === '' || strtolower($keterangan) === 'null') {
+                $keterangan = $defaultStatus;
+            }
 
             $rows[] = array(
                 'no' => $no++,
                 'noPerkara' => $noPerkara,
                 'agenda' => $agenda !== '' ? $agenda : 'Sidang',
                 'ruangSidang' => $ruangSidang !== '' ? $ruangSidang : 'Ruang Sidang',
-                'keterangan' => $keterangan !== '' ? $keterangan : 'Terjadwal',
+                'keterangan' => $keterangan,
             );
         }
 
@@ -232,12 +238,23 @@ if (isset($_GET['format_jadwal'])) {
                 // - Menunggu Sidang jika belum ada data kehadiran
                 foreach ($sippRows as &$row) {
                     $ket = trim((string)($row['keterangan_manual'] ?? ''));
-                    if ($ket !== '') {
+                    $dihadiri = trim((string)($row['dihadiri_oleh'] ?? ''));
+                    
+                    $isDihadiriEmpty = ($dihadiri === '' || strtolower($dihadiri) === 'null' || $dihadiri === '[]');
+                    $isKetEmpty = ($ket === '' || strtolower($ket) === 'null');
+
+                    if (!$isKetEmpty) {
                         $row['status'] = $ket;
-                    } elseif ($row['dihadiri_oleh'] !== null) {
-                        $row['status'] = 'Selesai Sidang';
+                    } elseif (!$isDihadiriEmpty) {
+                        // SIPP mencatat sidang ini sudah dihadiri (selesai)
+                        // TAPI abaikan jika ini sebelum jam 9 pagi (pasti data palsu/testing)
+                        if ((int)date('H') < 9) {
+                            $row['status'] = ''; // Biarkan kosong, buildRows akan mengisinya dgn Terjadwal
+                        } else {
+                            $row['status'] = 'Selesai Sidang';
+                        }
                     } else {
-                        $row['status'] = 'Menunggu Sidang';
+                        $row['status'] = ''; // Biarkan kosong agar buildRows pakai default status
                     }
                 }
                 unset($row);
@@ -374,14 +391,27 @@ if (isset($_GET['format_jadwal'])) {
     }
     unset($row);
 
-    // ⚠️ AUTO-CLOSE: Jika jam sudah >= 18:00 (6 PM), semua sidang dianggap selesai
+    // ⚠️ AUTO-CLOSE RULES:
     $currentHour = (int) date('H');
+    
+    // 1. Setelah jam 16:00 (4 Sore), status yang masih "Menunggu Sidang" atau "Terjadwal" otomatis jadi Selesai Sidang
+    if ($currentHour >= 16) {
+        foreach ($allRows as &$row) {
+            if ($row['keterangan'] === 'Menunggu Sidang' || $row['keterangan'] === 'Terjadwal') {
+                $row['keterangan'] = 'Selesai Sidang';
+            }
+        }
+        unset($row);
+        $error_log[] = 'After-hours (16:00+): pending sessions marked as completed';
+    }
+
+    // 2. Jika jam sudah >= 18:00 (6 PM), paksa SEMUA sidang (termasuk yang tersangkut Sedang Sidang) dianggap selesai
     if ($currentHour >= 18) {
         foreach ($allRows as &$row) {
             $row['keterangan'] = 'Selesai Sidang';
         }
         unset($row);
-        $error_log[] = 'After-hours (18:00+): all sessions marked as completed';
+        $error_log[] = 'After-hours (18:00+): all sessions forcibly marked as completed';
     }
 
     // ⚠️ FILTER: Jika hari ini adalah weekend (Sabtu/Minggu), kosongkan jadwal
@@ -532,7 +562,8 @@ if (isset($_GET['format_jadwal'])) {
                 $formatKeterangan = function (string $ket): string {
                     if ($ket === 'Sedang Sidang')  return '<span class="status-sedang">&#9654; Sedang Sidang</span>';
                     if ($ket === 'Selesai Sidang') return '<span class="status-selesai">&#10003; Selesai Sidang</span>';
-                    if ($ket === 'Menunggu Sidang' || $ket === 'Terjadwal') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                    if ($ket === 'Menunggu Sidang') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                    if ($ket === 'Terjadwal') return '<span class="status-menunggu">Terjadwal</span>';
                     return '<span class="status-manual">' . htmlspecialchars($ket) . '</span>';
                 };
 
@@ -606,6 +637,7 @@ if (isset($_GET['format_jadwal'])) {
                 if (status === 'Sedang Sidang')  return '<span class="status-sedang">&#9654; Sedang Sidang</span>';
                 if (status === 'Selesai Sidang') return '<span class="status-selesai">&#10003; Selesai Sidang</span>';
                 if (status === 'Menunggu Sidang') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                if (status === 'Terjadwal') return '<span class="status-menunggu">Terjadwal</span>';
                 return '<span class="status-manual">' + status.replace(/[<>&"]/g, function(c) {
                     return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];
                 }) + '</span>';
@@ -645,14 +677,16 @@ if (isset($_GET['format_jadwal'])) {
 
                             if (currentSedang[np]) {
                                 td.innerHTML = fmtKet('Sedang Sidang');
-                            } else if (previousSedang[np]) {
-                                // Barusan selesai dipanggil
-                                td.innerHTML = fmtKet('Selesai Sidang');
-                                td.setAttribute('data-base', 'Selesai Sidang');
-                            } else if (base === 'Sedang Sidang') {
-                                // Server render was Sedang, now gone
-                                td.innerHTML = fmtKet('Selesai Sidang');
-                                td.setAttribute('data-base', 'Selesai Sidang');
+                            } else if (previousSedang[np] || base === 'Sedang Sidang') {
+                                // Barusan selesai dipanggil, atau server-rendered Sedang tapi kini hilang
+                                var h = new Date().getHours();
+                                if (h < 9) {
+                                    td.innerHTML = fmtKet('Terjadwal');
+                                    td.setAttribute('data-base', 'Terjadwal');
+                                } else {
+                                    td.innerHTML = fmtKet('Selesai Sidang');
+                                    td.setAttribute('data-base', 'Selesai Sidang');
+                                }
                             }
                             // Jika base adalah Selesai Sidang dari server (dihadiri_oleh) -> biarkan
                             // Jika Menunggu Sidang dan tidak di antrian -> biarkan

@@ -38,6 +38,7 @@ services:
     working_dir: /var/www
     volumes:
       - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
       - ./storage/logs:/var/www/storage/logs
     networks:
       - lawangsewu-network
@@ -65,6 +66,7 @@ services:
     volumes:
       - ./docker/php/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
       - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
       - ./storage/logs:/var/www/storage/logs
     networks:
       - lawangsewu-network
@@ -92,6 +94,7 @@ services:
       sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
     volumes:
       - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
       - ./storage/logs:/var/www/storage/logs
     networks:
       - lawangsewu-network
@@ -150,5 +153,6 @@ volumes:
   db-data:
   redis-data:
   storage-data:
+  tvmedia-storage:   # File gambar/video yang diupload via admin panel TV Media
   caddy-data:
   caddy-config:

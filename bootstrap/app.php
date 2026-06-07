@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'permission' => \App\Http\Middleware\Permission::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'feature' => \App\Http\Middleware\CheckFeatureAccess::class,
         ]);
 
         $middleware->trustProxies(at: '*');

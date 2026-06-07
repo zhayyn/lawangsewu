@@ -35,6 +35,45 @@ class SikepSyncService
         };
     }
 
+    public function syncFromFile(\Illuminate\Http\UploadedFile $file): array
+    {
+        $extension = strtolower($file->getClientOriginalExtension());
+        $body = file_get_contents($file->getRealPath());
+
+        if ($extension === 'docx') {
+            $rows = $this->parseDocxEmployeeRows($body);
+            if (count($rows) === 0) {
+                return [
+                    'ok' => false,
+                    'inserted' => 0,
+                    'updated' => 0,
+                    'message' => 'Gagal memproses file DOCX. Pastikan file adalah format Bezetting SIKEP yang valid.',
+                ];
+            }
+            return $this->upsertEmployees($rows, 'file-upload-docx');
+        }
+
+        if (in_array($extension, ['csv', 'txt'])) {
+            $rows = $this->parseCsvRows($body);
+            if (count($rows) === 0) {
+                return [
+                    'ok' => false,
+                    'inserted' => 0,
+                    'updated' => 0,
+                    'message' => 'Gagal memproses file CSV. Pastikan data terpisah dengan koma atau titik koma.',
+                ];
+            }
+            return $this->upsertEmployees($rows, 'file-upload-csv');
+        }
+
+        return [
+            'ok' => false,
+            'inserted' => 0,
+            'updated' => 0,
+            'message' => 'Format file tidak didukung. Harap unggah file CSV atau DOCX.',
+        ];
+    }
+
     private function syncFromSikepPortal(string $username, string $password): array
     {
         $loginUrl = trim((string) config('sikep.portal_login_url', ''));
@@ -122,6 +161,67 @@ class SikepSyncService
         $contentType = strtolower((string) $export->header('Content-Type', ''));
         $disposition = strtolower((string) $export->header('Content-Disposition', ''));
         $body = (string) $export->body();
+
+        file_put_contents(sys_get_temp_dir() . '/sikep_debug.docx', $body);
+        file_put_contents(sys_get_temp_dir() . '/sikep_debug_meta.json', json_encode([
+            'content_type' => $contentType,
+            'disposition' => $disposition,
+        ]));
+
+        try {
+            $stats = Http::timeout($timeout)
+                ->withOptions(['verify' => $verifyTls, 'cookies' => $cookieJar])
+                ->get('https://sikep.mahkamahagung.go.id/informasi/statistik-detail');
+            
+            $statsHtml = (string) $stats->body();
+            file_put_contents(sys_get_temp_dir() . '/sikep_stats.html', $statsHtml);
+            
+            $domStats = new \DOMDocument();
+            @$domStats->loadHTML($statsHtml);
+            $xpathStats = new \DOMXPath($domStats);
+            
+            $statData = [];
+            
+            // Look for tab panes (e.g. w24-tab0, w24-tab1, ...)
+            $tabPanes = $xpathStats->query('//div[contains(@class, "tab-pane")]');
+            foreach ($tabPanes as $index => $pane) {
+                // Find tab title from the nav-tabs
+                $paneId = $pane->getAttribute('id');
+                $titleNode = $xpathStats->query('//ul[contains(@class, "nav-tabs")]//a[@href="#' . $paneId . '"]')->item(0);
+                $tabTitle = $titleNode ? trim($titleNode->textContent) : "Tab " . ($index + 1);
+                
+                $table = $xpathStats->query('.//table', $pane)->item(0);
+                if (!$table) continue;
+                
+                $headers = [];
+                foreach ($xpathStats->query('.//thead//th', $table) as $th) {
+                    $headers[] = trim(preg_replace('/\s+/', ' ', $th->textContent));
+                }
+                
+                $rows = [];
+                foreach ($xpathStats->query('.//tbody//tr', $table) as $tr) {
+                    $rowData = [];
+                    foreach ($xpathStats->query('.//td', $tr) as $td) {
+                        $rowData[] = trim(preg_replace('/\s+/', ' ', $td->textContent));
+                    }
+                    if (!empty($rowData)) $rows[] = $rowData;
+                }
+                
+                $statData[] = [
+                    'title' => $tabTitle,
+                    'headers' => $headers,
+                    'rows' => $rows
+                ];
+            }
+            
+            // Save parsed stats to storage for widgets to consume
+            if (!empty($statData)) {
+                \Illuminate\Support\Facades\Storage::put('sikep_stats.json', json_encode($statData, JSON_PRETTY_PRINT));
+            }
+            
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Gagal mengambil statistik SIKEP: ' . $e->getMessage());
+        }
 
         if (str_contains($contentType, 'application/octet-stream') || str_contains($disposition, '.docx')) {
             $rows = $this->parseDocxEmployeeRows($body);

@@ -8,6 +8,7 @@ import 'emoji-picker-element';
 import { useWaToast }          from '@/composables/useWaToast.js';
 import { useNetworkParticles } from '@/composables/useNetworkParticles.js';
 import { useWaConfirm }        from '@/composables/useWaConfirm.js';
+import { ensureReverb }        from '@/reverbLoader';
 
 const props = defineProps({
     appMeta:   { type: Object, default: () => ({}) },
@@ -2889,8 +2890,8 @@ const ticketTypeLabel = (type) => ({ pengaduan: '📢 Pengaduan', konsultasi: '�
 const ticketStatusClass = (s) => ({ open: 'bg-amber-100 text-amber-700', replied: 'bg-blue-100 text-blue-700', sent: 'bg-emerald-100 text-emerald-700', closed: 'bg-slate-100 text-slate-500' }[s] || 'bg-slate-100 text-slate-400');
 
 // ─── Realtime ─────────────────────────────────────────
-const connectRealtime = () => {
-    const echo = window.Echo;
+const connectRealtime = async () => {
+    const echo = await ensureReverb();
     if (!echo) { appendLog('Realtime: Reverb tidak aktif. Gunakan polling.'); return; }
     echo.private('lawangsewu.wacaraka.inbox')
         .listen('.wa-caraka.message.received', async (event) => {

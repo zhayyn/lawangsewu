@@ -1,0 +1,44 @@
+# Konfigurasi go2rtc untuk Lawangsewu CCTV Proxy
+# Server CCTV: 192.168.88.200
+
+streams:
+  # Camera 1 - Lobby Utama
+  lobby_utama:
+    - rtsp://admin:admin123@192.168.88.200:554/stream1
+
+  # Camera 2 - Lobby PTSP
+  lobby_ptsp:
+    - rtsp://admin:admin123@192.168.88.200:554/stream2
+
+  # Camera 3 - Ruang Sidang 1
+  ruang_sidang_1:
+    - rtsp://admin:admin123@192.168.88.200:554/stream3
+
+  # Camera 4 - Ruang Sidang 2
+  ruang_sidang_2:
+    - rtsp://admin:admin123@192.168.88.200:554/stream4
+
+  # Camera 5 - Area Parkir
+  area_parkir:
+    - rtsp://admin:admin123@192.168.88.200:554/stream5
+
+  # Camera 6 - Pintu Masuk
+  pintu_masuk:
+    - rtsp://admin:admin123@192.168.88.200:554/stream6
+
+log:
+  level: info
+  format: "[{time}] {level} {message}"
+
+api:
+  listen: ":1984"  # HTTP API untuk monitoring
+
+webrtc:
+  listen: ":8555"  # WebRTC signaling
+
+rtsp:
+  listen: ":554"   # RTSP server (biarkan jika tidak bentrok)
+
+# Sinks untuk recording (opsional)
+# sink:
+#   - ffmpeg:rtsp://...

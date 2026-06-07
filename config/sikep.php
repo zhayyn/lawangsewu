@@ -17,8 +17,8 @@ return [
     // Portal scraper configuration
     'portal_login_url' => env('SIKEP_PORTAL_LOGIN_URL', 'https://sikep.mahkamahagung.go.id/site/login'),
     'portal_employee_export_url' => env('SIKEP_PORTAL_EMPLOYEE_EXPORT_URL', 'https://sikep.mahkamahagung.go.id/laporan/bezetting/print'),
-    'portal_username_field' => env('SIKEP_PORTAL_USERNAME_FIELD', 'username'),
-    'portal_password_field' => env('SIKEP_PORTAL_PASSWORD_FIELD', 'password'),
+    'portal_username_field' => env('SIKEP_PORTAL_USERNAME_FIELD', 'LoginForm[username]'),
+    'portal_password_field' => env('SIKEP_PORTAL_PASSWORD_FIELD', 'LoginForm[password]'),
     'portal_csrf_field' => env('SIKEP_PORTAL_CSRF_FIELD', '_csrf'),
 
     'verify_tls' => env('SIKEP_VERIFY_TLS', true),

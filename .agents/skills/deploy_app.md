@@ -8,7 +8,26 @@ Ketika skill ini diaktifkan, @devops HARUS mengikuti prosedur deployment Lawangs
 
 ---
 
-### Phase 1: DETECT — Identifikasi Scope Perubahan
+## Phase 0: PRE-FLIGHT CHECK (Sebelum Deploy)
+
+```bash
+# 1. Status git terkini
+git status
+git log --oneline -3
+
+# 2. Pastikan working tree bersih atau known clean
+git diff --stat
+
+# 3. Cek branch yang akan di-deploy
+git branch --show-current
+
+# 4. Backup point untuk rollback
+git tag deploy-pre-$(date +%Y%m%d-%H%M%S) 2>/dev/null || true
+```
+
+---
+
+## Phase 1: DETECT — Identifikasi Scope Perubahan
 
 Sebelum deploy, identifikasi:
 
@@ -178,6 +197,125 @@ Setelah deployment, @devops WAJIB menyajikan laporan:
 
 ---
 
+## 🔙 Rollback Procedure (Jika Deploy Gagal)
+
+Jika deployment gagal atau ada regresi critical, FOLLOW THIS PROCEDURE:
+
+### Step 1: IDENTIFY FAILURE POINT
+
+```bash
+# Cek apakah masalah di frontend atau backend
+npm run build  # Apakah gagal?
+php artisan migrate --force  # Apakah migration error?
+php artisan test  # Apakah test fails?
+
+# Cek log untuk error spesifik
+tail -50 storage/logs/laravel.log
+```
+
+### Step 2: DECIDE ROLLBACK SCOPE
+
+| Scenario | Action |
+|----------|--------|
+| Frontend build failed | `npm run build` ulang, tidak perlu rollback DB |
+| Migration failed | `php artisan migrate:rollback --step=1` |
+| Test regression | Git revert, rebuild |
+| Full system crash | Restore dari backup |
+
+### Step 3: ROLLBACK CODE
+
+```bash
+# Jika perlu revert code changes
+# Option 1: Revert specific commit
+git revert <bad-commit-hash>
+
+# Option 2: Checkout ke commit terakhir yang good
+git log --oneline -10  # Cari commit good
+git checkout <good-commit-hash> -- .
+git commit -m "revert: rollback to stable state"
+
+# Option 3: Reset ke tag backup (dari Phase 0)
+git checkout deploy-pre-YYYYMMDD-HHMMSS  # Tag dari pre-flight
+```
+
+### Step 4: ROLLBACK DATABASE (Jika Perlu)
+
+```bash
+# HANYA jika migration yang menyebabkan masalah
+
+# Cek migration status
+php artisan migrate:status
+
+# Rollback migration terakhir
+php artisan migrate:rollback --step=1
+
+# Jika perlu full restore (HARUS punya backup sebelumnya)
+# mysql -u root -p lawangsewu < backup-YYYYMMDD-HHMMSS.sql
+```
+
+### Step 5: RESTART SERVICES
+
+```bash
+# Restart PHP-FPM
+sudo systemctl restart php8.3-fpm
+
+# Restart Reverb
+sudo supervisorctl restart lawangsewu-reverb
+
+# Restart Queue
+sudo supervisorctl restart lawangsewu-queue
+
+# Clear all caches
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+```
+
+### Step 6: VERIFY RECOVERY
+
+```bash
+# Framework OK?
+php artisan --version
+
+# Routes OK?
+php artisan route:list --compact | head -10
+
+# Test suite?
+php artisan test --compact 2>&1 | tail -20
+
+# Health check
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000
+```
+
+### Step 7: REPORT INCIDENT
+
+```markdown
+## 🔙 ROLLBACK REPORT
+
+### Incident
+- Time: [TIMESTAMP]
+- Trigger: [What caused the issue]
+- Impact: [What was affected]
+
+### Actions Taken
+- [x] Identified failure point: [description]
+- [x] Rolled back code to: [commit/tag]
+- [x] Rolled back DB: [Yes/No - reason]
+- [x] Restarted services
+- [x] Verified recovery
+
+### Current Status
+- Framework: [version] - OK
+- Test Suite: [passed/failed] - [count]
+- System: [operational/degraded]
+
+### Next Steps
+1. [What to do next]
+2. [Prevention measures]
+```
+
+---
+
 ## Constraint Assertions
 
 - ❌ **DILARANG** menjalankan `migrate:fresh` atau `migrate:reset` di production
@@ -187,5 +325,6 @@ Setelah deployment, @devops WAJIB menyajikan laporan:
 - ✅ **WAJIB** clear cache sebelum dan sesudah deployment
 - ✅ **WAJIB** report URL akses setelah deployment selesai
 - ✅ **WAJIB** restart supervisor: `lawangsewu-reverb` dan `lawangsewu-queue`
+- ✅ **WAJIB** buat rollback tag di Phase 0 sebelum deploy
 
 <!-- developed by dbprakom™ -->

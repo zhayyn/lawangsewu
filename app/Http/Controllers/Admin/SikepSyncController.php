@@ -18,17 +18,22 @@ class SikepSyncController extends Controller
         return Inertia::render('Admin/SikepSync', [
             'lastSynced' => $lastSynced,
             'totalEmployees' => $totalEmployees,
+            'appMeta' => \App\Support\LawangsewuPortal::appMeta(),
+            'navGroups' => \App\Support\LawangsewuPortal::navGroups(),
         ]);
     }
 
     public function sync(Request $request, SikepSyncService $syncService)
     {
         $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string',
+            'file' => 'required|file|mimes:csv,txt,docx,doc|max:10240',
+        ], [
+            'file.required' => 'Silakan pilih file untuk diunggah.',
+            'file.mimes' => 'Format file harus berupa CSV atau DOCX.',
+            'file.max' => 'Ukuran file maksimal adalah 10MB.',
         ]);
 
-        $result = $syncService->sync('sikep-portal', $request->username, $request->password);
+        $result = $syncService->syncFromFile($request->file('file'));
 
         if ($result['ok']) {
             return back()->with('success', $result['message'] . '. Inserted: ' . $result['inserted'] . ', Updated: ' . $result['updated']);

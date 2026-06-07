@@ -92,6 +92,22 @@ Route::match(['get', 'post'], '/statistik-data', [WidgetCompatController::class,
 Route::get('/tvmedia', [TvMediaController::class, 'index'])->name('lawangsewu.tvmedia');
 Route::get('/tvmedia/config', [TvMediaController::class, 'config'])->name('lawangsewu.tvmedia.config');
 
+// ── TV Media Admin Panel — dilindungi autentikasi superadmin ─────────────────
+Route::get('/tvmedia/prakom', [TvMediaController::class, 'adminPanel'])
+    ->middleware(['auth', 'verified', 'active', 'superadmin'])
+    ->name('lawangsewu.tvmedia.prakom');
+
+// ── TV Media Upload & Media Library — superadmin only ────────────────────────
+Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function () {
+    Route::post('/tvmedia/prakom/upload', [TvMediaController::class, 'upload'])
+        ->name('lawangsewu.tvmedia.upload');
+    Route::get('/tvmedia/prakom/uploads', [TvMediaController::class, 'listUploads'])
+        ->name('lawangsewu.tvmedia.uploads');
+    Route::delete('/tvmedia/prakom/uploads/{filename}', [TvMediaController::class, 'deleteUpload'])
+        ->where('filename', '[^/]+')
+        ->name('lawangsewu.tvmedia.upload.delete');
+});
+
 Route::prefix('lawangsewu')->group(function () {
     Route::get('/pengumuman-peradilan', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan');
     Route::get('/pengumuman-peradilan-embed', [WidgetCompatController::class, 'phpPublic'])->defaults('page', 'pengumuman-peradilan-embed');

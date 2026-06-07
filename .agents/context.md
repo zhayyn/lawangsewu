@@ -2,7 +2,7 @@
 
 > Dokumen ini adalah sumber kebenaran untuk semua agent SenopaTEA.
 > Setiap agent WAJIB membaca file ini sebelum melakukan aksi apapun.
-> **Terakhir diperbarui:** 2026-05-25
+> **Terakhir diperbarui:** 2026-05-30
 
 ---
 
@@ -213,6 +213,76 @@ Middleware stack: `auth → verified → active → role:xxx`
 - Naming: `test_[deskripsi_behavior]` (snake_case)
 - Wajib pakai `RefreshDatabase` trait
 
+### Test Patterns
+
+#### When to use `mock()` vs `factory()`
+```php
+// Gunakan factory() untuk test yang butuh database real
+public function test_user_can_view_queue()
+{
+    $user = User::factory()->create(['role' => 'operator']);
+    $ticket = QueueTicket::factory()->create(['user_id' => $user->id]);
+
+    $response = $this->actingAs($user)->get('/queue');
+
+    $response->assertStatus(200);
+}
+
+// Gunakan mock() untuk test external service / library
+public function test_http_client_calls_correct_endpoint()
+{
+    Http::fake([
+        '192.168.88.44:8790/*' => Http::response(['ok' => true], 200),
+    ]);
+
+    $client = new WaCarakaHttpClient();
+    $result = $client->get('/health');
+
+    $this->assertTrue($result['ok']);
+}
+```
+
+#### When to use `assertDatabaseHas()` vs `assertJson()`
+```php
+// assertDatabaseHas() untuk verify data tersimpan di DB
+public function test_message_saved_to_database()
+{
+    $this->actingAs($user)->post('/wacaraka/send', ['to' => '628123', 'text' => 'test']);
+
+    $this->assertDatabaseHas('wa_caraka_messages', [
+        'remote_number' => '628123',
+        'message_text' => 'test',
+    ]);
+}
+
+// assertJson() untuk verify API response format
+public function test_api_returns_correct_json_structure()
+{
+    $response = $this->getJson('/api/stats');
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'total', 'sent', 'failed', 'today'
+        ]);
+}
+```
+
+#### Naming Convention untuk Happy Path vs Error Path
+```php
+public function test_queue_ticket_created_successfully()     // Happy path
+public function test_queue_ticket_fails_when_counter_full()  // Error path
+public function test_unauthorized_user_cannot_create_ticket() // Auth error
+public function test_duplicate_ticket_rejected()             // Edge case
+```
+
+#### Coverage Target
+| Layer | Minimum Coverage |
+|-------|------------------|
+| Controller | 100% (semua method punya test) |
+| Service | 80% (business logic critical) |
+| Model | 60% (relasi & accessor) |
+| Integration | Semua route dengan middleware |
+
 ### Test Groups (Struktur Aktual)
 ```
 tests/Feature/
@@ -273,8 +343,11 @@ tests/Feature/
 
 | Service | Tanggung Jawab |
 |---|---|
-| `WaCarakaService` | Core gateway WA: send, receive, media, sync kontak |
-| `WaCarakaConversationService` | Manajemen percakapan & inbox operator |
+| `WaCarakaService` | Facade/coordinator untuk WA gateway (delegasi ke sub-services) |
+| `WaCaraka/WaCarakaHttpClient` | HTTP client untuk komunikasi dengan WA runtime |
+| `WaCaraka/WaCarakaMessageService` | Message sending, receiving, queueing & webhook handling |
+| `WaCaraka/WaCarakaConversationService` | Conversation management dan inbox sync |
+| `WaCaraka/WaCarakaStatsService` | Statistics dan metrics computation |
 | `WaCarakaChatbotService` | Logika chatbot & menu interaktif |
 | `WaCarakaTicketService` | Lifecycle tiket pengaduan |
 | `SippService` | Koneksi read-only ke DB SIPP (SIPP Hub) |
@@ -295,6 +368,8 @@ tests/Feature/
 | `PrometheusMetricsService` | Eksport metrik ke Prometheus |
 | `RateLimitingService` | Rate limiting per IP/user |
 | `Omnichannel/ChatOrchestrator` | Orkestrasi live chat omnichannel |
+
+> **Catatan (2026-05-30):** WaCarakaService telah di-refactor dari monolithic (2373 lines) menjadi facade pattern dengan 4 sub-services di `app/Services/WaCaraka/`. Use sub-services directly for new code; WaCarakaService facade maintained for backward compatibility.
 
 ---
 
@@ -357,7 +432,8 @@ curl -I https://lawangsewu.pa-semarang.go.id
 | `app/Support/LawangsewuPortal.php` | Helper portal utilities |
 | `app/Core/Traits/HasRolesAndPermissions.php` | RBAC logic |
 | `app/Http/Controllers/Auth/GoogleController.php` | SSO Google flow |
-| `app/Services/WaCarakaService.php` | Core WA gateway (95KB — file besar) |
+| `app/Services/WaCarakaService.php` | Facade WA gateway (backward compat) |
+| `app/Services/WaCaraka/` | Sub-services: HttpClient, MessageService, ConversationService, StatsService |
 | `app/Services/SystemMonitorService.php` | System monitoring (19KB) |
 | `app/Services/SippService.php` | Koneksi SIPP DB |
 

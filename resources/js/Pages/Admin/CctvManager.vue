@@ -14,6 +14,10 @@ const createForm = useForm({
     name: '',
     zone: '',
     iframe_src: '',
+    primary_sd_src: '',
+    primary_hd_src: '',
+    fallback_src: '',
+    stream_provider: 'custom',
     sort_order: 0,
     is_active: true,
     is_featured: false,
@@ -32,6 +36,10 @@ const cameraForms = reactive(
             name: camera.name,
             zone: camera.zone ?? '',
             iframe_src: camera.iframe_src,
+            primary_sd_src: camera.primary_sd_src ?? '',
+            primary_hd_src: camera.primary_hd_src ?? '',
+            fallback_src: camera.fallback_src ?? '',
+            stream_provider: camera.stream_provider ?? 'custom',
             sort_order: camera.sort_order ?? 0,
             is_active: Boolean(camera.is_active),
             is_featured: Boolean(camera.is_featured),
@@ -53,6 +61,7 @@ const submitCreate = () => {
                 createForm.reset();
                 createForm.is_active = true;
                 createForm.is_featured = false;
+                createForm.stream_provider = 'custom';
                 createForm.sort_order = 0;
             },
             preserveScroll: true,
@@ -103,7 +112,7 @@ const saveCamera = (cameraId) => {
                                 Kelola Tampilan CCTV
                             </h1>
                             <p class="mt-2 max-w-3xl text-sm text-[var(--text-3)]">
-                                Ubah nama kamera, alamat URL sumber, zona, urutan tampil, dan status feed tanpa menyentuh database manual.
+                                Ubah nama kamera, sumber SD/HD, fallback ACO Badilag, zona, urutan tampil, dan status feed tanpa menyentuh database manual.
                             </p>
                         </div>
                     </div>
@@ -166,8 +175,24 @@ const saveCamera = (cameraId) => {
                         </label>
                     </div>
                     <div class="space-y-2 lg:col-span-5">
-                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">URL Sumber CCTV / Embed</label>
-                        <input v-model="createForm.iframe_src" type="url" class="input-surface w-full" placeholder="https://..." required>
+                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">URL Legacy / Fallback ACO</label>
+                        <input v-model="createForm.iframe_src" type="url" class="input-surface w-full" placeholder="https://pasemarang.cctvbadilag.my.id/..." required>
+                    </div>
+                    <div class="space-y-2 lg:col-span-3">
+                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Primary SD Grid</label>
+                        <input v-model="createForm.primary_sd_src" type="url" class="input-surface w-full" placeholder="https://lawangsewu.pa-semarang.go.id/cctv/nama-sd/index.m3u8">
+                    </div>
+                    <div class="space-y-2 lg:col-span-3">
+                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Primary HD Detail</label>
+                        <input v-model="createForm.primary_hd_src" type="url" class="input-surface w-full" placeholder="https://lawangsewu.pa-semarang.go.id/cctv/nama-hd/index.m3u8">
+                    </div>
+                    <div class="space-y-2 lg:col-span-3">
+                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Fallback Override</label>
+                        <input v-model="createForm.fallback_src" type="url" class="input-surface w-full" placeholder="Kosongkan untuk memakai URL legacy">
+                    </div>
+                    <div class="space-y-2 lg:col-span-2">
+                        <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Provider</label>
+                        <input v-model="createForm.stream_provider" type="text" class="input-surface w-full" placeholder="mediamtx-relay">
                     </div>
                     <div class="flex items-end">
                         <button type="submit" class="github-button !w-full !bg-cyan-600 hover:!bg-cyan-700" :disabled="createForm.processing">
@@ -246,12 +271,12 @@ const saveCamera = (cameraId) => {
                                 <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                                 <span class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Live Preview</span>
                                 <span class="ml-auto max-w-[60%] truncate text-[10px] text-slate-500">
-                                    {{ cameraForms[camera.id].iframe_src }}
+                                    {{ cameraForms[camera.id].primary_sd_src || cameraForms[camera.id].iframe_src }}
                                 </span>
                             </div>
                             <div class="relative aspect-video w-full">
                                 <iframe
-                                    :src="cameraForms[camera.id].iframe_src"
+                                    :src="cameraForms[camera.id].primary_sd_src || cameraForms[camera.id].iframe_src"
                                     :title="`Preview: ${cameraForms[camera.id].name}`"
                                     class="h-full w-full border-0"
                                     allow="autoplay; fullscreen"
@@ -300,10 +325,38 @@ const saveCamera = (cameraId) => {
                             </p>
                         </div>
                         <div class="space-y-2 lg:col-span-6">
-                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">URL Sumber CCTV / Embed</label>
+                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">URL Legacy / Fallback ACO</label>
                             <input v-model="cameraForms[camera.id].iframe_src" type="url" class="input-surface w-full" required>
                             <p v-if="cameraForms[camera.id].errors.iframe_src" class="mt-1 text-xs font-bold text-rose-400">
                                 {{ cameraForms[camera.id].errors.iframe_src }}
+                            </p>
+                        </div>
+                        <div class="space-y-2 lg:col-span-3">
+                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Primary SD Grid</label>
+                            <input v-model="cameraForms[camera.id].primary_sd_src" type="url" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.primary_sd_src" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.primary_sd_src }}
+                            </p>
+                        </div>
+                        <div class="space-y-2 lg:col-span-3">
+                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Primary HD Detail</label>
+                            <input v-model="cameraForms[camera.id].primary_hd_src" type="url" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.primary_hd_src" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.primary_hd_src }}
+                            </p>
+                        </div>
+                        <div class="space-y-2 lg:col-span-4">
+                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Fallback Override</label>
+                            <input v-model="cameraForms[camera.id].fallback_src" type="url" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.fallback_src" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.fallback_src }}
+                            </p>
+                        </div>
+                        <div class="space-y-2 lg:col-span-2">
+                            <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Provider</label>
+                            <input v-model="cameraForms[camera.id].stream_provider" type="text" class="input-surface w-full">
+                            <p v-if="cameraForms[camera.id].errors.stream_provider" class="mt-1 text-xs font-bold text-rose-400">
+                                {{ cameraForms[camera.id].errors.stream_provider }}
                             </p>
                         </div>
                     </div>

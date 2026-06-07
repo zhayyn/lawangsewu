@@ -1,6 +1,7 @@
 <script setup>
 import ChatBubble from '@/Components/lawangsewu/ChatBubble.vue';
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
+import { ensureReverb } from '@/reverbLoader';
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -170,8 +171,8 @@ const handleVisibilityChange = () => {
     schedulePolling();
 };
 
-const connectEcho = () => {
-    const echo = window.Echo;
+const connectEcho = async () => {
+    const echo = await ensureReverb();
 
     if (!echo) {
         return;

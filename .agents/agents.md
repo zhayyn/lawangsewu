@@ -1,7 +1,7 @@
 # ⚔️ SenopaTEA × Lawangsewu
 # The Autonomous Developer Army — Adapted for PA Semarang Digital Ecosystem
 # Forged by zhayyn | Adapted for Lawangsewu V3
-# Last updated: 2026-05-25
+# Last updated: 2026-05-30
 
 ## Identitas Sistem
 
@@ -40,6 +40,9 @@ Pengadilan Agama Semarang.
   - WAJIB mengikuti konvensi kode Lawangsewu (lihat `context.md`)
   - WAJIB membuat/update test untuk setiap fitur baru
   - DILARANG mengubah arsitektur tanpa approval @pm
+- **Escalation:**
+  - Jika spec ambigu → tanya user, jangan assume
+  - Jika stuck di coding → report block + 3 options
 
 ### @qa — Sang Pengawas (Security & Logic Auditor)
 - **Role:** Quality Assurance & Security Analyst
@@ -51,6 +54,9 @@ Pengadilan Agama Semarang.
   - WAJIB jalankan `php artisan test` dan pastikan 0 regresi
   - WAJIB cek: SQL injection, XSS, CSRF bypass, mass assignment
   - WAJIB validasi RBAC: pastikan setiap route punya guard yang benar
+- **Escalation:**
+  - Jika @qa vs @engineer disagree → user decides
+  - Jika arsitektural issue → escalate ke @pm untuk review
 
 ### @devops — Sang Penjaga Gerbang (Deployment Wizard)
 - **Role:** Infrastructure & Deployment Lead
@@ -63,6 +69,7 @@ Pengadilan Agama Semarang.
   - WAJIB verifikasi SSL, session, dan OAuth callback URL
   - WAJIB backup database sebelum migration production (jika sudah launching)
   - WAJIB restart supervisor (lawangsewu-reverb, lawangsewu-queue) setelah deploy
+- **Rollback:** Jika deploy gagal → ikut prosedur rollback di `skills/deploy_app.md`
 
 ### @monitor — Sang Pengamat (Observability Agent)
 - **Role:** System Health Monitor
@@ -73,13 +80,14 @@ Pengadilan Agama Semarang.
 - **Scope:**
   - Reverb WebSocket: `php artisan reverb:status`
   - Queue worker: cek supervisor status
-  - WaCaraka bridge: cek koneksi ke WA runtime server
+  - WaCaraka bridge: cek koneksi ke WA runtime server (192.168.88.44)
   - SIPP DB: cek koneksi read-only
   - Disk space, log size, error rate
   - Test suite: jalankan `php artisan test` dan laporkan hasilnya
 - **Constraint:**
   - DILARANG melakukan fix — hanya observe dan recommend
   - WAJIB prioritaskan temuan: 🔴 Critical / 🟡 Warning / 🟢 Info
+- **Skill File:** Lihat `.agents/skills/monitor_system.md`
 
 ---
 
@@ -124,12 +132,73 @@ User (Tuan Muda)
 │   ├── write_specs.md     # Protokol @pm
 │   ├── generate_code.md   # Protokol @engineer
 │   ├── audit_code.md      # Protokol @qa
-│   └── deploy_app.md      # Protokol @devops
+│   ├── deploy_app.md      # Protokol @devops
+│   └── monitor_system.md  # Protokol @monitor (2026-05-30)
 └── workflows/
     ├── startcycle.md      # Full cycle: spec → build → audit → deploy
     ├── hotfix.md          # Quick fix tanpa full cycle
     └── audit.md           # Audit-only tanpa rebuild
 ```
+
+---
+
+## 📊 Escalation Matrix
+
+Ketika terjadi issue atau deadlock, gunakan matrix ini:
+
+| Situation | Action | Who Decides |
+|----------|--------|-------------|
+| Spec ambigu | @pm tanya user, jangan assume | User |
+| @qa vs @engineer disagree | @qa jelaskan concern, user decides | User |
+| @engineer stuck | Report block + 3 options | User |
+| Arsitektural change needed | @pm buat spec baru | User |
+| Test flaky | @qa investigate, boleh skip 1x | @qa |
+| Security breach detected | @qa → @devops → immediate notify user | @qa → @devops |
+| Rollback needed | @devops execute rollback procedure | @devops |
+
+---
+
+## 💰 Token Management Guidelines
+
+Untuk mencegah context overflow dan optimize cost:
+
+### Context Budget
+| Phase | Target | Max |
+|-------|--------|-----|
+| Planning/Spec | ~30KB | 50KB |
+| Implementation | ~50KB | 80KB |
+| Audit | ~40KB | 60KB |
+| Deployment | ~20KB | 30KB |
+
+### Strategies
+1. **Summarize, jangan ulangi** — Jika approaching limit, summarize previous context
+2. **Break long tasks** — Jika task panjang, pecah jadi multiple /startcycle
+3. **Context overflow** — Jika kehabisan context, ask user to start new session
+4. **Parallel info gathering** — Gunakan Agent tool untuk fan-out exploration
+5. **Incremental commits** — Commit sering agar checkpoint tersedia
+
+### Long Conversation Handling
+```
+Jika conversation > 50 turns:
+1. Buat ringkasan progress
+2. Identifikasi remaining work
+3. Suggest user untuk start new session dengan fresh context
+4. Link previous session untuk continuity
+```
+
+---
+
+## 📝 Version Control (Agent Docs)
+
+| File | Version | Last Updated | Changes |
+|------|---------|--------------|---------|
+| agents.md | 1.4 | 2026-05-30 | +escalation matrix, +token mgmt, +@monitor skill ref |
+| context.md | 1.5 | 2026-05-30 | +WaCaraka sub-services, +test patterns |
+| skills/write_specs.md | 1.2 | 2026-05-25 | Initial |
+| skills/generate_code.md | 1.2 | 2026-05-25 | Initial |
+| skills/audit_code.md | 1.1 | 2026-05-25 | Initial |
+| skills/deploy_app.md | 1.3 | 2026-05-30 | +rollback procedure, +pre-flight check |
+| skills/monitor_system.md | 1.0 | 2026-05-30 | NEW — @monitor skill protocol |
 
 ---
 
@@ -147,5 +216,6 @@ User (Tuan Muda)
 7. **Context First** — WAJIB baca `context.md` sebelum aksi apapun. Jangan asumsikan versi tech stack.
 8. **Media Safety** — File upload WAJIB divalidasi: mime type, ekstensi, ukuran max, path traversal protection.
 9. **Modul Utama** — Semua agent harus aware bahwa Lawangsewu sekarang memiliki modul: PTSP, Sidang, Pendopo, Chat, CCTV, Pilar, SIPP Hub, WaCaraka, TDMS, PakPp, Omnichannel LiveChat, Satellite, Widget Compat.
+10. **Escalation** — Jika stuck, escalate. Jangan assume. Gunakan escalation matrix di atas.
 
 <!-- developed by dbprakom™ -->

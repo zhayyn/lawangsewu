@@ -1,0 +1,1364 @@
+[
+    {
+        "kecamatan": "Banyumanik",
+        "id_kecamatan": "Banyumanik",
+        "kelurahan": [
+            {
+                "nama": "Banyumanik",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Banyumanik, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gedawang",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Gedawang, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jabungan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Jabungan, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Ngesrep",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Ngesrep, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Padangsari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Padangsari, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pedalangan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pedalangan, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pudakpayung",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pudakpayung, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Srondol Kulon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Srondol Kulon, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Srondol Wetan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Srondol Wetan, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sumurboto",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sumurboto, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tinjomoyo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tinjomoyo, Kecamatan Banyumanik, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Candisari",
+        "id_kecamatan": "Candisari",
+        "kelurahan": [
+            {
+                "nama": "Candi",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Candi, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jatingaleh",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Jatingaleh, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jomblang",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Jomblang, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kaliwiru",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kaliwiru, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karanganyar Gunung",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karanganyar Gunung, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tegalsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tegalsari, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Wonotingal",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Wonotingal, Kecamatan Candisari, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Gajahmungkur",
+        "id_kecamatan": "Gajahmungkur",
+        "kelurahan": [
+            {
+                "nama": "Bendan Duwur",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bendan Duwur, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bendan Ngisor",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bendan Ngisor, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bendungan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bendungan, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gajahmungkur",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Gajahmungkur, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangrejo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karangrejo, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Lempongsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Lempongsari, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Petompon",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Petompon, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sampangan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Sampangan, Kecamatan Gajahmungkur, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Gayamsari",
+        "id_kecamatan": "Gayamsari",
+        "kelurahan": [
+            {
+                "nama": "Gayamsari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Gayamsari, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kaligawe",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kaligawe, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pandean Lamper",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pandean Lamper, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sambirejo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sambirejo, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sawah Besar",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sawah Besar, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Siwalan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Siwalan, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tambakrejo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tambakrejo, Kecamatan Gayamsari, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Genuk",
+        "id_kecamatan": "Genuk",
+        "kelurahan": [
+            {
+                "nama": "Bangetayu Kulon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Bangetayu Kulon, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bangetayu Wetan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Bangetayu Wetan, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Banjardowo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Banjardowo, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gebangsari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Gebangsari, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Genuksari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Genuksari, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangroto",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Karangroto, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kudu",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kudu, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Muktiharjo Lor",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Muktiharjo Lor, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Penggaron Lor",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Penggaron Lor, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sembungharjo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sembungharjo, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Terboyo Kulon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Terboyo Kulon, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Terboyo Wetan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Terboyo Wetan, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Trimulyo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Trimulyo, Kecamatan Genuk, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Gunungpati",
+        "id_kecamatan": "Gunungpati",
+        "kelurahan": [
+            {
+                "nama": "Cepoko",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Cepoko, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gunungpati",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Gunungpati, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jatirejo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Jatirejo, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kalisegoro",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kalisegoro, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kandri",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kandri, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mangunsari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Mangunsari, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Ngijo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Ngijo, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Nongkosawit",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Nongkosawit, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pakintelan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pakintelan, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Patemon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Patemon, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Plalangan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Plalangan, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pongangan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pongangan, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sadeng",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sadeng, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sekaran",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sekaran, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sukorejo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sukorejo, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sumur Rejo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sumur Rejo, Kecamatan Gunungpati, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Mass Media",
+        "id_kecamatan": "Mass Media",
+        "kelurahan": [
+            {
+                "nama": "Koran",
+                "biaya_raw": 600000,
+                "satker_code": "401219",
+                "alamat": "Koran, Kecamatan Mass Media, Kab. Kulonprogo DI Yogyakarta"
+            },
+            {
+                "nama": "Mass Media",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Mass Media, Kecamatan Mass Media, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Radio",
+                "biaya_raw": 125000,
+                "satker_code": "401219",
+                "alamat": "Radio, Kecamatan Mass Media, Kab. Kulonprogo DI Yogyakarta"
+            },
+            {
+                "nama": "Radio Republik Indonesia",
+                "biaya_raw": 200000,
+                "satker_code": "400622",
+                "alamat": "Radio Republik Indonesia, Kecamatan Mass Media, Kota Jakarta Utara DKI Jakarta"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Mijen",
+        "id_kecamatan": "Mijen",
+        "kelurahan": [
+            {
+                "nama": "Bubakan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bubakan, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Cangkiran",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Cangkiran, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Desa Bakung",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Bakung, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Bantengmati",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Bantengmati, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Bremi",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Bremi, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Gempolsongo",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Gempolsongo, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Geneng",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Geneng, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Jleper",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Jleper, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Mijen",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Mijen, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Mlaten",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Mlaten, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Ngegot",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Ngegot, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Ngelokulon",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Ngelokulon, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Ngelowetan",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Ngelowetan, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Pasir",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Pasir, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Pecuk",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Pecuk, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Rejosari",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Rejosari, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Desa Tanggul",
+                "biaya_raw": 120000,
+                "satker_code": "400942",
+                "alamat": "Desa Tanggul, Kecamatan Mijen, Kab. Demak Jawa Tengah"
+            },
+            {
+                "nama": "Jatibarang",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Jatibarang, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jatisari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Jatisari, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangmalang",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karangmalang, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kedungpane",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kedungpane, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mijen",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Mijen, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Ngadirgo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Ngadirgo, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pesantren",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pesantren, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Polaman",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Polaman, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Purwosari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Purwosari, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tambangan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tambangan, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Wonolopo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Wonolopo, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Wonoplumbon",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Wonoplumbon, Kecamatan Mijen, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Ngaliyan",
+        "id_kecamatan": "Ngaliyan",
+        "kelurahan": [
+            {
+                "nama": "Bambankerep",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Bambankerep, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Beringin",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Beringin, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gondoriyo",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Gondoriyo, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kalipancur",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Kalipancur, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Ngaliyan",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Ngaliyan, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Podorejo",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Podorejo, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Purwoyoso",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Purwoyoso, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tambakaji",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Tambakaji, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Wonosari",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Wonosari, Kecamatan Ngaliyan, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Pedurungan",
+        "id_kecamatan": "Pedurungan",
+        "kelurahan": [
+            {
+                "nama": "Gemah",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Gemah, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kalicari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kalicari, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Muktiharjo Kidul",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Muktiharjo Kidul, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Palebon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Palebon, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pedurungan Kidul",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pedurungan Kidul, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pedurungan Lor",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pedurungan Lor, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pedurungan Tengah",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Pedurungan Tengah, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Penggaron Kidul",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Penggaron Kidul, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Plamongansari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Plamongansari, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tlogomulyo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tlogomulyo, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tlogosari Kulon",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tlogosari Kulon, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tlogosari Wetan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tlogosari Wetan, Kecamatan Pedurungan, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Semarang Barat",
+        "id_kecamatan": "Semarang Barat",
+        "kelurahan": [
+            {
+                "nama": "Bojongsalaman",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bojongsalaman, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bongsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bongsari, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Cabean",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Cabean, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gisikdrono",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Gisikdrono, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kalibanteng Kidul",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kalibanteng Kidul, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kalibanteng Kulon",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kalibanteng Kulon, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangayu",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karangayu, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kembangarum",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kembangarum, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Krapyak",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Krapyak, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Krobokan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Krobokan, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Manyaran",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Manyaran, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Ngemplak Simongan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Ngemplak Simongan, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Salaman Mloyo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Salaman Mloyo, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tambakharjo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tambakharjo, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tawangmas",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tawangmas, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tawangsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tawangsari, Kecamatan Semarang Barat, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Semarang Selatan",
+        "id_kecamatan": "Semarang Selatan",
+        "kelurahan": [
+            {
+                "nama": "Barusari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Barusari, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bulustalan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bulustalan, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Lamper Kidul",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Lamper Kidul, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Lamper Lor",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Lamper Lor, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Lamper Tengah",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Lamper Tengah, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mugassari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Mugassari, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Peterongan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Peterongan, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pleburan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pleburan, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Randusari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Randusari, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Wonodri",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Wonodri, Kecamatan Semarang Selatan, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Semarang Tengah",
+        "id_kecamatan": "Semarang Tengah",
+        "kelurahan": [
+            {
+                "nama": "Bangunharjo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bangunharjo, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Brumbungan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Brumbungan, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Gabahan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Gabahan, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jagalan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Jagalan, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karang Kidul",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karang Kidul, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kauman",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kauman, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kembangsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kembangsari, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kranggan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kranggan, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Miroto",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Miroto, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pandansari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pandansari, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pekunden",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pekunden, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pendrikan Kidul",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pendrikan Kidul, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Pendrikan Lor",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Pendrikan Lor, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Purwodinatan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Purwodinatan, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sekayu",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Sekayu, Kecamatan Semarang Tengah, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Semarang Timur",
+        "id_kecamatan": "Semarang Timur",
+        "kelurahan": [
+            {
+                "nama": "Bugangan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bugangan, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangtempel",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karangtempel, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karangturi",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Karangturi, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kebonagung",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kebonagung, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kemijen",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kemijen, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mlatibaru",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Mlatibaru, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mlatiharjo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Mlatiharjo, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Rejomulyo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Rejomulyo, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Rejosari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Rejosari, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sarirejo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Sarirejo, Kecamatan Semarang Timur, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Semarang Utara",
+        "id_kecamatan": "Semarang Utara",
+        "kelurahan": [
+            {
+                "nama": "Bandarharjo",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bandarharjo, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Bulu Lor",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Bulu Lor, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Dadapsari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Dadapsari, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kuningan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Kuningan, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Panggung Kidul",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Panggung Kidul, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Panggung Lor",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Panggung Lor, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Plombokan",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Plombokan, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Purwosari",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Purwosari, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tanjungmas",
+                "biaya_raw": 160000,
+                "satker_code": "400911",
+                "alamat": "Tanjungmas, Kecamatan Semarang Utara, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Tembalang",
+        "id_kecamatan": "Tembalang",
+        "kelurahan": [
+            {
+                "nama": "Bulusan",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Bulusan, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Jangli",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Jangli, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kedungmundu",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kedungmundu, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Kramas",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Kramas, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mangunharjo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Mangunharjo, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Meteseh",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Meteseh, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Rowosari",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Rowosari, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sambiroto",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sambiroto, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sendangguwo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sendangguwo, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Sendangmulyo",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Sendangmulyo, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tandang",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tandang, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tembalang",
+                "biaya_raw": 180000,
+                "satker_code": "400911",
+                "alamat": "Tembalang, Kecamatan Tembalang, Kota Semarang Jawa Tengah"
+            }
+        ]
+    },
+    {
+        "kecamatan": "Tugu",
+        "id_kecamatan": "Tugu",
+        "kelurahan": [
+            {
+                "nama": "Desa Banaran",
+                "biaya_raw": 100000,
+                "satker_code": "401390",
+                "alamat": "Desa Banaran, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Dermosari",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Dermosari, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Duren",
+                "biaya_raw": 175000,
+                "satker_code": "401390",
+                "alamat": "Desa Duren, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Gading",
+                "biaya_raw": 175000,
+                "satker_code": "401390",
+                "alamat": "Desa Gading, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Gondang",
+                "biaya_raw": 100000,
+                "satker_code": "401390",
+                "alamat": "Desa Gondang, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Jambu",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Jambu, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Ngepeh",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Ngepeh, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Nglinggis",
+                "biaya_raw": 150000,
+                "satker_code": "401390",
+                "alamat": "Desa Nglinggis, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Nglongsor",
+                "biaya_raw": 100000,
+                "satker_code": "401390",
+                "alamat": "Desa Nglongsor, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Prambon",
+                "biaya_raw": 150000,
+                "satker_code": "401390",
+                "alamat": "Desa Prambon, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Pucanganak",
+                "biaya_raw": 150000,
+                "satker_code": "401390",
+                "alamat": "Desa Pucanganak, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Sukorejo",
+                "biaya_raw": 100000,
+                "satker_code": "401390",
+                "alamat": "Desa Sukorejo, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Tegaren",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Tegaren, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Tumpuk",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Tumpuk, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Desa Winong",
+                "biaya_raw": 125000,
+                "satker_code": "401390",
+                "alamat": "Desa Winong, Kecamatan Tugu, Kab. Trenggalek Jawa Timur"
+            },
+            {
+                "nama": "Jerakah",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Jerakah, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Karanganyar",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Karanganyar, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mangkang Kulon",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Mangkang Kulon, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mangkang Wetan",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Mangkang Wetan, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Mangunharjo",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Mangunharjo, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Randu Garut",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Randu Garut, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            },
+            {
+                "nama": "Tugurejo",
+                "biaya_raw": 140000,
+                "satker_code": "400911",
+                "alamat": "Tugurejo, Kecamatan Tugu, Kota Semarang Jawa Tengah"
+            }
+        ]
+    }
+]

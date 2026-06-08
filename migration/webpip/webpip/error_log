@@ -1,0 +1,273 @@
+[24-Mar-2026 02:26:09 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[24-Mar-2026 05:25:46 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[26-Mar-2026 05:45:49 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[26-Mar-2026 07:46:00 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[26-Mar-2026 16:04:17 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[26-Mar-2026 16:04:32 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[26-Mar-2026 16:04:32 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[27-Mar-2026 07:01:09 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[28-Mar-2026 06:25:49 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[31-Mar-2026 09:44:18 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[31-Mar-2026 09:44:36 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[31-Mar-2026 09:44:36 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[02-Apr-2026 06:00:45 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[06-Apr-2026 00:02:13 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[08-Apr-2026 00:02:15 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[10-Apr-2026 16:40:09 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[10-Apr-2026 16:40:32 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[10-Apr-2026 16:40:32 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[10-Apr-2026 16:40:35 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[10-Apr-2026 16:40:35 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[10-Apr-2026 16:40:52 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[10-Apr-2026 16:40:52 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[13-Apr-2026 22:36:43 Asia/Jakarta] PHP Notice:  Undefined index: aksi in /home/paseman/public_html/webpip/_kunci.php on line 7
+[13-Apr-2026 22:36:43 Asia/Jakarta] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/paseman/public_html/webpip/_kunci.php:200) in /home/paseman/public_html/webpip/_kunci.php on line 305
+[14-Apr-2026 15:04:06 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[14-Apr-2026 15:04:38 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[14-Apr-2026 15:04:38 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[14-Apr-2026 15:04:43 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[14-Apr-2026 15:04:43 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[14-Apr-2026 15:04:45 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[14-Apr-2026 15:04:45 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[14-Apr-2026 15:05:05 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[14-Apr-2026 15:05:05 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[15-Apr-2026 02:10:54 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[15-Apr-2026 02:10:55 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[16-Apr-2026 04:26:06 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[19-Apr-2026 01:25:53 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[20-Apr-2026 16:04:43 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[20-Apr-2026 16:04:46 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[20-Apr-2026 16:05:05 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[20-Apr-2026 16:05:05 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[20-Apr-2026 16:05:24 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[20-Apr-2026 16:05:24 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[20-Apr-2026 16:05:39 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[20-Apr-2026 16:05:39 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[22-Apr-2026 05:01:09 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[26-Apr-2026 03:11:12 Asia/Jakarta] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] Can't connect to local server through socket '/var/lib/mysql/mysql.sock' (2) in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_sys_koneksi.php(19): PDO->__construct('mysql:host=loca...', 'paseman_paseman', 'nDZkbUBK6FeA96')
+#1 /home/paseman/public_html/webpip/pipwebview3.php(101): Database->__construct()
+#2 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[30-Apr-2026 14:03:25 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[30-Apr-2026 14:03:43 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[30-Apr-2026 14:03:43 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[06-May-2026 15:42:34 Asia/Jakarta] PHP Notice:  Undefined offset: 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[06-May-2026 15:42:49 Asia/Jakarta] PHP Notice:  Undefined variable: nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[06-May-2026 15:42:49 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder('dmk_content', Array)
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[11-May-2026 16:03:14 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:18 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:25 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:37 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:39 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:54 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:03:56 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:04:06 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:04:19 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:04:26 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_45u2ff8itgiufdn2hjhvi9oai3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/_logout.php on line 2
+[11-May-2026 16:04:26 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/_logout.php on line 2
+[11-May-2026 16:04:26 Asia/Jakarta] PHP Warning:  session_destroy(): Trying to destroy uninitialized session in /home/paseman/public_html/webpip/_logout.php on line 4
+[11-May-2026 16:04:26 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_45u2ff8itgiufdn2hjhvi9oai3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:04:26 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:04:33 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_45u2ff8itgiufdn2hjhvi9oai3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:04:33 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:04:33 Asia/Jakarta] PHP Warning:  Undefined array key "aksi" in /home/paseman/public_html/webpip/_kunci.php on line 7
+[11-May-2026 16:04:33 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_kunci.php(218): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:04:36 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_45u2ff8itgiufdn2hjhvi9oai3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:04:36 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:04:36 Asia/Jakarta] PHP Warning:  Undefined array key "aksi" in /home/paseman/public_html/webpip/_kunci.php on line 7
+[11-May-2026 16:04:36 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/_kunci.php(218): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:04:37 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Class "PDO" not found in /home/paseman/public_html/webpip/_sys_koneksi.php:19
+Stack trace:
+#0 /home/paseman/public_html/webpip/home_admin.php(24): Database->__construct()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 19
+[11-May-2026 16:32:37 Asia/Jakarta] PHP Warning:  Undefined array key 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[11-May-2026 16:32:42 Asia/Jakarta] PHP Warning:  Undefined array key 0 in /home/paseman/public_html/webpip/home_admin.php on line 12
+[11-May-2026 16:32:52 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_uuhfge06vn1d3j2e7m24rl43dm, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:32:52 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:33:56 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_6shh1c67l1m3vokcgg4adig6b3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:33:56 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 16:34:05 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_6shh1c67l1m3vokcgg4adig6b3, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:34:05 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/_kunci.php on line 6
+[11-May-2026 16:34:05 Asia/Jakarta] PHP Warning:  Undefined array key "aksi" in /home/paseman/public_html/webpip/_kunci.php on line 7
+[11-May-2026 16:34:05 Asia/Jakarta] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/paseman/public_html/webpip/_kunci.php:13) in /home/paseman/public_html/webpip/_kunci.php on line 288
+[11-May-2026 16:34:28 Asia/Jakarta] PHP Warning:  Undefined variable $nama_doc in /home/paseman/public_html/webpip/_operasi_data.php on line 125
+[11-May-2026 16:34:28 Asia/Jakarta] PHP Fatal error:  Uncaught Error: Call to undefined function execute() in /home/paseman/public_html/webpip/_sys_koneksi.php:70
+Stack trace:
+#0 /home/paseman/public_html/webpip/_operasi_data.php(162): Tambah_sekunder->tambah_data_sekunder()
+#1 {main}
+  thrown in /home/paseman/public_html/webpip/_sys_koneksi.php on line 70
+[11-May-2026 17:08:44 Asia/Jakarta] PHP Warning:  session_start(): open(/var/cpanel/php/sessions/alt-php81/sess_uuhfge06vn1d3j2e7m24rl43dm, O_RDWR) failed: No such file or directory (2) in /home/paseman/public_html/webpip/index.php on line 2
+[11-May-2026 17:08:44 Asia/Jakarta] PHP Warning:  session_start(): Failed to read session data: files (path: /var/cpanel/php/sessions/alt-php81) in /home/paseman/public_html/webpip/index.php on line 2

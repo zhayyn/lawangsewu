@@ -29,9 +29,31 @@ class LaporanController extends Controller
      */
     public function index(): \Inertia\Response
     {
+        // Ambil data statistik widget native
+        $visitorToday = \App\Models\WidgetVisitor::where('visit_date', now()->toDateString())->count();
+        $visitorThisMonth = \App\Models\WidgetVisitor::whereMonth('visit_date', now()->month)
+            ->whereYear('visit_date', now()->year)
+            ->count();
+        $widgetStats = \App\Models\WidgetVisitor::selectRaw('widget_name, count(*) as total')
+            ->groupBy('widget_name')
+            ->orderByDesc('total')
+            ->get();
+            
+        $last7Days = \App\Models\WidgetVisitor::select('visit_date', \Illuminate\Support\Facades\DB::raw('count(*) as total'))
+            ->where('visit_date', '>=', now()->subDays(6)->toDateString())
+            ->groupBy('visit_date')
+            ->orderBy('visit_date')
+            ->get();
+
         return Inertia::render('Admin/Laporan', [
             'appMeta'   => LawangsewuPortal::appMeta(),
             'navGroups' => LawangsewuPortal::navGroups(),
+            'visitorStats' => [
+                'today' => $visitorToday,
+                'this_month' => $visitorThisMonth,
+                'breakdown' => $widgetStats,
+                'chart_data' => $last7Days,
+            ],
         ]);
     }
 

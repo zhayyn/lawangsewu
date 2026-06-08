@@ -24,6 +24,9 @@ class WaCarakaConversation extends WaCarakaModel
         'conversation_id',
         'remote_number',
         'remote_name',
+        'profile_photo_url',
+        'resolved_number',
+        'profile_synced_at',
         'status',
         'claimed_by',
         'claimed_at',
@@ -32,10 +35,11 @@ class WaCarakaConversation extends WaCarakaModel
     ];
 
     protected $casts = [
-        'claimed_at'       => 'datetime',
-        'last_activity_at' => 'datetime',
-        'unread_count'     => 'integer',
-        'force_approved'   => 'boolean',
+        'claimed_at'        => 'datetime',
+        'last_activity_at'  => 'datetime',
+        'profile_synced_at' => 'datetime',
+        'unread_count'      => 'integer',
+        'force_approved'    => 'boolean',
     ];
 
     // ──────────────────────────────────────────────

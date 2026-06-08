@@ -26,7 +26,12 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'alias' => ['nullable', 'string', 'max:50'],
+            // Alias: izinkan emoji & simbol Unicode, max 50 karakter (bukan bytes)
+            'alias' => ['nullable', 'string', function ($attribute, $value, $fail) {
+                if (mb_strlen((string) $value, 'UTF-8') > 50) {
+                    $fail('Alias maksimal 50 karakter.');
+                }
+            }],
             'email' => [
                 'required',
                 'string',

@@ -1,0 +1,50 @@
+# Dependencies (di-install saat build)
+node_modules/
+vendor/
+
+# Environment (jangan pernah masuk image!)
+.env
+.env.*
+!.env.docker
+!.env.example
+
+# Storage (mount via volume di runtime)
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/app/public/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Dev tools
+.github/
+tests/
+phpunit.xml
+phpunit.xml.dist
+.phpunit.cache/
+
+# Build artifacts
+public/hot
+public/build/
+
+# Docker (tidak perlu masuk image)
+docker/scripts/
+Dockerfile*
+docker-compose*.yml
+Makefile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

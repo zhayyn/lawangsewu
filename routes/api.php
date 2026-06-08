@@ -3,7 +3,21 @@
 use App\Http\Controllers\Api\PortalApiController;
 use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\WaCarakaWebhookController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('auth:api')->get('/user', function (Request $request) {
+    $user = $request->user();
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'role' => $user->role,
+        'is_superadmin' => (bool)$user->is_superadmin,
+        'alias' => $user->alias,
+        'avatar' => $user->avatar,
+    ];
+});
 
 // Health Check Endpoints — Public, no auth required
 Route::get('/health', [HealthCheckController::class, 'health']);
@@ -27,3 +41,6 @@ Route::middleware([\App\Http\Middleware\SecureWaWebhook::class, 'throttle:500,1'
     Route::post('/wa-caraka/webhook/history-sync', [WaCarakaWebhookController::class, 'historySync'])
         ->name('wacaraka.webhook.history-sync');
 });
+
+use App\Http\Controllers\Omnichannel\WebHookController;
+Route::post('/omnichannel/web-chat', [WebHookController::class, 'receiveWebChat']);

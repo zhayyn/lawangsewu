@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TV Media — Docker Compose Standalone
+# Deploy TV Media secara mandiri tanpa seluruh stack Lawangsewu
+#
+# Penggunaan:
+#   docker compose -f docker/tvmedia/docker-compose.standalone.yml up -d
+#
+# Akses setelah up:
+#   http://localhost:8090/tvmedia
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  tvmedia:
+    build:
+      context: ../../          # Root project Lawangsewu
+      dockerfile: docker/tvmedia/Dockerfile.standalone
+    container_name: tvmedia-standalone
+    restart: unless-stopped
+    ports:
+      - "8090:80"              # Ganti 8090 jika port sudah dipakai
+    volumes:
+      # ★ Folder ini berisi gambar/video yang diupload via admin panel
+      # Mount ke host agar data tidak hilang saat rebuild container
+      - tvmedia-uploads:/var/www/storage/tvmedia
+    environment:
+      # Jika tvmedia.php perlu koneksi DB di masa depan, set di sini
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_DATABASE: ${DB_DATABASE:-lawangsewu_core}
+      DB_USERNAME: ${DB_USERNAME:-dbprakom}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/tvmedia"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  tvmedia-uploads:
+    # Untuk mount ke path host tertentu (opsional):
+    # driver: local
+    # driver_opts:
+    #   type: none
+    #   device: /data/tvmedia-uploads
+    #   o: bind

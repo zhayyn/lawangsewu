@@ -157,4 +157,50 @@
     .text-shadow-sm {
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
+
+    @keyframes border-spin {
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .chat-input-wrapper {
+        position: relative;
+        z-index: 1;
+        overflow: hidden;
+        border-color: var(--border);
+        transition: border-color 0.3s;
+    }
+
+    .chat-input-wrapper:focus-within {
+        border-color: transparent;
+    }
+
+    .chat-input-wrapper::before {
+        content: '';
+        position: absolute;
+        top: -100%;
+        left: -100%;
+        width: 300%;
+        height: 300%;
+        background: conic-gradient(from 0deg, transparent 75%, var(--accent) 100%);
+        animation: border-spin 2.5s linear infinite;
+        z-index: -2;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }
+
+    .chat-input-wrapper:focus-within::before {
+        opacity: 1;
+    }
+
+    .chat-input-wrapper::after {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        background-color: var(--wrapper-bg, var(--surface-1));
+        border-radius: calc(var(--input-radius, 20px) - 1px);
+        z-index: -1;
+    }
 }

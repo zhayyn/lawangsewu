@@ -123,26 +123,55 @@ class LawangsewuPortal
                     ['label' => 'Antrian PTSP', 'short' => 'PT', 'routeKey' => 'ptsp', 'href' => route('lawangsewu.ptsp.index'), 'badge' => 'Ready'],
                     ['label' => 'Antrian Sidang', 'short' => 'SD', 'routeKey' => 'sidang', 'href' => route('lawangsewu.sidang.index'), 'badge' => 'Ready'],
                     ['label' => 'Pilar Antrian PASMG', 'short' => 'PL', 'routeKey' => 'pilar', 'href' => route('lawangsewu.pilar.index'), 'badge' => 'Ready'],
-                    ['label' => 'WA Live PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
+                    ['label' => 'Omnichannel PTSP', 'short' => 'WA', 'routeKey' => 'wacaraka', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'badge' => 'Ready'],
+                    ['label' => 'PAK PP', 'short' => 'AK', 'routeKey' => 'pakpp', 'href' => self::routeOrNull('lawangsewu.pakpp.index'), 'badge' => 'AI'],
                 ],
             ],
             [
-                'label' => 'SIPP Hub & Data',
+                'label' => 'Monev Pelayanan',
                 'items' => [
                     ['label' => 'Monitoring CCTV', 'short' => 'CV', 'routeKey' => 'cctv', 'href' => route('lawangsewu.cctv'), 'badge' => '19'],
                     ['label' => 'SIPP Hub', 'short' => 'SP', 'routeKey' => 'sipp', 'href' => route('lawangsewu.sipp.index'), 'badge' => 'Ready'],
+                    self::isSuperAdmin()
+                        ? ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'admin-pendopo', 'href' => self::routeOrNull('admin.pendopo.index') ?? route('lawangsewu.guestbook.report'), 'badge' => 'Admin']
+                        : ['label' => 'Statistik Tamu', 'short' => 'ST', 'routeKey' => 'guestbook.report', 'href' => route('lawangsewu.guestbook.report'), 'badge' => 'Ready'],
                     ...(self::isSuperAdmin()
-                        ? [['label' => 'WA Caraka Admin', 'short' => 'WA⚙', 'routeKey' => 'wacaraka.admin', 'href' => self::routeOrNull('admin.wacaraka.index'), 'badge' => 'Admin']]
+                        ? [
+                            ['label' => 'Laporan Sistem', 'short' => 'LS', 'routeKey' => 'laporan', 'href' => self::routeOrNull('admin.laporan.index'), 'badge' => 'Admin'],
+                            ['label' => 'Lawangsewu Analytics', 'short' => 'LA', 'routeKey' => 'analytics', 'href' => self::routeOrNull('admin.analytics.index'), 'badge' => 'Admin']
+                          ]
                         : []),
                 ],
             ],
             [
-                'label' => 'Organisasi',
+                'label' => 'Monitoring',
                 'items' => [
-                    ['label' => 'Kepegawaian', 'short' => 'KG', 'routeKey' => 'kepegawaian', 'href' => null, 'badge' => null],
+                    ['label' => 'Monitor Sistem', 'short' => 'MS', 'routeKey' => 'admin-system-monitor', 'href' => self::routeOrNull('admin.system-monitor.index'), 'badge' => 'Admin'],
+                    ['label' => 'Monitor Jaringan', 'short' => 'MJ', 'routeKey' => 'admin-network-monitor', 'href' => self::routeOrNull('admin.network-monitor.index'), 'badge' => 'Admin'],
+                    ['label' => 'Tailscale Network', 'short' => 'TN', 'routeKey' => 'tailscale', 'href' => self::routeOrNull('lawangsewu.tailscale.index'), 'badge' => 'Admin'],
+                ],
+            ],
+            [
+                'label' => 'Infrastruktur IT',
+                'items' => [
+                    ['label' => 'TDMS Dashboard', 'short' => 'TD', 'routeKey' => 'tdms', 'href' => self::routeOrNull('lawangsewu.tdms.index'), 'badge' => 'New'],
+                    ['label' => 'Inventaris Aset', 'short' => 'IA', 'routeKey' => 'tdms-assets', 'href' => self::routeOrNull('lawangsewu.tdms.assets'), 'badge' => 'New'],
+                    ['label' => 'Tiket Perbaikan', 'short' => 'TP', 'routeKey' => 'tdms-service', 'href' => self::routeOrNull('lawangsewu.tdms.service-records'), 'badge' => 'New'],
+                    ['label' => 'Jadwal Perawatan', 'short' => 'JP', 'routeKey' => 'tdms-maintenance', 'href' => self::routeOrNull('lawangsewu.tdms.maintenance'), 'badge' => 'New'],
+                ],
+            ],
+            [
+                'label' => 'Kesekretariatan',
+                'items' => [
+                    ['label' => 'Kepegawaian', 'short' => 'KG', 'routeKey' => 'kepegawaian', 'href' => self::routeOrNull('admin.sikep-sync.index'), 'badge' => 'SIKEP'],
                     ['label' => 'PTIP', 'short' => 'PI', 'routeKey' => 'ptip', 'href' => null, 'badge' => null],
                     ['label' => 'Umum / Keuangan', 'short' => 'UK', 'routeKey' => 'keuangan', 'href' => null, 'badge' => null],
                     ['label' => 'Pandanaran AI', 'short' => 'AI', 'routeKey' => 'ai', 'href' => null, 'badge' => 'Beta'],
+                    ...(self::isSuperAdmin()
+                        ? [
+                            ['label' => 'Kelola TV Media', 'short' => 'TV', 'routeKey' => 'tvmedia', 'href' => self::routeOrNull('lawangsewu.tvmedia.prakom'), 'badge' => 'Prakom'],
+                          ]
+                        : []),
                 ],
             ],
             [
@@ -150,6 +179,12 @@ class LawangsewuPortal
                 'items' => [
                     ['label' => 'Alias & Tema', 'short' => 'AT', 'routeKey' => 'appearance', 'href' => null, 'badge' => null],
                     ['label' => 'Preferensi Operator', 'short' => 'OP', 'routeKey' => 'preferences', 'href' => null, 'badge' => null],
+                    ...(self::isSuperAdmin()
+                        ? [
+                            ['label' => 'Kelola User', 'short' => 'KU', 'routeKey' => 'users', 'href' => route('admin.users.index'), 'badge' => 'Admin'],
+                            ['label' => 'OAuth2 SSO', 'short' => 'OA', 'routeKey' => 'oauth2', 'href' => route('admin.oauth2.index'), 'badge' => 'Admin']
+                          ]
+                        : []),
                 ],
             ],
         ];
@@ -171,7 +206,7 @@ class LawangsewuPortal
             ['label' => 'Buka Antrian Sidang', 'href' => route('lawangsewu.sidang.index'), 'tone' => 'neutral', 'routeKey' => 'sidang'],
             ['label' => 'Buka Pilar Antrian PASMG', 'href' => route('lawangsewu.pilar.index'), 'tone' => 'neutral', 'routeKey' => 'pilar'],
             ['label' => 'Buka SIPP Hub', 'href' => route('lawangsewu.sipp.index'), 'tone' => 'accent', 'routeKey' => 'sipp'],
-            ['label' => 'WA Live PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent', 'routeKey' => 'wacaraka'],
+            ['label' => 'Omnichannel PTSP', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'tone' => 'accent', 'routeKey' => 'wacaraka'],
         ]);
     }
 
@@ -209,8 +244,9 @@ class LawangsewuPortal
             ['title' => 'Antrian Sidang', 'description' => 'Panggilan sidang dan status ruang.', 'owner' => 'Kepaniteraan', 'badge' => 'Ready', 'href' => route('lawangsewu.sidang.index'), 'routeKey' => 'sidang'],
             ['title' => 'Pilar Antrian PASMG', 'description' => 'Hub antrean terpadu — katalog loket, ruang sidang, dan queue authority.', 'owner' => 'Pelayanan', 'badge' => 'Ready', 'href' => route('lawangsewu.pilar.index'), 'routeKey' => 'pilar'],
             ['title' => 'SIPP Hub', 'description' => 'Widget statistik dan cache sinkron.', 'owner' => 'Data', 'badge' => 'Ready', 'href' => route('lawangsewu.sipp.index'), 'routeKey' => 'sipp'],
-            ['title' => 'WA Live PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'routeKey' => 'wacaraka'],
-            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan SDM.', 'owner' => 'Organisasi', 'badge' => 'Ready', 'href' => null],
+            ['title' => 'Omnichannel PTSP', 'description' => 'Inbox WhatsApp layanan PTSP untuk operator, takeover chat, dan pemantauan sesi device.', 'owner' => 'PTSP', 'badge' => 'Ready', 'href' => self::routeOrNull('lawangsewu.wacaraka.index'), 'routeKey' => 'wacaraka'],
+            ['title' => 'Kepegawaian', 'description' => 'Jatidiri, identitas pegawai, dan Sinkronisasi SIKEP.', 'owner' => 'Kesekretariatan', 'badge' => 'Ready', 'href' => self::routeOrNull('admin.sikep-sync.index')],
+            ['title' => 'Kelola TV Media', 'description' => 'Kelola konten slideshow Digital Signage untuk layar TV di lingkungan PA Semarang.', 'owner' => 'Prakom', 'badge' => 'TV', 'href' => self::routeOrNull('lawangsewu.tvmedia.prakom')],
             ['title' => 'PTIP', 'description' => 'Monitoring server, perangkat, dan SLA.', 'owner' => 'PTIP', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Umum / Keuangan', 'description' => 'Inventaris, kas, dan layanan umum.', 'owner' => 'Sekretariat', 'badge' => 'Ready', 'href' => null],
             ['title' => 'Pandanaran AI', 'description' => 'Asisten internal untuk tanya jawab cepat.', 'owner' => 'AI', 'badge' => 'Beta', 'href' => null],
@@ -269,16 +305,19 @@ class LawangsewuPortal
 
     public static function cctvPayload(): array
     {
+        $activeCount  = CctvCamera::query()->active()->count();
+        $zoneCount    = CctvCamera::query()->active()->distinct('zone')->count('zone');
+
         return [
-            'appMeta' => self::appMeta(),
+            'appMeta'   => self::appMeta(),
             'navGroups' => self::navGroups(),
-            'alerts' => self::alerts(),
-            'cameras' => self::cameras(),
+            'alerts'    => self::alerts(),
+            'cameras'   => self::cameras(),
             'networkSummary' => [
-                'cameraCount' => CctvCamera::query()->active()->count(),
-                'locationCount' => CctvCamera::query()->active()->distinct('zone')->count('zone'),
-                'status' => 'Jaringan stabil',
-                'latency' => '1.2 detik',
+                'cameraCount'   => $activeCount,
+                'locationCount' => $zoneCount,
+                'status'        => $zoneCount > 0 ? "{$zoneCount} zona terpantau" : 'Tidak ada zona aktif',
+                'latency'       => '1.2 detik',
             ],
         ];
     }
@@ -479,19 +518,54 @@ class LawangsewuPortal
         return $messages->map(fn (ChatMessage $message) => self::transformMessage($message))->all();
     }
 
+    protected static function normalizeCctvStreamUrl(?string $source): ?string
+    {
+        if (! $source) {
+            return null;
+        }
+
+        $source = trim($source);
+
+        if (str_starts_with($source, '/cctv/')) {
+            return $source;
+        }
+
+        $host = parse_url($source, PHP_URL_HOST);
+        $port = parse_url($source, PHP_URL_PORT);
+        $path = trim((string) parse_url($source, PHP_URL_PATH), '/');
+
+        if ($host === '192.168.88.200' && in_array((int) $port, [8888, 8889], true) && $path !== '') {
+            $streamPath = explode('/', $path)[0];
+
+            return "/cctv/{$streamPath}/index.m3u8";
+        }
+
+        return $source;
+    }
+
     public static function transformCamera(CctvCamera $camera): array
     {
+        $fallbackSrc = $camera->fallback_src ?: self::normalizeCctvStreamUrl($camera->iframe_src);
+        $previewSrc = self::normalizeCctvStreamUrl($camera->primary_sd_src ?: $fallbackSrc);
+        $fullSrc = self::normalizeCctvStreamUrl($camera->primary_hd_src ?: $camera->primary_sd_src ?: $fallbackSrc);
+        $isRelayStream = (string) $camera->stream_provider === 'mediamtx-relay';
+
         return [
             'id' => $camera->id,
             'key' => $camera->key,
             'name' => $camera->name,
             'zone' => $camera->zone,
-            'iframeSrc' => $camera->iframe_src,
+            'iframeSrc' => $previewSrc,
+            'previewSrc' => $previewSrc,
+            'fullSrc' => $fullSrc,
+            'fallbackSrc' => $fallbackSrc,
+            'streamType' => str_contains((string) $previewSrc, '.m3u8') ? 'hls' : 'iframe',
+            'streamProvider' => $camera->stream_provider,
             'status' => $camera->is_active ? 'LIVE' : 'OFFLINE',
             'featured' => $camera->is_featured,
-            'resolution' => $camera->sort_order <= 4 ? 'HD 1080p' : 'HD 720p',
+            'resolution' => $isRelayStream ? 'SD Grid / HD Detail' : ($camera->sort_order <= 4 ? 'HD 1080p' : 'HD 720p'),
             'updatedAt' => now()->setTimezone('Asia/Jakarta')->format('H:i').' WIB',
-            'signal' => $camera->sort_order <= 6 ? 'Stabil' : 'Normal',
+            'signal' => $isRelayStream ? 'Relay utama' : ($camera->sort_order <= 6 ? 'Stabil' : 'Normal'),
             'sortOrder' => $camera->sort_order,
         ];
     }

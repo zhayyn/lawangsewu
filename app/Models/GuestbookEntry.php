@@ -24,6 +24,7 @@ class GuestbookEntry extends Model
         'institution_category',
         'institution',
         'purpose',
+        'phone',
         'checkin',
     ];
     protected $casts = [

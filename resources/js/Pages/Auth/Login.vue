@@ -10,25 +10,12 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
-    canResetPassword: {
-        type: Boolean,
-    },
-    canRegister: {
-        type: Boolean,
-    },
-    canGoogleAuth: {
-        type: Boolean,
-    },
-    googleClientId: {
-        type: String,
-        default: '',
-    },
-    status: {
-        type: String,
-    },
-    error: {
-        type: String,
-    },
+    canResetPassword: { type: Boolean },
+    canRegister: { type: Boolean },
+    canGoogleAuth: { type: Boolean },
+    googleClientId: { type: String, default: '' },
+    status: { type: String },
+    error: { type: String },
 });
 
 const googleButtonContainer = ref(null);
@@ -38,7 +25,6 @@ const googleBusyLabel = ref('Menyiapkan login Google...');
 const googleError = ref('');
 const isDark = ref(true);
 const isPasswordVisible = ref(false);
-const isGoogleRedirectMode = ref(false);
 const passwordRevealTimer = ref(null);
 let googleIdentityScriptPromise = null;
 
@@ -85,7 +71,6 @@ const loadGoogleIdentityScript = () => {
         if (existingScript) {
             existingScript.addEventListener('load', () => resolve(window.google), { once: true });
             existingScript.addEventListener('error', () => reject(new Error('Script Google gagal dimuat.')), { once: true });
-
             return;
         }
 
@@ -103,41 +88,13 @@ const loadGoogleIdentityScript = () => {
     return googleIdentityScriptPromise;
 };
 
-const isAppleTouchDevice = () => {
-    if (typeof window === 'undefined') {
-        return false;
-    }
-
-    const userAgent = window.navigator.userAgent || '';
-    const platform = window.navigator.platform || '';
-    const maxTouchPoints = window.navigator.maxTouchPoints || 0;
-
-    return /iPad|iPhone|iPod/.test(userAgent)
-        || (platform === 'MacIntel' && maxTouchPoints > 1);
-};
-
-const shouldUseGoogleRedirect = () => {
-    if (typeof window === 'undefined') {
-        return false;
-    }
-
-    const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
-    return isGoogleRedirectMode.value || isAppleTouchDevice() || Boolean(coarsePointer && /Safari/i.test(window.navigator.userAgent || '') && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(window.navigator.userAgent || ''));
-};
-
-const openGoogleRedirect = () => {
-    window.location.assign(route('auth.google'));
-};
-
 const handleGoogleButtonPress = () => {
     if (googleBusy.value) {
         return;
     }
 
-    if (shouldUseGoogleRedirect() || !googleReady.value) {
-        googleBusy.value = true;
-        googleBusyLabel.value = 'Mengalihkan ke Google...';
-        openGoogleRedirect();
+    if (!googleReady.value) {
+        googleError.value = 'Tombol Google masih disiapkan. Tunggu sesaat lalu coba lagi.';
         return;
     }
 
@@ -154,9 +111,7 @@ const handleGoogleButtonPress = () => {
         return;
     }
 
-    googleError.value = 'Tombol Google belum siap. Browser akan dialihkan ke mode login yang lebih stabil.';
-    isGoogleRedirectMode.value = true;
-    openGoogleRedirect();
+    googleError.value = 'Tombol Google belum siap. Muat ulang halaman lalu coba lagi.';
 };
 
 const revealPasswordTemporarily = () => {
@@ -175,7 +130,6 @@ const revealPasswordTemporarily = () => {
 const handleGoogleCredential = async (response) => {
     if (!response?.credential) {
         googleError.value = 'Google tidak mengirimkan token login yang dibutuhkan.';
-
         return;
     }
 
@@ -228,10 +182,10 @@ const renderGoogleButton = async () => {
             client_id: props.googleClientId,
             callback: handleGoogleCredential,
             context: 'signin',
-            ux_mode: shouldUseGoogleRedirect() ? 'redirect' : 'popup',
-            login_uri: route('auth.google'),
+            ux_mode: 'popup',
             auto_select: false,
             cancel_on_tap_outside: true,
+            use_fedcm_for_prompt: false,
         });
 
         window.google.accounts.id.renderButton(googleButtonContainer.value, {
@@ -252,11 +206,6 @@ const renderGoogleButton = async () => {
         }
 
         googleReady.value = true;
-
-        if (shouldUseGoogleRedirect()) {
-            googleBusy.value = false;
-            googleBusyLabel.value = 'Lanjutkan dengan Google';
-        }
     } catch (scriptError) {
         googleError.value = scriptError?.message
             || 'Tombol Google tidak berhasil dimuat di browser ini.';
@@ -326,7 +275,7 @@ onBeforeUnmount(() => {
                 <div
                     ref="googleButtonContainer"
                     class="google-button-hitbox absolute inset-0 overflow-hidden rounded-2xl opacity-0"
-                    :class="googleReady && !googleBusy && !shouldUseGoogleRedirect() ? 'pointer-events-auto' : 'pointer-events-none'"
+                    :class="googleReady && !googleBusy ? 'pointer-events-auto' : 'pointer-events-none'"
                     aria-hidden="true"
                 />
             </div>
@@ -335,9 +284,6 @@ onBeforeUnmount(() => {
                 {{ googleError }}
             </div>
 
-            <p v-if="shouldUseGoogleRedirect()" class="text-center text-xs font-semibold text-sky-600">
-                Browser ini memakai alur Google yang paling stabil untuk perangkat sentuh.
-            </p>
         </div>
 
         <form @submit.prevent="submit" class="space-y-4">

@@ -68,9 +68,33 @@ class UserAccessController extends Controller
                     'enabled' => (bool) $entry->enabled,
                 ])
                 ->values(),
-            'allowlist' => GoogleAccessAllowlist::query()
-                ->orderBy('email')
-                ->get(),
+            'allowlist' => (function () {
+                // Ambil semua email user yang sudah terdaftar sekaligus (1 query, bukan N+1)
+                $registeredUsers = User::query()
+                    ->select(['email', 'is_active', 'name'])
+                    ->get()
+                    ->keyBy(fn (User $u) => strtolower(trim($u->email)));
+
+                return GoogleAccessAllowlist::query()
+                    ->orderBy('email')
+                    ->get()
+                    ->map(function (GoogleAccessAllowlist $entry) use ($registeredUsers) {
+                        $emailKey    = strtolower(trim($entry->email));
+                        $matchedUser = $registeredUsers->get($emailKey);
+                        return [
+                            'id'             => $entry->id,
+                            'email'          => $entry->email,
+                            'note'           => $entry->note,
+                            'auto_activate'  => (bool) $entry->auto_activate,
+                            'created_at'     => $entry->created_at,
+                            // Info apakah sudah jadi user aktif
+                            'is_registered'  => $matchedUser !== null,
+                            'is_active_user' => $matchedUser ? (bool) $matchedUser->is_active : false,
+                            'user_name'      => $matchedUser?->name,
+                        ];
+                    })
+                    ->values();
+            })(),
             'loginHistories' => LoginHistory::with('user:id,name,email')
                 ->latest('logged_in_at')
                 ->take(100)
@@ -151,7 +175,12 @@ class UserAccessController extends Controller
             'role'     => ['required', 'in:'.$allowedRoles],
             'is_active' => ['required', 'boolean'],
             'name'     => ['nullable', 'string', 'max:255'],
-            'alias'    => ['nullable', 'string', 'max:50'],
+            // Alias: izinkan emoji & simbol Unicode, max 50 karakter (bukan bytes)
+            'alias'    => ['nullable', 'string', function ($attribute, $value, $fail) {
+                if (mb_strlen((string) $value, 'UTF-8') > 50) {
+                    $fail('Alias maksimal 50 karakter.');
+                }
+            }],
         ]);
 
         $superAdminEmail = strtolower((string) config('auth.super_admin_email'));
@@ -201,6 +230,27 @@ class UserAccessController extends Controller
         $user->update($updateData);
 
         return back()->with('status', 'Akses pengguna berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        $actorIsSuperAdmin = (bool) ($actor?->isSuperAdmin());
+
+        $superAdminEmail = strtolower((string) config('auth.super_admin_email'));
+        $isTargetSuperAdmin = $superAdminEmail !== '' && strtolower((string) $user->email) === $superAdminEmail;
+
+        if (! $actorIsSuperAdmin && ($isTargetSuperAdmin || $user->is_superadmin || $user->role === 'admin')) {
+            return back()->with('status', 'Akun admin/superadmin hanya bisa dihapus oleh superadmin utama.');
+        }
+
+        if ($actor && $actor->id === $user->id) {
+            return back()->with('status', 'Anda tidak dapat menghapus akun Anda sendiri yang sedang dipakai.');
+        }
+
+        $user->delete();
+
+        return back()->with('status', 'Pengguna berhasil dihapus.');
     }
 
     public function updateRoleFeaturePermission(Request $request): RedirectResponse

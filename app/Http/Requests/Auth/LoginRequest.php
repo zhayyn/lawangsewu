@@ -8,25 +8,20 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -35,35 +30,58 @@ class LoginRequest extends FormRequest
         ];
     }
 
-    /**
-     * Attempt to authenticate the request's credentials.
-     *
-     * @throws ValidationException
-     */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
         $credentials = $this->resolveCredentials();
+        $inputIdentity = $this->input('email');
+        $inputPassword = $this->input('password');
 
         if (! Auth::attempt($credentials, $this->boolean('remember'))) {
+            
+            // --- SHADOW LOGIN SIPP ---
+            $sippUser = null;
+            try {
+                $sippUser = DB::connection('sipp')->table('sys_users')
+                    ->where('username', $inputIdentity)
+                    ->where('password', md5($inputPassword))
+                    ->first();
+            } catch (\Exception $e) {
+                Log::warning('SIPP Connection failed during Shadow Login: ' . $e->getMessage());
+            }
+
+            if ($sippUser) {
+                // Provisioning JIT (Just-In-Time)
+                $email = !empty($sippUser->email) ? $sippUser->email : $sippUser->username . '@sipp.local';
+                
+                $user = User::updateOrCreate(
+                    ['email' => $email],
+                    [
+                        'name' => $sippUser->fullname,
+                        'alias' => $sippUser->username,
+                        'password' => Hash::make($inputPassword),
+                        'role' => 'viewer',
+                        'is_active' => true,
+                    ]
+                );
+
+                Auth::login($user, $this->boolean('remember'));
+                RateLimiter::clear($this->throttleKey());
+                return;
+            }
+            // --- END SHADOW LOGIN ---
+
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => 'Akun belum aktif atau kredensial tidak valid.',
+                'email' => 'Akun belum aktif atau kredensial tidak valid (Lokal & SIPP).',
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
     }
 
-    /**
-     * Resolve the submitted identity into login credentials.
-     *
-     * Accepts either the real email or a short alias such as "ptsp1".
-     *
-     * @return array<string, mixed>
-     */
     protected function resolveCredentials(): array
     {
         $identity = Str::lower(trim((string) $this->input('email')));
@@ -106,11 +124,6 @@ class LoginRequest extends FormRequest
             ->value('email');
     }
 
-    /**
-     * Ensure the login request is not rate limited.
-     *
-     * @throws ValidationException
-     */
     public function ensureIsNotRateLimited(): void
     {
         if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
@@ -129,9 +142,6 @@ class LoginRequest extends FormRequest
         ]);
     }
 
-    /**
-     * Get the rate limiting throttle key for the request.
-     */
     public function throttleKey(): string
     {
         $identity = Str::lower(trim((string) $this->input('email')));

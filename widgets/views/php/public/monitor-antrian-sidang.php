@@ -368,9 +368,16 @@ if (isset($_GET['format_jadwal'])) {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('tgl_indo').innerText = new Date().toLocaleDateString('id-ID', options);
 
-    setInterval(updateData, 5000);
+    var QUEUE_POLL_INTERVAL_MS = 30000;
+    var isQueueRequestRunning = false;
+    var pendingDisplayRequests = 0;
+    var lastRoomQueueSignature = '';
+
+    setInterval(updateClock, 1000);
+    setInterval(updateData, QUEUE_POLL_INTERVAL_MS);
     setInterval(refreshSIPP, 900000); 
-    
+
+    updateClock();
     updateData();
 
     function refreshSIPP() {
@@ -378,10 +385,53 @@ if (isset($_GET['format_jadwal'])) {
         sippFrame.src = '?format_jadwal=1&t=' + new Date().getTime();
     }
 
+    function updateClock() {
+        var d = new Date();
+        document.getElementById("jam").textContent = d.toLocaleTimeString([], {hour12: false});
+    }
+
+    function setTextIfChanged(element, value) {
+        if (!element) return;
+        var nextValue = value == null ? '' : String(value);
+        if (element.textContent !== nextValue) {
+            element.textContent = nextValue;
+        }
+    }
+
+    function buildRoomQueueSignature(list) {
+        if (!Array.isArray(list)) return '';
+
+        var rooms = [];
+        for (var i = 0; i < list.length; i++) {
+            var rs = parseInt(list[i].r_sidang);
+            if (rs >= 1 && rs <= 3) {
+                rooms.push([
+                    rs,
+                    list[i].no_antrian || '',
+                    list[i].no_perk || ''
+                ]);
+            }
+        }
+
+        rooms.sort(function(a, b) { return a[0] - b[0]; });
+        return JSON.stringify(rooms);
+    }
+
+    function finishDisplayRequest() {
+        pendingDisplayRequests--;
+        if (pendingDisplayRequests <= 0) {
+            pendingDisplayRequests = 0;
+            isQueueRequestRunning = false;
+        }
+    }
+
     // PENYEMPURNAAN PROXY BROWSER MENGGUNAKAN NATIVE JS
     function updateData() {
-        var d = new Date();
-        document.getElementById("jam").innerHTML = d.toLocaleTimeString([], {hour12: false});
+        if (document.hidden || isQueueRequestRunning) {
+            return;
+        }
+
+        isQueueRequestRunning = true;
         
         // Kita gunakan PHP Proxy kita sendiri agar kebal CORS!
         var cacheKiller = '&t=' + new Date().getTime();
@@ -392,9 +442,9 @@ if (isset($_GET['format_jadwal'])) {
             if (this.readyState == 4 && this.status == 200) {
                 try {
                     var obj = JSON.parse(this.responseText);
-                    console.log("Status Sidang:", obj); // Untuk pantauan di F12
                     
                     if (obj && parseInt(obj.jml_sidang) > 0) {
+                        pendingDisplayRequests = 2;
                         
                         // 2. Ambil data ruangan (Bawah)
                         var reqBawah = new XMLHttpRequest();
@@ -403,21 +453,33 @@ if (isset($_GET['format_jadwal'])) {
                                 try {
                                     var objBawah = JSON.parse(this.responseText);
                                     if (objBawah !== null) {
+                                        var signature = buildRoomQueueSignature(objBawah);
+                                        if (signature === lastRoomQueueSignature) {
+                                            return;
+                                        }
+                                        lastRoomQueueSignature = signature;
+
                                         for (var i = 0; i < objBawah.length; i++) {
                                             var rs = parseInt(objBawah[i].r_sidang);
                                             // Hanya proses ruang 1, 2, 3
                                             if (rs >= 1 && rs <= 3) {
                                                 var noEl = document.getElementById("no" + rs);
                                                 var perkEl = document.getElementById("noperk" + rs);
-                                                if(noEl) noEl.innerHTML = objBawah[i].no_antrian;
-                                                if(perkEl) perkEl.innerHTML = objBawah[i].no_perk;
+                                                setTextIfChanged(noEl, objBawah[i].no_antrian);
+                                                setTextIfChanged(perkEl, objBawah[i].no_perk);
                                             }
                                         }
                                     }
                                 } catch(e) {}
+                                finally {
+                                    finishDisplayRequest();
+                                }
+                            } else if (this.readyState == 4) {
+                                finishDisplayRequest();
                             }
                         };
                         reqBawah.open("GET", "?proxy=bawah" + cacheKiller, true);
+                        reqBawah.onerror = finishDisplayRequest;
                         reqBawah.send();
 
                         // 3. Ambil data panggilan atas
@@ -432,10 +494,10 @@ if (isset($_GET['format_jadwal'])) {
                                         var elPerkAtas = document.getElementById('no_perkara_atas');
                                         
                                         // Update jika beda (baru dipanggil)
-                                        if (elRsAtas.innerHTML !== objAtas.nama_ruang.toUpperCase() || elNoAtas.innerHTML !== objAtas.no_antrian) {
-                                            elRsAtas.innerHTML = objAtas.nama_ruang.toUpperCase();
-                                            elNoAtas.innerHTML = objAtas.no_antrian;
-                                            elPerkAtas.innerHTML = objAtas.no_perk;
+                                        if (elRsAtas && elNoAtas && (elRsAtas.textContent !== objAtas.nama_ruang.toUpperCase() || elNoAtas.textContent !== objAtas.no_antrian)) {
+                                            setTextIfChanged(elRsAtas, objAtas.nama_ruang.toUpperCase());
+                                            setTextIfChanged(elNoAtas, objAtas.no_antrian);
+                                            setTextIfChanged(elPerkAtas, objAtas.no_perk);
                                             
                                             // Efek berkedip saat ada panggilan baru
                                             elNoAtas.classList.add("blink");
@@ -447,21 +509,41 @@ if (isset($_GET['format_jadwal'])) {
                                         }
                                     }
                                 } catch(e) {}
+                                finally {
+                                    finishDisplayRequest();
+                                }
+                            } else if (this.readyState == 4) {
+                                finishDisplayRequest();
                             }
                         };
                         reqAtas.open("GET", "?proxy=atas" + cacheKiller, true);
+                        reqAtas.onerror = finishDisplayRequest;
                         reqAtas.send();
 
+                    } else {
+                        isQueueRequestRunning = false;
                     }
                 } catch(e) { 
                     // Jika memang JSON kosong karena di server asli belum ada yg dipanggil
+                    isQueueRequestRunning = false;
                 }
+            } else if (this.readyState == 4) {
+                isQueueRequestRunning = false;
             }
         };
         // Tembak ke file kita sendiri, bukan ke antrian.pa-semarang (Bypass CORS)
         reqAda.open("GET", "?proxy=ada_sidang" + cacheKiller, true);
+        reqAda.onerror = function() {
+            isQueueRequestRunning = false;
+        };
         reqAda.send();
     }
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            updateData();
+        }
+    });
 </script>
 </body>
 </html>

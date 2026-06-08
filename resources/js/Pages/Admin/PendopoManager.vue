@@ -1,6 +1,6 @@
 <script setup>
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -10,30 +10,34 @@ const props = defineProps({
     settings: { type: Object, required: true },
     stats: { type: Object, required: true },
     monthlySummary: { type: Object, required: true },
+    profileSummary: { type: Object, default: () => ({ positions: { total: 0, items: [] }, institutions: { total: 0, items: [] } }) },
     recentEntries: { type: Array, default: () => [] },
     photoCount: { type: Number, default: 0 },
     legacy: { type: Object, default: () => ({}) },
 });
 
-const settingsForm = useForm({
-    per_page: props.settings.per_page ?? 10,
-    require_identity_fields: Boolean(props.settings.require_identity_fields),
-    event_name: props.settings.event_name ?? '',
-});
-
 const maxMonthlyValue = computed(() => Math.max(...(props.monthlySummary.data ?? [0]), 1));
+const chartColors = ['#f59e0b', '#06b6d4', '#8b5cf6', '#22c55e', '#ef4444', '#3b82f6', '#94a3b8'];
 
-const submitSettings = () => {
-    settingsForm.patch(route('admin.pendopo.settings.update'), {
-        preserveScroll: true,
+const donutStyle = (items = []) => {
+    if (!items.length) {
+        return { background: 'conic-gradient(#cbd5e1 0deg 360deg)' };
+    }
+
+    let cursor = 0;
+    const segments = items.map((item, index) => {
+        const degrees = Math.max(0, Number(item.percentage || 0) * 3.6);
+        const start = cursor;
+        cursor += degrees;
+        return `${chartColors[index % chartColors.length]} ${start}deg ${cursor}deg`;
     });
+
+    return { background: `conic-gradient(${segments.join(', ')})` };
 };
 
-const syncLegacy = () => {
-    router.post(route('admin.pendopo.sync'), {}, {
-        preserveScroll: true,
-    });
-};
+const segmentColor = (index) => ({
+    backgroundColor: chartColors[index % chartColors.length],
+});
 
 const destroyEntry = (entryId) => {
     router.delete(route('admin.pendopo.entries.destroy', entryId), {
@@ -62,19 +66,14 @@ const destroyEntry = (entryId) => {
                                 Kelola Pendopo
                             </h1>
                             <p class="mt-2 max-w-3xl text-sm text-[var(--text-3)]">
-                                Dashboard migrasi penuh Pendopo: sinkronisasi data legacy, statistik kunjungan, pengaturan event, dan status arsip.
+                                Dashboard statistik Buku Tamu/Pendopo untuk memantau kunjungan, profil jabatan, asal instansi, dan entri terbaru.
                             </p>
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap gap-3">
-                        <button type="button" class="secondary-button" @click="syncLegacy">
-                            Sinkronkan Legacy Pendopo
-                        </button>
-                        <a :href="route('lawangsewu.guestbook.list', { period: 'all' })" class="github-button !bg-amber-600 hover:!bg-amber-700">
-                            Buka Daftar Tamu
-                        </a>
-                    </div>
+                    <a :href="route('lawangsewu.guestbook.list', { period: 'all' })" class="github-button !bg-amber-600 hover:!bg-amber-700">
+                        Buka Daftar Tamu
+                    </a>
                 </div>
             </section>
 
@@ -108,7 +107,7 @@ const destroyEntry = (entryId) => {
                 </div>
             </section>
 
-            <section class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section>
                 <div class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-xl shadow-black/10">
                     <div class="flex items-center justify-between gap-3">
                         <div>
@@ -139,52 +138,69 @@ const destroyEntry = (entryId) => {
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <div class="space-y-6">
-                    <section class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-xl shadow-black/10">
-                        <h2 class="text-lg font-black uppercase tracking-[0.18em] text-[var(--text-1)]">Status Migrasi</h2>
-                        <div class="mt-5 space-y-3 text-sm">
-                            <div class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-                                <span class="text-[var(--text-3)]">Folder legacy</span>
-                                <span class="font-black text-[var(--text-1)]">{{ legacy.exists ? legacy.root : 'Tidak ditemukan' }}</span>
-                            </div>
-                            <div class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-                                <span class="text-[var(--text-3)]">Status arsip</span>
-                                <span class="font-black" :class="legacy.is_archived ? 'text-emerald-400' : 'text-amber-400'">
-                                    {{ legacy.is_archived ? 'Sudah diarsipkan' : 'Masih aktif / belum diarsipkan' }}
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-                                <span class="text-[var(--text-3)]">Data legacy</span>
-                                <span class="font-black text-[var(--text-1)]">{{ legacy.entries ?? 0 }}</span>
-                            </div>
-                            <div class="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-                                <span class="text-[var(--text-3)]">Foto legacy</span>
-                                <span class="font-black text-[var(--text-1)]">{{ legacy.photos ?? 0 }}</span>
+            <section class="grid gap-6 xl:grid-cols-2">
+                <div class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-xl shadow-black/10">
+                    <div class="flex flex-col gap-5 md:flex-row md:items-center">
+                        <div class="relative mx-auto h-44 w-44 shrink-0 rounded-full p-4" :style="donutStyle(profileSummary.positions.items)">
+                            <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-[var(--surface-1)] text-center shadow-inner shadow-black/10">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Jabatan</p>
+                                <p class="text-3xl font-black text-[var(--text-1)]">{{ profileSummary.positions.total }}</p>
+                                <p class="text-[10px] font-bold text-[var(--text-3)]">profil</p>
                             </div>
                         </div>
-                    </section>
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-lg font-black uppercase tracking-[0.18em] text-[var(--text-1)]">Profil Jabatan</h2>
+                            <p class="mt-2 text-sm text-[var(--text-3)]">Komposisi pekerjaan dan jabatan tamu yang tercatat.</p>
+                            <div class="mt-5 space-y-3">
+                                <div v-for="(item, index) in profileSummary.positions.items" :key="`position-${item.label}`" class="space-y-1.5">
+                                    <div class="flex items-center justify-between gap-3 text-xs">
+                                        <span class="flex min-w-0 items-center gap-2 font-bold text-[var(--text-2)]">
+                                            <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="segmentColor(index)"></span>
+                                            <span class="truncate">{{ item.label }}</span>
+                                        </span>
+                                        <span class="shrink-0 font-black text-[var(--text-1)]">{{ item.total }} / {{ item.percentage }}%</span>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
+                                        <div class="h-full rounded-full" :style="{ ...segmentColor(index), width: `${item.percentage}%` }"></div>
+                                    </div>
+                                </div>
+                                <p v-if="!profileSummary.positions.items.length" class="text-sm font-bold text-[var(--text-3)]">Belum ada data jabatan.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                    <section class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-xl shadow-black/10">
-                        <h2 class="text-lg font-black uppercase tracking-[0.18em] text-[var(--text-1)]">Pengaturan Pendopo</h2>
-                        <form class="mt-5 space-y-4" @submit.prevent="submitSettings">
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Nama Acara</label>
-                                <input v-model="settingsForm.event_name" type="text" class="input-surface w-full">
+                <div class="rounded-[2rem] border border-[var(--border)] bg-[var(--surface-1)] p-6 shadow-xl shadow-black/10">
+                    <div class="flex flex-col gap-5 md:flex-row md:items-center">
+                        <div class="relative mx-auto h-44 w-44 shrink-0 rounded-full p-4" :style="donutStyle(profileSummary.institutions.items)">
+                            <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-[var(--surface-1)] text-center shadow-inner shadow-black/10">
+                                <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Instansi</p>
+                                <p class="text-3xl font-black text-[var(--text-1)]">{{ profileSummary.institutions.total }}</p>
+                                <p class="text-[10px] font-bold text-[var(--text-3)]">asal</p>
                             </div>
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">Jumlah Data per Halaman</label>
-                                <input v-model.number="settingsForm.per_page" type="number" min="5" max="100" class="input-surface w-full">
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-lg font-black uppercase tracking-[0.18em] text-[var(--text-1)]">Asal Instansi</h2>
+                            <p class="mt-2 text-sm text-[var(--text-3)]">Distribusi kategori asal instansi atau satuan tamu.</p>
+                            <div class="mt-5 space-y-3">
+                                <div v-for="(item, index) in profileSummary.institutions.items" :key="`institution-${item.label}`" class="space-y-1.5">
+                                    <div class="flex items-center justify-between gap-3 text-xs">
+                                        <span class="flex min-w-0 items-center gap-2 font-bold text-[var(--text-2)]">
+                                            <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="segmentColor(index)"></span>
+                                            <span class="truncate">{{ item.label }}</span>
+                                        </span>
+                                        <span class="shrink-0 font-black text-[var(--text-1)]">{{ item.total }} / {{ item.percentage }}%</span>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
+                                        <div class="h-full rounded-full" :style="{ ...segmentColor(index), width: `${item.percentage}%` }"></div>
+                                    </div>
+                                </div>
+                                <p v-if="!profileSummary.institutions.items.length" class="text-sm font-bold text-[var(--text-3)]">Belum ada data instansi.</p>
                             </div>
-                            <label class="inline-flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold text-[var(--text-2)]">
-                                <input v-model="settingsForm.require_identity_fields" type="checkbox" class="rounded border-[var(--border)] bg-[var(--surface-2)]">
-                                Wajibkan isian identitas lengkap
-                            </label>
-                            <button type="submit" class="github-button !w-full !bg-amber-600 hover:!bg-amber-700" :disabled="settingsForm.processing">
-                                Simpan Pengaturan Pendopo
-                            </button>
-                        </form>
-                    </section>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -196,37 +212,83 @@ const destroyEntry = (entryId) => {
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
+                <div class="grid gap-3 lg:hidden">
+                    <article
+                        v-for="entry in recentEntries"
+                        :key="`card-${entry.id}`"
+                        class="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="break-words text-sm font-black text-[var(--text-1)]">{{ entry.name }}</p>
+                                <p class="mt-1 break-words text-xs font-semibold text-[var(--text-3)]">{{ entry.position || '-' }}</p>
+                            </div>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-rose-400 transition hover:bg-rose-500/20"
+                                @click="destroyEntry(entry.id)"
+                            >
+                                Hapus
+                            </button>
+                        </div>
+                        <dl class="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+                            <div class="min-w-0">
+                                <dt class="font-black uppercase tracking-[0.16em] text-[var(--text-3)]">ID</dt>
+                                <dd class="mt-1 break-all font-mono text-[var(--text-2)]">{{ entry.id }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-black uppercase tracking-[0.16em] text-[var(--text-3)]">Checkin</dt>
+                                <dd class="mt-1 text-[var(--text-2)]">{{ entry.checkin || '-' }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-black uppercase tracking-[0.16em] text-[var(--text-3)]">Instansi</dt>
+                                <dd class="mt-1 break-words text-[var(--text-2)]">{{ entry.institution || '-' }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="font-black uppercase tracking-[0.16em] text-[var(--text-3)]">Keperluan</dt>
+                                <dd class="mt-1 break-words text-[var(--text-2)]">{{ entry.purpose || '-' }}</dd>
+                            </div>
+                        </dl>
+                    </article>
+                    <p v-if="!recentEntries.length" class="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-6 text-center text-sm font-bold text-[var(--text-3)]">
+                        Belum ada data tamu terbaru.
+                    </p>
+                </div>
+
+                <div class="hidden overflow-x-auto lg:block">
+                    <table class="min-w-[980px] table-fixed text-sm">
                         <thead>
                             <tr class="border-b border-[var(--border)] text-left text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-3)]">
-                                <th class="px-3 py-3">ID</th>
-                                <th class="px-3 py-3">Nama</th>
-                                <th class="px-3 py-3">Instansi</th>
-                                <th class="px-3 py-3">Keperluan</th>
-                                <th class="px-3 py-3">Checkin</th>
-                                <th class="px-3 py-3 text-right">Aksi</th>
+                                <th class="w-[17%] px-3 py-3">ID</th>
+                                <th class="w-[22%] px-3 py-3">Nama</th>
+                                <th class="w-[22%] px-3 py-3">Instansi</th>
+                                <th class="w-[17%] px-3 py-3">Keperluan</th>
+                                <th class="w-[14%] px-3 py-3">Checkin</th>
+                                <th class="w-[8%] px-3 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="entry in recentEntries" :key="entry.id" class="border-b border-[var(--border)]/70 text-[var(--text-2)]">
-                                <td class="px-3 py-3 font-mono text-xs text-[var(--text-3)]">{{ entry.id }}</td>
-                                <td class="px-3 py-3">
-                                    <div class="font-bold text-[var(--text-1)]">{{ entry.name }}</div>
-                                    <div class="text-xs text-[var(--text-3)]">{{ entry.position || '-' }}</div>
+                                <td class="break-all px-3 py-3 font-mono text-xs text-[var(--text-3)]">{{ entry.id }}</td>
+                                <td class="px-3 py-3 align-top">
+                                    <div class="break-words font-bold text-[var(--text-1)]">{{ entry.name }}</div>
+                                    <div class="break-words text-xs text-[var(--text-3)]">{{ entry.position || '-' }}</div>
                                 </td>
-                                <td class="px-3 py-3">{{ entry.institution || '-' }}</td>
-                                <td class="px-3 py-3">{{ entry.purpose || '-' }}</td>
-                                <td class="px-3 py-3 whitespace-nowrap">{{ entry.checkin }}</td>
-                                <td class="px-3 py-3 text-right">
+                                <td class="break-words px-3 py-3 align-top">{{ entry.institution || '-' }}</td>
+                                <td class="break-words px-3 py-3 align-top">{{ entry.purpose || '-' }}</td>
+                                <td class="px-3 py-3 align-top">{{ entry.checkin }}</td>
+                                <td class="px-3 py-3 text-right align-top">
                                     <button
                                         type="button"
-                                        class="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-rose-300 transition hover:bg-rose-500/20"
+                                        class="whitespace-nowrap rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-rose-400 transition hover:bg-rose-500/20"
                                         @click="destroyEntry(entry.id)"
                                     >
                                         Hapus
                                     </button>
                                 </td>
+                            </tr>
+                            <tr v-if="!recentEntries.length">
+                                <td colspan="6" class="px-3 py-8 text-center text-sm font-bold text-[var(--text-3)]">Belum ada data tamu terbaru.</td>
                             </tr>
                         </tbody>
                     </table>

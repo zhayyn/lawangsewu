@@ -1,0 +1,158 @@
+services:
+  # ─────────────────────────────────────────────────────────
+  # Caddy — Reverse proxy dengan HTTPS otomatis
+  # Let's Encrypt (domain publik) atau self-signed (lokal)
+  # ─────────────────────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: lawangsewu-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./:/var/www:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - lawangsewu-network
+    depends_on:
+      - app
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+      - TLS_EMAIL=${TLS_EMAIL:-internal}
+
+  # ─────────────────────────────────────────────────────────
+  # App — PHP-FPM
+  # ─────────────────────────────────────────────────────────
+  app:
+    image: ghcr.io/zhayyn/lawangsewu:${APP_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: lawangsewu-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - lawangsewu-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  # ─────────────────────────────────────────────────────────
+  # Worker — Queue + Reverb WebSocket (via Supervisor)
+  # ─────────────────────────────────────────────────────────
+  worker:
+    image: ghcr.io/zhayyn/lawangsewu:${APP_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: lawangsewu-worker
+    restart: unless-stopped
+    working_dir: /var/www
+    command: ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+    volumes:
+      - ./docker/php/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro
+      - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - lawangsewu-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  # ─────────────────────────────────────────────────────────
+  # Scheduler — Artisan Schedule (cron setiap menit)
+  # ─────────────────────────────────────────────────────────
+  scheduler:
+    image: ghcr.io/zhayyn/lawangsewu:${APP_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: lawangsewu-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    command: >
+      sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
+    volumes:
+      - storage-data:/var/www/storage/app/public
+      - tvmedia-storage:/var/www/storage/app/public/tvmedia
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - lawangsewu-network
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  # ─────────────────────────────────────────────────────────
+  # MariaDB 10.11
+  # ─────────────────────────────────────────────────────────
+  db:
+    image: mariadb:10.11
+    container_name: lawangsewu-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-lawangsewu}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-changeme}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+      MYSQL_USER: ${DB_USERNAME:-lawangsewu}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - lawangsewu-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────
+  # Redis
+  # ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: lawangsewu-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - lawangsewu-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  lawangsewu-network:
+    driver: bridge
+
+volumes:
+  db-data:
+  redis-data:
+  storage-data:
+  tvmedia-storage:   # File gambar/video yang diupload via admin panel TV Media
+  caddy-data:
+  caddy-config:

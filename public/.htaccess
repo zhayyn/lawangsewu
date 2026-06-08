@@ -13,13 +13,38 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Reverb WebSocket bridge. This keeps /app working even when
+    # Cloudflare connects to the HTTP vhost before TLS mode is adjusted.
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^app/(.*)$ ws://127.0.0.1:8080/app/$1 [P,L]
+    RewriteRule ^apps/(.*)$ http://127.0.0.1:8080/apps/$1 [P,L]
+
+    # CCTV HLS SSL bridge for MediaMTX relay.
+    # Public HTTPS path: /cctv/{stream}/index.m3u8
+    # Internal relay: http://192.168.88.200:8888/{stream}/index.m3u8
+    RewriteRule ^cctv/(.*)$ http://192.168.88.200:8888/$1?cookieCheck=1 [P,L,QSA,E=CCTV_PROXY:1]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
-
     # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_URI} !^/app/
+    RewriteCond %{REQUEST_URI} !^/apps/
+    RewriteCond %{REQUEST_URI} !^/cctv/
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header onsuccess unset Access-Control-Allow-Origin env=CCTV_PROXY
+    Header onsuccess unset Access-Control-Allow-Credentials env=CCTV_PROXY
+    Header onsuccess unset Cache-Control env=CCTV_PROXY
+    Header always unset Access-Control-Allow-Credentials env=CCTV_PROXY
+    Header always unset Cache-Control env=CCTV_PROXY
+    Header always set Access-Control-Allow-Origin "*" env=CCTV_PROXY
+    Header always set Access-Control-Allow-Methods "GET, OPTIONS" env=CCTV_PROXY
+    Header always set Access-Control-Allow-Headers "Range, Origin, Accept, Content-Type" env=CCTV_PROXY
+    Header always set Access-Control-Expose-Headers "Content-Length, Content-Range, Accept-Ranges" env=CCTV_PROXY
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0" env=CCTV_PROXY
 </IfModule>

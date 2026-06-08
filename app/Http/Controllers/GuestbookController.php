@@ -68,6 +68,7 @@ class GuestbookController extends Controller
             'kategori_instansi' => ['required', Rule::in(['MAHKAMAH_AGUNG', 'INSTANSI_PERUSAHAAN', 'UNIVERSITAS_SEKOLAH', 'PERSEORANGAN'])],
             'instansi' => ['required', 'string', 'max:160'],
             'keperluan' => ['required', 'string', 'max:255'],
+            'nomor_hp' => ['required', 'string', 'max:20'],
             'foto' => ['nullable', 'string', 'required_without:foto_file'],
             'foto_file' => ['nullable', 'file', 'required_without:foto', 'max:5120'],
         ], [
@@ -111,6 +112,7 @@ class GuestbookController extends Controller
             'institution_category' => (string) $request->string('kategori_instansi'),
             'institution' => $this->normalizeDisplayCase((string) $request->string('instansi')),
             'purpose' => $this->normalizeDisplayCase((string) $request->string('keperluan')),
+            'phone' => (string) $request->string('nomor_hp'),
             'checkin' => now('Asia/Jakarta')->format('Y-m-d H:i:s'),
         ]);
 
@@ -138,6 +140,15 @@ class GuestbookController extends Controller
         }
 
         Cache::forget(self::INSTANSI_OPTIONS_CACHE_KEY);
+
+        try {
+            $waService = app(\App\Services\WaCarakaService::class);
+            $messageText = "Yth. Bapak/Ibu {$entry->name},\n\nTerima kasih atas kunjungan Anda di Pengadilan Agama Semarang hari ini.\n\nKami terus berupaya meningkatkan kualitas pelayanan dan fasilitas kami. Oleh karena itu, kami memohon kesediaan Bapak/Ibu untuk memberikan kritik, saran, atau masukan.\n\nBapak/Ibu dapat menyampaikan masukannya dengan membalas pesan ini secara langsung, atau dengan mengisi formulir pada tautan berikut:\nhttps://tanjungmas.pa-semarang.go.id/\n\nTerima kasih atas waktu dan partisipasi Anda. Semoga pelayanan kami selalu memberikan kepuasan.\n\nSalam hormat,\nPengadilan Agama Semarang";
+            
+            $waService->queueText($entry->phone, $messageText, 'PA Semarang');
+        } catch (\Throwable $e) {
+            Log::error("Failed to send WA feedback message to {$entry->phone}", ['error' => $e->getMessage()]);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -380,23 +391,123 @@ class GuestbookController extends Controller
         ]);
     }
 
+    public function rename(Request $request, string $id): JsonResponse
+    {
+        $entry = GuestbookEntry::query()->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'nama' => ['required', 'string', 'max:120'],
+        ], [
+            'nama.required' => 'Nama tamu wajib diisi.',
+            'nama.max'      => 'Nama tamu maksimal 120 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Validasi gagal.',
+                'errors'  => $validator->errors()->toArray(),
+            ], 422);
+        }
+
+        $oldName = $entry->name;
+        $entry->update([
+            'name' => $this->normalizeDisplayCase((string) $request->string('nama')),
+        ]);
+
+        Log::info("Guestbook entry {$id} renamed by operator", [
+            'user_id'  => optional(auth()->user())->id,
+            'old_name' => $oldName,
+            'new_name' => $entry->name,
+        ]);
+
+        return response()->json([
+            'status'   => 'success',
+            'message'  => 'Nama tamu berhasil diubah.',
+            'new_name' => $entry->name,
+        ]);
+    }
+
+    public function updateInfo(Request $request, string $id): JsonResponse
+    {
+        // Only superadmin can update info
+        if (!optional(auth()->user())->isSuperAdmin()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Anda tidak memiliki izin untuk mengubah informasi tamu.',
+            ], 403);
+        }
+
+        $entry = GuestbookEntry::query()->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'nama' => ['required', 'string', 'max:120'],
+            'instansi' => ['required', 'string', 'max:160'],
+        ], [
+            'nama.required' => 'Nama tamu wajib diisi.',
+            'nama.max'      => 'Nama tamu maksimal 120 karakter.',
+            'instansi.required' => 'Asal instansi wajib diisi.',
+            'instansi.max'      => 'Asal instansi maksimal 160 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Validasi gagal.',
+                'errors'  => $validator->errors()->toArray(),
+            ], 422);
+        }
+
+        $oldName = $entry->name;
+        $oldInstitution = $entry->institution;
+
+        $entry->update([
+            'name' => $this->normalizeDisplayCase((string) $request->string('nama')),
+            'institution' => $this->normalizeDisplayCase((string) $request->string('instansi')),
+        ]);
+
+        Log::info("Guestbook entry {$id} info updated by superadmin", [
+            'user_id'  => optional(auth()->user())->id,
+            'old_name' => $oldName,
+            'new_name' => $entry->name,
+            'old_institution' => $oldInstitution,
+            'new_institution' => $entry->institution,
+        ]);
+
+        return response()->json([
+            'status'   => 'success',
+            'message'  => 'Data tamu berhasil diubah.',
+            'name' => $entry->name,
+            'institution' => $entry->institution,
+        ]);
+    }
+
+    private function deletePhotoFiles(string $entryId): void
+    {
+        $extensions = ['jpg', 'png', 'webp'];
+        
+        foreach ($extensions as $ext) {
+            try {
+                $storagePath = "guestbook/photos/{$entryId}.{$ext}";
+                if (Storage::disk('public')->exists($storagePath)) {
+                    Storage::disk('public')->delete($storagePath);
+                }
+                
+                $publicPath = public_path("guestbook/photos/{$entryId}.{$ext}");
+                if (File::exists($publicPath)) {
+                    File::delete($publicPath);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to delete photo {$ext} for guestbook entry {$entryId}", ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $entry = GuestbookEntry::query()->findOrFail($id);
 
-        // Delete photo files if they exist
-        try {
-            $photoPath = "guestbook/photos/{$id}.jpg";
-            if (Storage::disk('public')->exists($photoPath)) {
-                Storage::disk('public')->delete($photoPath);
-            }
-            if (File::exists(public_path("guestbook/photos/{$id}.jpg"))) {
-                File::delete(public_path("guestbook/photos/{$id}.jpg"));
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to delete photo for guestbook entry {$id}", ['error' => $e->getMessage()]);
-        }
-
+        $this->deletePhotoFiles($id);
         $entry->delete();
 
         Log::info("Guestbook entry {$id} deleted by operator", ['user_id' => optional(auth()->user())->id]);
@@ -426,18 +537,7 @@ class GuestbookController extends Controller
         $entries = GuestbookEntry::query()->whereIn('id', $ids)->get();
 
         foreach ($entries as $entry) {
-            try {
-                $photoPath = "guestbook/photos/{$entry->id}.jpg";
-                if (Storage::disk('public')->exists($photoPath)) {
-                    Storage::disk('public')->delete($photoPath);
-                }
-                if (File::exists(public_path("guestbook/photos/{$entry->id}.jpg"))) {
-                    File::delete(public_path("guestbook/photos/{$entry->id}.jpg"));
-                }
-            } catch (\Exception $e) {
-                Log::warning("Failed to delete photo for guestbook entry {$entry->id}", ['error' => $e->getMessage()]);
-            }
-
+            $this->deletePhotoFiles($entry->id);
             $entry->delete();
         }
 

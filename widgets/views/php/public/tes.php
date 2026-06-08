@@ -1,1 +1,0 @@
-<?php echo "Halo Tuan Muda, Server Siap!"; ?>

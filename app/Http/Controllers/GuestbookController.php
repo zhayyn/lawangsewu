@@ -68,6 +68,7 @@ class GuestbookController extends Controller
             'kategori_instansi' => ['required', Rule::in(['MAHKAMAH_AGUNG', 'INSTANSI_PERUSAHAAN', 'UNIVERSITAS_SEKOLAH', 'PERSEORANGAN'])],
             'instansi' => ['required', 'string', 'max:160'],
             'keperluan' => ['required', 'string', 'max:255'],
+            'nomor_hp' => ['required', 'string', 'max:20'],
             'foto' => ['nullable', 'string', 'required_without:foto_file'],
             'foto_file' => ['nullable', 'file', 'required_without:foto', 'max:5120'],
         ], [
@@ -111,6 +112,7 @@ class GuestbookController extends Controller
             'institution_category' => (string) $request->string('kategori_instansi'),
             'institution' => $this->normalizeDisplayCase((string) $request->string('instansi')),
             'purpose' => $this->normalizeDisplayCase((string) $request->string('keperluan')),
+            'phone' => (string) $request->string('nomor_hp'),
             'checkin' => now('Asia/Jakarta')->format('Y-m-d H:i:s'),
         ]);
 
@@ -138,6 +140,15 @@ class GuestbookController extends Controller
         }
 
         Cache::forget(self::INSTANSI_OPTIONS_CACHE_KEY);
+
+        try {
+            $waService = app(\App\Services\WaCarakaService::class);
+            $messageText = "Yth. Bapak/Ibu {$entry->name},\n\nTerima kasih atas kunjungan Anda di Pengadilan Agama Semarang hari ini.\n\nKami terus berupaya meningkatkan kualitas pelayanan dan fasilitas kami. Oleh karena itu, kami memohon kesediaan Bapak/Ibu untuk memberikan kritik, saran, atau masukan.\n\nBapak/Ibu dapat menyampaikan masukannya dengan membalas pesan ini secara langsung, atau dengan mengisi formulir pada tautan berikut:\nhttps://tanjungmas.pa-semarang.go.id/\n\nTerima kasih atas waktu dan partisipasi Anda. Semoga pelayanan kami selalu memberikan kepuasan.\n\nSalam hormat,\nPengadilan Agama Semarang";
+            
+            $waService->queueText($entry->phone, $messageText, 'PA Semarang');
+        } catch (\Throwable $e) {
+            Log::error("Failed to send WA feedback message to {$entry->phone}", ['error' => $e->getMessage()]);
+        }
 
         return response()->json([
             'status' => 'success',

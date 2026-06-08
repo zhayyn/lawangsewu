@@ -400,7 +400,7 @@
                         </td>
                         <td>
                             <span class="history-primary">{{ $entry->name }}</span>
-                            <span class="history-secondary">{{ $entry->position }} - {{ $entry->institution }}</span>
+                            <span class="history-secondary">{{ $entry->position }} - {{ $entry->institution }} | HP: {{ $entry->phone ?? '-' }}</span>
                             <span class="history-purpose">Keperluan: {{ $entry->purpose ?: '-' }}</span>
                         </td>
                         <td class="text-end">{{ \Illuminate\Support\Carbon::parse($entry->checkin)->format('d/m/Y H:i') }}</td>

@@ -311,6 +311,7 @@
 
                                     <input type="text" class="form-control form-control-lg" id="nama" name="nama" placeholder="Nama / Name" autocomplete="off" onkeyup="tombolaktif();">
                                     <input type="text" class="form-control form-control-lg" id="jabatan" name="jabatan" placeholder="Pekerjaan & Jabatan" autocomplete="off" onkeyup="tombolaktif();">
+                                    <input type="text" class="form-control form-control-lg" id="nomor_hp" name="nomor_hp" placeholder="Nomor HP / WhatsApp" autocomplete="off" onkeyup="tombolaktif();">
                                     <select class="form-control form-control-lg" id="kategori_instansi" name="kategori_instansi" autocomplete="off" onchange="muatPilihanDetailInstansi(); sinkronkanInstansi(); tombolaktif();">
                                         <option value="">Pilih Kategori Instansi/Satuan</option>
                                         <option value="MAHKAMAH_AGUNG">1. Mahkamah Agung</option>
@@ -542,6 +543,7 @@ function resetStandbyTimer() {
 function bidangWajibTerisi() {
     return document.getElementById('nama').value.trim() !== ''
         && document.getElementById('jabatan').value.trim() !== ''
+        && document.getElementById('nomor_hp').value.trim() !== ''
         && document.getElementById('kategori_instansi').value.trim() !== ''
         && document.getElementById('instansi').value.trim() !== ''
         && document.getElementById('keperluan').value.trim() !== '';
@@ -851,6 +853,7 @@ function kirimDataTamu() {
     formData.append('id', document.getElementById('id_tamu').value || '');
     formData.append('nama', document.getElementById('nama').value || '');
     formData.append('jabatan', document.getElementById('jabatan').value || '');
+    formData.append('nomor_hp', document.getElementById('nomor_hp').value || '');
     formData.append('kategori_instansi', document.getElementById('kategori_instansi').value || '');
     formData.append('instansi', document.getElementById('instansi').value || '');
     formData.append('keperluan', document.getElementById('keperluan').value || '');

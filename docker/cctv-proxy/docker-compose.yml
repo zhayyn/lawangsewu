@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: lawangsewu-cctv-proxy
+    restart: unless-stopped
+    network_mode: host # Disarankan host agar WebRTC bebas dari kendala NAT/Port mapping
+    volumes:
+      - ./go2rtc.yaml:/config/go2rtc.yaml
+    environment:
+      - TZ=Asia/Jakarta

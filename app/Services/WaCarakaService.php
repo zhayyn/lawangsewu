@@ -2,115 +2,98 @@
 
 namespace App\Services;
 
-use App\Events\WaCarakaConversationUpdated;
-use App\Events\WaCarakaMessageReceived;
-use App\Events\WaCarakaMessageSynced;
-use App\Jobs\SendWaCarakaOutboundMessage;
-use App\Models\WaCarakaConversation;
-use App\Models\WaCarakaDailyMetric;
-use App\Models\WaCarakaLog;
+use App\Services\WaCaraka\WaCarakaHttpClient;
+use App\Services\WaCaraka\WaCarakaMessageService;
+use App\Services\WaCaraka\WaCarakaConversationService;
+use App\Services\WaCaraka\WaCarakaStatsService;
 use App\Models\WaCarakaMessage;
-use App\Models\WaCarakaSyncRun;
 use App\Models\User;
-use App\Support\WaCarakaDatabase;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * WaCarakaService
  *
  * Full-stack messaging gateway service for the WA Caraka module.
- * Handles runtime communication (Node.js/Baileys), message logging,
- * inbound webhook processing, inbox queries, and broadcast.
+ * This is a facade/coordinator that delegates to focused sub-services.
+ *
+ * Architecture:
+ * - WaCarakaHttpClient: HTTP communication with Node.js/Baileys runtime
+ * - WaCarakaMessageService: Message sending, receiving, queueing
+ * - WaCarakaConversationService: Conversation management and sync
+ * - WaCarakaStatsService: Statistics and metrics
  *
  * SSO is handled at the controller/middleware layer.
+ *
+ * @deprecated Use sub-services directly for new code.
+ *             This facade maintains backward compatibility only.
  */
 class WaCarakaService
 {
-    protected string $baseUrl;
-    protected string $token;
-    protected int $timeout;
-    protected int $broadcastLimit;
+    private WaCarakaHttpClient $http;
+    private WaCarakaMessageService $messages;
+    private WaCarakaConversationService $conversations;
+    private WaCarakaStatsService $stats;
+
     protected array $validatedUserIds = [];
 
-    public function __construct()
-    {
-        $this->baseUrl        = rtrim(config('wa_caraka.base_url', env('LW_WA_V2_BASE', 'http://127.0.0.1:8790')), '/');
-        $this->token          = config('wa_caraka.token', env('LW_WA_V2_TOKEN', ''));
-        $this->timeout        = (int) config('wa_caraka.timeout', 20);
-        $this->broadcastLimit = (int) config('wa_caraka.broadcast_limit', 50);
+    /**
+     * @deprecated Use dependency injection instead.
+     */
+    public function __construct(
+        ?WaCarakaHttpClient $http = null,
+        ?WaCarakaMessageService $messages = null,
+        ?WaCarakaConversationService $conversations = null,
+        ?WaCarakaStatsService $stats = null
+    ) {
+        // Resolve from container if not injected
+        $this->http = $http ?? app(WaCarakaHttpClient::class);
+        $this->messages = $messages ?? app(WaCarakaMessageService::class);
+        $this->conversations = $conversations ?? app(WaCarakaConversationService::class);
+        $this->stats = $stats ?? app(WaCarakaStatsService::class);
     }
+
+    // ══════════════════════════════════════════════
+    // Accessors
+    // ══════════════════════════════════════════════
 
     public function baseUrl(): string
     {
-        return $this->baseUrl;
+        return $this->http->baseUrl();
     }
 
     public function broadcastLimit(): int
     {
-        return $this->broadcastLimit;
+        return $this->messages->broadcastLimit();
     }
 
     // ══════════════════════════════════════════════
-    // Internal HTTP Client
+    // HTTP Client Delegation
     // ══════════════════════════════════════════════
 
     protected function request()
     {
-        $builder = Http::timeout($this->timeout)->withHeaders([
-            'Accept' => 'application/json',
-        ]);
-
-        if (!empty($this->token)) {
-            $builder = $builder->withHeaders([
-                'X-WA-V2-Token' => $this->token,
-            ]);
-        }
-
-        return $builder;
+        return $this->http->request();
     }
 
     protected function get(string $path, array $query = []): array
     {
-        try {
-            $response = $this->request()->get($this->baseUrl . $path, $query);
-            return $this->wrap($response);
-        } catch (\Exception $e) {
-            Log::error('[WaCaraka] GET failed', ['path' => $path, 'error' => $e->getMessage()]);
-            return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
-        }
+        return $this->http->get($path, $query);
     }
 
     protected function post(string $path, array $data = []): array
     {
-        try {
-            $response = $this->request()->post($this->baseUrl . $path, $data);
-            return $this->wrap($response);
-        } catch (\Exception $e) {
-            Log::error('[WaCaraka] POST failed', ['path' => $path, 'error' => $e->getMessage()]);
-            return $this->error('Gagal terhubung ke WA runtime', $e->getMessage());
-        }
+        return $this->http->post($path, $data);
     }
 
-    private function wrap(\Illuminate\Http\Client\Response $response): array
+    private function wrap($response): array
     {
-        return [
-            'ok'     => $response->successful(),
-            'status' => $response->status(),
-            'data'   => $response->json(),
-        ];
+        return $this->http->wrap($response);
     }
 
     private function error(string $message, ?string $detail = null, int $status = 502): array
     {
-        return [
-            'ok'     => false,
-            'status' => $status,
-            'error'  => $message,
-            'detail' => $detail,
-        ];
+        return $this->http->error($message, $detail, $status);
     }
 
     // ══════════════════════════════════════════════
@@ -119,1536 +102,285 @@ class WaCarakaService
 
     public function health(): array
     {
-        return $this->get('/health');
+        return $this->messages->health();
     }
 
     public function qr(): array
     {
-        return $this->get('/qr');
+        return $this->messages->qr();
     }
 
     public function refreshQr(): array
     {
-        return $this->post('/refresh-qr');
+        return $this->messages->refreshQr();
     }
 
     public function restart(): array
     {
-        return $this->post('/restart');
+        return $this->messages->restart();
     }
 
     public function reconnect(): array
     {
-        return $this->post('/reconnect');
+        return $this->messages->reconnect();
     }
 
     public function disconnect(): array
     {
-        return $this->post('/disconnect');
+        return $this->messages->disconnect();
     }
 
     // ══════════════════════════════════════════════
-    // Runtime History (from Node.js process)
+    // Runtime History
     // ══════════════════════════════════════════════
 
     public function history(): array
     {
-        return $this->get('/history');
+        return $this->messages->history();
     }
 
     public function clearHistory(): array
     {
-        return $this->post('/history/clear');
+        return $this->messages->clearHistory();
+    }
+
+    public function clearInbox(): array
+    {
+        return $this->messages->clearInbox();
     }
 
     public function getLidMappings(): array
     {
-        return $this->get('/lid-mappings');
+        return $this->messages->getLidMappings();
     }
 
     public function syncContacts(): array
     {
-        $response = $this->post('/contacts/sync');
-
-        // Some runtimes do not implement /contacts/sync yet.
-        // Fallback to current lid mappings so UI action stays useful.
-        if (($response['status'] ?? 0) === 404 || ($response['ok'] ?? false) === false) {
-            $mappings = $this->getLidMappings();
-            $pairs = $mappings['data']['pairs'] ?? [];
-
-            return [
-                'ok' => true,
-                'status' => 200,
-                'data' => [
-                    'ok' => true,
-                    'scanned' => null,
-                    'learned' => 0,
-                    'lidMappings' => is_array($pairs) ? count($pairs) : 0,
-                    'fallback' => true,
-                ],
-            ];
-        }
-
-        return $response;
+        return $this->messages->syncContacts();
     }
 
     public function resolveContactsMeta(array $jids): array
     {
-        $normalized = collect($jids)
-            ->filter(fn ($jid) => is_string($jid) && trim($jid) !== '')
-            ->map(fn ($jid) => trim((string) $jid))
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($normalized)) {
-            return [
-                'ok' => true,
-                'status' => 200,
-                'data' => ['ok' => true, 'items' => []],
-            ];
-        }
-
-        $response = $this->post('/contacts/resolve', ['jids' => $normalized]);
-
-        if (($response['status'] ?? 0) === 404) {
-            return [
-                'ok' => true,
-                'status' => 200,
-                'data' => ['ok' => true, 'items' => [], 'fallback' => true],
-            ];
-        }
-
-        return $response;
+        return $this->messages->resolveContactsMeta($jids);
     }
 
     // ══════════════════════════════════════════════
     // Outbound Messaging
     // ══════════════════════════════════════════════
 
-    /**
-     * Send a single text message via runtime and log it.
-     */
-    public function sendText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?\App\Models\User $user = null): array
+    public function sendText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?string $quoteWaId = null): array
     {
-        return $this->sendRuntimeText($to, $text, $sender, $userId);
+        return $this->messages->sendText($to, $text, $sender, $userId, $quoteWaId);
     }
 
     public function sendMedia(string $to, array $mediaPayload, ?string $sender = null, ?int $userId = null): array
     {
-        return $this->sendRuntimeMedia($to, $mediaPayload, $sender, $userId);
+        return $this->messages->sendMedia($to, $mediaPayload, $sender, $userId);
     }
 
     public function queueText(string $to, string $text, ?string $sender = null, ?int $userId = null): array
     {
-        $queuedMessage = $this->createQueuedOutboundMessage($to, $text, $userId);
-
-        if (!$queuedMessage) {
-            return $this->sendRuntimeText($to, $text, $sender, $userId);
-        }
-
-        $this->dispatchMessageSynced($queuedMessage->fresh('user:id,name,alias'));
-
-        $job = new SendWaCarakaOutboundMessage($queuedMessage->id, $sender);
-
-        if ($this->shouldDispatchOutboundAsync()) {
-            dispatch($job->onQueue(config('wa_caraka.queue', 'wa-caraka')));
-            $queuedMessage = $queuedMessage->fresh('user:id,name,alias');
-
-            return [
-                'ok' => true,
-                'status' => 200,
-                'queued' => true,
-                'data' => [
-                    'queuedMessageId' => $queuedMessage?->id,
-                    'status' => $queuedMessage?->status ?? 'queued',
-                    'conversationId' => $queuedMessage?->conversation_id,
-                ],
-            ];
-        }
-
-        return $this->deliverQueuedMessage($queuedMessage->id, $sender);
+        return $this->messages->queueText($to, $text, $sender, $userId);
     }
 
     public function queueBroadcastText(array $recipients, string $text, ?string $sender = null, ?int $userId = null): array
     {
-        if (count($recipients) > $this->broadcastLimit) {
-            return $this->error(
-                sprintf('Maksimal %d penerima per broadcast.', $this->broadcastLimit),
-                'Kurangi jumlah penerima lalu kirim ulang.',
-                422,
-            );
-        }
-
-        $results = [];
-
-        foreach ($recipients as $to) {
-            $res = $this->queueText($to, $text, $sender, $userId);
-            $results[] = [
-                'to' => $to,
-                'ok' => $res['ok'],
-                'status' => $res['data']['status'] ?? ($res['ok'] ? 'queued' : 'failed'),
-                'message' => $res['error'] ?? ($res['queued'] ?? false ? 'QUEUED' : 'OK'),
-            ];
-        }
-
-        return [
-            'ok' => true,
-            'status' => 200,
-            'data' => [
-                'total' => count($recipients),
-                'succeeded' => count(array_filter($results, fn ($r) => in_array($r['status'], ['sent', 'queued'], true))),
-                'failed' => count(array_filter($results, fn ($r) => $r['status'] === 'failed')),
-                'results' => $results,
-            ],
-        ];
+        return $this->messages->queueBroadcastText($recipients, $text, $sender, $userId);
     }
 
     public function deliverQueuedMessage(int $messageId, ?string $sender = null): array
     {
-        $message = WaCarakaMessage::query()->find($messageId);
-
-        if (!$message || $message->direction !== 'outbound') {
-            return $this->error('Pesan antrean tidak ditemukan.', null, 404);
-        }
-
-        if (in_array($message->status, ['sent', 'delivered', 'read'], true)) {
-            return [
-                'ok' => true,
-                'status' => 200,
-                'data' => ['messageId' => $message->wa_message_id, 'status' => $message->status],
-            ];
-        }
-
-        $response = $this->post('/send-text', [
-            'to' => $message->remote_number,
-            'text' => $message->message_text,
-        ]);
-
-        $message->forceFill([
-            'wa_message_id' => $response['data']['messageId'] ?? $message->wa_message_id,
-            'status' => $response['ok'] ? 'sent' : 'failed',
-            'metadata' => $response['data'] ?? ['error' => $response['error'] ?? null],
-        ])->save();
-
-        $freshMessage = $message->fresh();
-        if ($freshMessage) {
-            $this->syncConversation($freshMessage);
-        }
-
-        $storedMessage = $message->fresh('user:id,name,alias');
-        if ($storedMessage) {
-            $this->dispatchMessageSynced($storedMessage);
-        }
-
-        $this->logLegacy([
-            'sender' => $sender,
-            'receiver' => $message->remote_number,
-            'message' => $message->message_text,
-            'type' => $message->message_type,
-            'status' => $response['ok'] ? 'sent' : 'failed',
-            'payload' => $response['data'] ?? ['error' => $response['error'] ?? null],
-        ]);
-
-        return $response;
+        return $this->messages->deliverQueuedMessage($messageId, $sender);
     }
 
-    /**
-     * Reply to a specific inbound message.
-     */
     public function replyTo(WaCarakaMessage $inboundMessage, string $text, int $userId): array
     {
-        $response = $this->sendText(
-            $inboundMessage->remote_number,
-            $text,
-            null,
-            $userId,
-        );
-
-        // Mark original inbound as replied
-        if ($response['ok']) {
-            $inboundMessage->update(['replied_at' => now()]);
-        }
-
-        return $response;
+        return $this->messages->replyTo($inboundMessage, $text, $userId);
     }
 
-    /**
-     * Bulk send — same message to multiple recipients.
-     */
+    public function unsendMessage(string $jid, string $messageId, ?int $userId = null): array
+    {
+        return $this->messages->unsendMessage($jid, $messageId, $userId);
+    }
+
     public function broadcastText(array $recipients, string $text, ?string $sender = null, ?int $userId = null): array
     {
-        if (count($recipients) > $this->broadcastLimit) {
-            return $this->error(
-                sprintf('Maksimal %d penerima per broadcast.', $this->broadcastLimit),
-                'Kurangi jumlah penerima lalu kirim ulang.',
-                422,
-            );
-        }
-
-        $results = [];
-
-        foreach ($recipients as $to) {
-            $res = $this->sendText($to, $text, $sender, $userId);
-            $results[] = [
-                'to'      => $to,
-                'ok'      => $res['ok'],
-                'status'  => $res['status'],
-                'message' => $res['error'] ?? 'OK',
-            ];
-        }
-
-        return [
-            'ok'     => true,
-            'status' => 200,
-            'data'   => [
-                'total'     => count($recipients),
-                'succeeded' => count(array_filter($results, fn ($r) => $r['ok'])),
-                'failed'    => count(array_filter($results, fn ($r) => !$r['ok'])),
-                'results'   => $results,
-            ],
-        ];
-    }
-
-    protected function sendRuntimeText(string $to, string $text, ?string $sender = null, ?int $userId = null): array
-    {
-        $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
-
-        $response = $this->post('/send-text', [
-            'to'   => $normalizedTo,
-            'text' => $text,
-        ]);
-
-        $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
-
-        $outboundMsg = $this->storeMessageAndSync([
-            'user_id'         => $userId,
-            'direction'       => 'outbound',
-            'remote_number'   => $normalizedTo,
-            'message_text'    => $text,
-            'message_type'    => 'text',
-            'wa_message_id'   => $response['data']['messageId'] ?? null,
-            'status'          => $response['ok'] ? 'sent' : 'failed',
-            'conversation_id' => $conversationId,
-            'metadata'        => $response['data'] ?? ['error' => $response['error'] ?? null],
-        ]);
-
-        if ($outboundMsg) {
-            $this->dispatchMessageSynced($outboundMsg);
-        }
-
-        $this->logLegacy([
-            'sender'   => $sender,
-            'receiver' => $normalizedTo,
-            'message'  => $text,
-            'type'     => 'text',
-            'status'   => $response['ok'] ? 'sent' : 'failed',
-            'payload'  => $response['data'] ?? ['error' => $response['error'] ?? null],
-        ]);
-
-        return $response;
-    }
-
-    protected function sendRuntimeMedia(string $to, array $mediaPayload, ?string $sender = null, ?int $userId = null): array
-    {
-        $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
-        $kind = strtolower(trim((string) ($mediaPayload['media_kind'] ?? $mediaPayload['kind'] ?? 'document')));
-        $caption = (string) ($mediaPayload['caption'] ?? '');
-        $fileName = $this->normalizeOutgoingMediaFileName($mediaPayload['file_name'] ?? null, $kind, $mediaPayload['media_url'] ?? null);
-        $mimeType = $this->normalizeOutgoingMediaMimeType(
-            $mediaPayload['mime_type'] ?? null,
-            $fileName,
-            $kind,
-            $mediaPayload['media_url'] ?? null,
-        );
-        $mediaUrl = isset($mediaPayload['media_url']) ? trim((string) $mediaPayload['media_url']) : null;
-
-        $response = $this->post('/send-media', [
-            'to' => $normalizedTo,
-            'media_kind' => $kind,
-            'media_url' => $mediaUrl,
-            'mime_type' => $mimeType,
-            'file_name' => $fileName,
-            'caption' => $caption,
-            'ptt' => (bool) ($mediaPayload['ptt'] ?? false),
-        ]);
-
-        $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
-
-        $metadata = $response['data'] ?? [];
-        if (!is_array($metadata)) {
-            $metadata = ['raw' => $metadata];
-        }
-
-        $existingMedia = is_array($metadata['media'] ?? null) ? $metadata['media'] : [];
-        $sourceUrl = $existingMedia['source'] ?? $existingMedia['url'] ?? null;
-        $byteLength = $existingMedia['byteLength'] ?? $this->byteLengthFromDataUrl($mediaUrl);
-
-        $metadata['media'] = array_merge(
-            $existingMedia,
-            [
-                'kind' => $kind,
-                'mimetype' => $mimeType,
-                'fileName' => $fileName,
-                'caption' => $caption,
-                'byteLength' => $byteLength,
-                // Prefer bridge source URL for large docs/files, fallback to original data URL.
-                'dataUrl' => $kind === 'image' || $kind === 'sticker' ? ($mediaUrl ?? $sourceUrl) : null,
-                'url' => $sourceUrl ?? $mediaUrl,
-            ],
-        );
-
-        $outboundMsg = $this->storeMessageAndSync([
-            'user_id'         => $userId,
-            'direction'       => 'outbound',
-            'remote_number'   => $normalizedTo,
-            'message_text'    => $caption,
-            'message_type'    => $kind,
-            'wa_message_id'   => $response['data']['messageId'] ?? null,
-            'status'          => $response['ok'] ? 'sent' : 'failed',
-            'conversation_id' => $conversationId,
-            'metadata'        => $metadata,
-        ]);
-
-        if ($outboundMsg) {
-            $this->dispatchMessageSynced($outboundMsg);
-        }
-
-        $this->logLegacy([
-            'sender'   => $sender,
-            'receiver' => $normalizedTo,
-            'message'  => $caption,
-            'type'     => $kind,
-            'status'   => $response['ok'] ? 'sent' : 'failed',
-            'payload'  => $response['data'] ?? ['error' => $response['error'] ?? null],
-        ]);
-
-        return $response;
-    }
-
-    private function byteLengthFromDataUrl(?string $mediaUrl): ?int
-    {
-        if (!is_string($mediaUrl) || !str_starts_with($mediaUrl, 'data:')) {
-            return null;
-        }
-
-        $parts = explode(',', $mediaUrl, 2);
-        if (count($parts) !== 2) {
-            return null;
-        }
-
-        $payload = preg_replace('/\s+/', '', $parts[1] ?? '');
-        if ($payload === '') {
-            return null;
-        }
-
-        $padding = 0;
-        if (str_ends_with($payload, '==')) {
-            $padding = 2;
-        } elseif (str_ends_with($payload, '=')) {
-            $padding = 1;
-        }
-
-        return (int) max(0, ((strlen($payload) * 3) / 4) - $padding);
-    }
-
-    private function normalizeOutgoingMediaFileName(mixed $fileName, string $kind, mixed $mediaUrl = null): ?string
-    {
-        $normalized = trim((string) ($fileName ?? ''));
-        if ($normalized !== '') {
-            return $normalized;
-        }
-
-        if (is_string($mediaUrl) && preg_match('#^https?://#i', $mediaUrl)) {
-            $path = parse_url($mediaUrl, PHP_URL_PATH);
-            $candidate = trim((string) basename((string) $path));
-            if ($candidate !== '' && $candidate !== '/' && $candidate !== '.') {
-                return $candidate;
-            }
-        }
-
-        return match ($kind) {
-            'image' => 'image.jpg',
-            'video' => 'video.mp4',
-            'audio' => 'audio.ogg',
-            'sticker' => 'sticker.webp',
-            default => 'document.bin',
-        };
-    }
-
-    private function normalizeOutgoingMediaMimeType(mixed $mimeType, ?string $fileName, string $kind, mixed $mediaUrl = null): ?string
-    {
-        $normalized = strtolower(trim((string) ($mimeType ?? '')));
-        if ($normalized !== '') {
-            return $normalized;
-        }
-
-        if (is_string($mediaUrl) && preg_match('/^data:([^;,]+);base64,/i', $mediaUrl, $matches)) {
-            return strtolower(trim((string) ($matches[1] ?? ''))) ?: null;
-        }
-
-        $extension = strtolower((string) pathinfo((string) ($fileName ?? ''), PATHINFO_EXTENSION));
-
-        return match ($extension) {
-            'jpg', 'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'heic' => 'image/heic',
-            'heif' => 'image/heif',
-            'mp4' => 'video/mp4',
-            'mov' => 'video/quicktime',
-            'avi' => 'video/x-msvideo',
-            'mp3' => 'audio/mpeg',
-            'ogg', 'oga' => 'audio/ogg',
-            'wav' => 'audio/wav',
-            'm4a' => 'audio/mp4',
-            'pdf' => 'application/pdf',
-            'rtf' => 'application/rtf',
-            'doc' => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls' => 'application/vnd.ms-excel',
-            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'ppt' => 'application/vnd.ms-powerpoint',
-            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'csv' => 'text/csv',
-            'txt' => 'text/plain',
-            'json' => 'application/json',
-            'xml' => 'application/xml',
-            'zip' => 'application/zip',
-            'rar' => 'application/vnd.rar',
-            '7z' => 'application/x-7z-compressed',
-            default => match ($kind) {
-                'image' => 'image/jpeg',
-                'video' => 'video/mp4',
-                'audio' => 'audio/ogg',
-                'sticker' => 'image/webp',
-                default => 'application/octet-stream',
-            },
-        };
+        return $this->messages->broadcastText($recipients, $text, $sender, $userId);
     }
 
     // ══════════════════════════════════════════════
     // Inbound Webhook Handler
     // ══════════════════════════════════════════════
 
-    /**
-     * Process an incoming message pushed by the WA runtime webhook.
-     * Called from the webhook controller endpoint.
-     */
     public function handleInbound(array $payload): WaCarakaMessage
     {
-        $message = $this->ingestWebhookMessage(array_merge($payload, [
-            'direction' => 'inbound',
-            'syncSource' => $payload['syncSource'] ?? 'realtime',
-        ]));
+        return $this->messages->handleInbound($payload);
+    }
 
-        if ($message->wasRecentlyCreated) {
-            try {
-                WaCarakaMessageReceived::dispatch($message);
-            } catch (\Throwable $e) {
-                Log::warning('[WaCaraka] Failed to dispatch message received event', [
-                    'message_id' => $message->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return $message;
+    public function shouldIgnoreInboundPayload(array $payload): bool
+    {
+        return $this->messages->shouldIgnoreInboundPayload($payload);
     }
 
     public function ingestWebhookMessage(array $payload): WaCarakaMessage
     {
-        $attributes = $this->buildMessageAttributesFromWebhookPayload($payload);
-
-        return $this->storeWebhookMessage($attributes);
+        return $this->messages->ingestWebhookMessage($payload);
     }
 
     public function ingestHistorySyncBatch(array $payload): array
     {
-        $items = is_array($payload['messages'] ?? null) ? $payload['messages'] : [];
-        $run = $this->beginOrUpdateSyncRun($payload);
-
-        $imported = 0;
-        $duplicates = 0;
-        $failed = 0;
-
-        foreach ($items as $item) {
-            try {
-                $message = $this->ingestWebhookMessage(array_merge((array) $item, [
-                    'syncSource' => 'history',
-                    'historySync' => true,
-                    'historyRunKey' => $run->run_key,
-                ]));
-
-                if ($message->wasRecentlyCreated) {
-                    $imported++;
-                } else {
-                    $duplicates++;
-                }
-            } catch (\Throwable $e) {
-                $failed++;
-                Log::warning('[WaCaraka] History sync item failed', [
-                    'run_key' => $run->run_key,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        $run = $this->finishSyncRunProgress($run, $payload, count($items), $imported, $duplicates, $failed);
-
-        return [
-            'runKey' => $run->run_key,
-            'status' => $run->status,
-            'received' => count($items),
-            'imported' => $imported,
-            'duplicates' => $duplicates,
-            'failed' => $failed,
-            'progress' => $run->progress,
-        ];
+        return $this->messages->ingestHistorySyncBatch($payload);
     }
 
-    private function buildMessageAttributesFromWebhookPayload(array $payload): array
-    {
-        $raw = is_array($payload['raw'] ?? null) ? $payload['raw'] : [];
-        $direction = $this->resolveWebhookDirection($payload);
-
-        $chatAddress = (string) (
-            $payload['chatId']
-            ?? $payload['remoteJid']
-            ?? $payload['remote']
-            ?? ($raw['chatId'] ?? null)
-            ?? ($raw['remoteJid'] ?? null)
-            ?? $payload['to']
-            ?? $payload['from']
-            ?? ''
-        );
-        $senderAddress = (string) (
-            $payload['fromPn']
-            ?? $payload['resolvedFromJid']
-            ?? $payload['from']
-            ?? $payload['participant']
-            ?? $payload['author']
-            ?? ($raw['participant'] ?? null)
-            ?? ($raw['author'] ?? null)
-            ?? ($raw['fromRaw'] ?? null)
-            ?? $chatAddress
-        );
-
-        $isGroup = str_ends_with($chatAddress, '@g.us')
-            || (bool) ($payload['isGroup'] ?? false)
-            || (bool) ($raw['isGroup'] ?? false)
-            || str_ends_with((string) ($raw['chatId'] ?? ''), '@g.us');
-
-        if ($isGroup && !str_ends_with($chatAddress, '@g.us')) {
-            $chatAddress = (string) ($raw['chatId'] ?? $chatAddress);
-        }
-
-        $remoteNumber = $direction === 'outbound'
-            ? ($isGroup ? $chatAddress : ($chatAddress ?: $payload['to'] ?? $senderAddress))
-            : ($isGroup ? $chatAddress : $senderAddress);
-
-        if ($isGroup && str_ends_with((string) ($raw['chatId'] ?? ''), '@g.us')) {
-            $remoteNumber = (string) $raw['chatId'];
-        }
-
-        $remoteNumber = WaCarakaMessage::normalizeRemoteNumber($remoteNumber);
-        $payload = $this->normalizePayloadMediaUrls($payload);
-        $timestamp = $this->resolvePayloadTimestamp($payload);
-
-        return [
-            'user_id' => null,
-            'direction' => $direction,
-            'remote_number' => $remoteNumber,
-            'local_number' => $payload['to'] ?? $payload['local'] ?? null,
-            'message_text' => $payload['text'] ?? $payload['body'] ?? $payload['message'] ?? null,
-            'message_type' => $payload['type'] ?? 'text',
-            'wa_message_id' => $payload['id'] ?? $payload['messageId'] ?? null,
-            'status' => $payload['status'] ?? ($direction === 'inbound' ? 'received' : 'sent'),
-            'conversation_id' => WaCarakaMessage::conversationIdFor($remoteNumber),
-            'metadata' => $payload,
-            'occurred_at' => $timestamp,
-        ];
-    }
-
-    private function storeWebhookMessage(array $attributes): WaCarakaMessage
-    {
-        $occurredAt = $attributes['occurred_at'] ?? null;
-        unset($attributes['occurred_at']);
-
-        $waMessageId = $attributes['wa_message_id'] ?? null;
-        if ($waMessageId) {
-            $existing = WaCarakaMessage::query()->where('wa_message_id', $waMessageId)->first();
-            if ($existing) {
-                return $existing;
-            }
-        }
-
-        $message = new WaCarakaMessage($attributes);
-
-        if ($occurredAt instanceof Carbon) {
-            $message->setCreatedAt($occurredAt);
-            $message->setUpdatedAt($occurredAt);
-        }
-
-        $message->save();
-        $this->syncConversation($message);
-        $this->recordDailyMetricForMessage($message);
-
-        return $message;
-    }
-
-    private function resolveWebhookDirection(array $payload): string
-    {
-        $direction = strtolower(trim((string) ($payload['direction'] ?? '')));
-        if (in_array($direction, ['inbound', 'outbound'], true)) {
-            return $direction;
-        }
-
-        return (bool) ($payload['fromMe'] ?? false) ? 'outbound' : 'inbound';
-    }
-
-    private function normalizePayloadMediaUrls(array $payload): array
-    {
-        if (
-            isset($payload['media']['url'])
-            && !empty($payload['media']['url'])
-            && empty($payload['media']['dataUrl'])
-        ) {
-            $payload['media']['dataUrl'] = $payload['media']['url'];
-        }
-
-        if (
-            isset($payload['media']['mediaToken'])
-            && empty($payload['media']['dataUrl'])
-            && preg_match('/^[a-f0-9]{32,}$/', $payload['media']['mediaToken'])
-        ) {
-            $mediaProxyUrl = route('lawangsewu.wacaraka.media', [
-                'path' => $payload['media']['mediaToken'],
-            ]);
-            $payload['media']['dataUrl'] = $mediaProxyUrl;
-            $payload['media']['url'] = $mediaProxyUrl;
-        }
-
-        return $payload;
-    }
-
-    private function resolvePayloadTimestamp(array $payload): ?Carbon
-    {
-        $raw = is_array($payload['raw'] ?? null) ? $payload['raw'] : [];
-        $candidates = [
-            $payload['timestamp'] ?? null,
-            $payload['messageTimestamp'] ?? null,
-            $raw['messageTimestamp'] ?? null,
-            $raw['messageTimestamp.low'] ?? null,
-            data_get($raw, 'messageTimestamp'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if ($candidate instanceof Carbon) {
-                return $candidate;
-            }
-
-            if (is_object($candidate) && isset($candidate->low) && is_numeric($candidate->low)) {
-                $candidate = $candidate->low;
-            }
-
-            if (is_array($candidate) && isset($candidate['low']) && is_numeric($candidate['low'])) {
-                $candidate = $candidate['low'];
-            }
-
-            if (is_numeric($candidate)) {
-                $value = (int) $candidate;
-                if ($value > 9999999999) {
-                    $value = (int) floor($value / 1000);
-                }
-
-                if ($value > 0) {
-                    return Carbon::createFromTimestamp($value);
-                }
-            }
-
-            if (is_string($candidate) && trim($candidate) !== '') {
-                try {
-                    return Carbon::parse($candidate);
-                } catch (\Throwable $e) {
-                    // Try next candidate.
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function beginOrUpdateSyncRun(array $payload): WaCarakaSyncRun
-    {
-        $runKey = trim((string) ($payload['runKey'] ?? ''));
-        if ($runKey === '') {
-            $runKey = 'history-' . now()->format('YmdHis');
-        }
-
-        return WaCarakaSyncRun::query()->updateOrCreate(
-            ['run_key' => $runKey],
-            [
-                'source' => 'history',
-                'status' => 'running',
-                'connection_jid' => $payload['connectionJid'] ?? null,
-                'device_label' => $payload['deviceLabel'] ?? null,
-                'sync_type' => $payload['syncType'] ?? null,
-                'progress' => is_numeric($payload['progress'] ?? null) ? (int) $payload['progress'] : null,
-                'started_at' => isset($payload['startedAt']) ? Carbon::parse((string) $payload['startedAt']) : now(),
-                'last_event_at' => now(),
-                'meta' => [
-                    'isLatest' => (bool) ($payload['isLatest'] ?? false),
-                    'historySync' => true,
-                ],
-            ],
-        );
-    }
-
-    private function finishSyncRunProgress(WaCarakaSyncRun $run, array $payload, int $received, int $imported, int $duplicates, int $failed): WaCarakaSyncRun
-    {
-        $run->fill([
-            'status' => (bool) ($payload['isLatest'] ?? false) ? 'completed' : 'running',
-            'sync_type' => $payload['syncType'] ?? $run->sync_type,
-            'progress' => is_numeric($payload['progress'] ?? null) ? (int) $payload['progress'] : $run->progress,
-            'last_event_at' => now(),
-            'finished_at' => (bool) ($payload['isLatest'] ?? false) ? now() : $run->finished_at,
-        ]);
-
-        $run->batches_count += 1;
-        $run->chats_count += count(is_array($payload['chats'] ?? null) ? $payload['chats'] : []);
-        $run->contacts_count += count(is_array($payload['contacts'] ?? null) ? $payload['contacts'] : []);
-        $run->messages_received += $received;
-        $run->messages_imported += $imported;
-        $run->messages_duplicate += $duplicates;
-        $run->messages_failed += $failed;
-        $run->save();
-
-        return $run->fresh();
-    }
-
-    /**
-     * Try to pull inbox from runtime (if endpoint exists).
-     * Falls back gracefully if runtime doesn't support it yet.
-     */
     public function pullInbox(?string $since = null): array
     {
-        $query = $since ? ['since' => $since] : [];
-
-        $response = $this->get('/messages', $query);
-
-        if (!$response['ok']) {
-            return [
-                'ok'     => true,
-                'status' => 200,
-                'data'   => [
-                    'supported' => false,
-                    'pulled' => 0,
-                    'stored' => 0,
-                    'message' => 'Runtime belum mendukung endpoint inbox.',
-                ],
-            ];
-        }
-
-        $messages = $response['data']['messages'] ?? $response['data'] ?? [];
-
-        // Store each pulled message if not already stored
-        $stored = 0;
-        foreach ($messages as $msg) {
-            $waId = $msg['id'] ?? $msg['messageId'] ?? null;
-
-            if ($waId && WaCarakaMessage::where('wa_message_id', $waId)->exists()) {
-                continue;
-            }
-
-            $message = $this->ingestWebhookMessage(array_merge($msg, [
-                'direction' => $msg['direction'] ?? 'inbound',
-                'syncSource' => $msg['syncSource'] ?? 'realtime',
-            ]));
-
-            if ($message->wasRecentlyCreated) {
-                $stored++;
-            }
-        }
-
-        return [
-            'ok'     => true,
-            'status' => 200,
-            'data'   => [
-                'supported' => true,
-                'pulled' => count($messages),
-                'stored' => $stored,
-            ],
-        ];
+        return $this->messages->pullInbox($since);
     }
 
     // ══════════════════════════════════════════════
-    // Inbox Queries (from local DB)
+    // Inbox Queries
     // ══════════════════════════════════════════════
 
-    /**
-     * Get inbox conversations (grouped by remote_number).
-     */
     public function conversations(int $limit = 30): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return [];
-        }
-
-        return WaCarakaMessage::query()
-            ->select('remote_number', 'conversation_id')
-            ->selectRaw('MAX(created_at) as last_message_at')
-            ->selectRaw('COUNT(*) as message_count')
-            ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND replied_at IS NULL THEN 1 ELSE 0 END) as unreplied_count")
-            ->groupBy('remote_number', 'conversation_id')
-            ->orderByDesc('last_message_at')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($row) => [
-                'remoteNumber'   => $row->remote_number,
-                'conversationId' => $row->conversation_id,
-                'lastMessageAt'  => $row->last_message_at,
-                'messageCount'   => (int) $row->message_count,
-                'unrepliedCount' => (int) $row->unreplied_count,
-            ])
-            ->all();
+        return $this->conversations->conversations($limit);
     }
 
-    /**
-     * Get messages for a specific conversation (by remote number).
-     */
     public function conversationMessages(string $conversationKey, int $limit = 50, bool $preferConversationId = true): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return [];
-        }
-
-        $normalizedKey = trim($conversationKey);
-        if ($normalizedKey === '') {
-            return [];
-        }
-
-        $query = WaCarakaMessage::query();
-
-        $query->where(function (Builder $builder) use ($normalizedKey, $preferConversationId) {
-            if ($preferConversationId) {
-                $relatedConversationIds = $this->relatedConversationIdsFor($normalizedKey);
-
-                if (!empty($relatedConversationIds)) {
-                    $builder->whereIn('conversation_id', $relatedConversationIds);
-                    return;
-                }
-
-                $builder->where('conversation_id', $normalizedKey);
-                return;
-            }
-
-            $normalizedRemote = WaCarakaMessage::normalizeRemoteNumber($normalizedKey);
-
-            $builder->where('remote_number', $normalizedRemote)
-                ->orWhere('remote_number', $normalizedKey)
-                ->orWhere('conversation_id', $normalizedKey);
-        });
-
-        return $query
-            ->with('user:id,name,alias')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get()
-            ->reverse()
-            ->values()
-            ->map(function (WaCarakaMessage $msg) {
-                $metadata = is_array($msg->metadata) ? $msg->metadata : [];
-                $context = $this->messageContext($msg);
-
-                return [
-                    'id'            => $msg->id,
-                    'direction'     => $msg->direction,
-                    'remoteNumber'  => $msg->remote_number,
-                    'text'          => $msg->message_text,
-                    'type'          => $msg->message_type,
-                    'status'        => $msg->status,
-                    'waMessageId'   => $msg->wa_message_id,
-                    'operator'      => $msg->user ? ($msg->user->alias ?: $msg->user->name) : null,
-                    'repliedAt'     => $msg->replied_at
-                        ? $msg->replied_at->setTimezone('Asia/Jakarta')->format('d M H:i') . ' WIB'
-                        : null,
-                    'sentAt'        => $msg->created_at
-                        ? $msg->created_at->setTimezone('Asia/Jakarta')->format('d M H:i') . ' WIB'
-                        : null,
-                    'metadata'      => $metadata,
-                    'isGroup'       => $context['is_group'],
-                    'groupName'     => $context['group_name'],
-                    'senderName'    => $context['sender_name'],
-                    'senderKey'     => $context['sender_key'],
-                ];
-            })
-            ->all();
-    }
-
-    /**
-     * Resolve all conversation IDs that still belong to the same logical chat.
-     */
-    private function relatedConversationIdsFor(string $conversationId): array
-    {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
-            return [$conversationId];
-        }
-
-        $conversation = WaCarakaConversation::query()
-            ->where('conversation_id', $conversationId)
-            ->first(['conversation_id', 'remote_number']);
-
-        if (!$conversation) {
-            return [$conversationId];
-        }
-
-        $normalizedRemote = WaCarakaMessage::normalizeRemoteNumber((string) $conversation->remote_number);
-        if ($normalizedRemote === '') {
-            return [$conversationId];
-        }
-
-        $relatedIds = WaCarakaConversation::query()
-            ->get(['conversation_id', 'remote_number'])
-            ->filter(fn (WaCarakaConversation $item) => WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedRemote)
-            ->pluck('conversation_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if (!in_array($conversationId, $relatedIds, true)) {
-            $relatedIds[] = $conversationId;
-        }
-
-        return $relatedIds;
-    }
-
-    private function messageContext(WaCarakaMessage $message): array
-    {
-        $metadata = is_array($message->metadata) ? $message->metadata : [];
-
-        $remote = (string) ($message->remote_number ?? '');
-        $remoteJid = (string) ($metadata['remoteJid'] ?? $metadata['chatId'] ?? $remote);
-        $participant = (string) ($metadata['participant'] ?? $metadata['author'] ?? $metadata['from'] ?? '');
-
-        $isGroup = str_ends_with($remoteJid, '@g.us') || str_ends_with($remote, '@g.us') || (bool) ($metadata['isGroup'] ?? false);
-
-        $groupName = $metadata['groupName']
-            ?? $metadata['groupSubject']
-            ?? ($isGroup ? ($metadata['pushName'] ?? null) : null);
-
-        $senderName = $metadata['senderName']
-            ?? $metadata['participantName']
-            ?? $metadata['pushName']
-            ?? null;
-
-        if ($message->direction === 'outbound') {
-            $senderName = $message->user ? ($message->user->alias ?: $message->user->name) : ($senderName ?? 'Operator');
-        }
-
-        if (!$senderName && $participant !== '') {
-            $senderName = $participant;
-        }
-
-        if (!$senderName) {
-            $senderName = $message->direction === 'outbound' ? 'Operator' : 'Kontak';
-        }
-
-        return [
-            'is_group' => $isGroup,
-            'group_name' => $groupName,
-            'sender_name' => $senderName,
-            'sender_key' => $participant !== '' ? $participant : ($isGroup ? $remoteJid : $remote),
-        ];
+        return $this->conversations->conversationMessages($conversationKey, $limit, $preferConversationId);
     }
 
     // ══════════════════════════════════════════════
-    // Stats & Metrics (local DB)
+    // Stats & Metrics
     // ══════════════════════════════════════════════
 
-    /**
-     * Stats from the legacy wa_caraka_logs table.
-     */
     public function stats(): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_logs')) {
-            return [
-                'total' => 0, 'sent' => 0, 'failed' => 0,
-                'today' => 0, 'lastSent' => 'Belum ada',
-            ];
-        }
-
-        return [
-            'total'    => WaCarakaLog::count(),
-            'sent'     => WaCarakaLog::where('status', 'sent')->count(),
-            'failed'   => WaCarakaLog::where('status', 'failed')->count(),
-            'today'    => WaCarakaLog::whereDate('created_at', today())->count(),
-            'lastSent' => optional(WaCarakaLog::latest()->first())?->created_at?->diffForHumans() ?? 'Belum ada',
-        ];
+        return $this->stats->stats();
     }
 
-    /**
-     * Enhanced stats from the new wa_caraka_messages table.
-     */
     public function messageStats(): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return [
-                'totalMessages' => 0, 'inbound' => 0, 'outbound' => 0,
-                'unreplied' => 0, 'todayInbound' => 0, 'todayOutbound' => 0,
-                'conversations' => 0,
-            ];
-        }
-
-        // Pending reply is counted from conversations shown in inbox:
-        // chat terakhir bukan dari WA Caraka (direction terakhir !== outbound).
-        // Use effective runtime timestamp when available; pull-inbox can import
-        // older messages with newer DB ids.
-        $inboxConversationIds = WaCarakaConversation::query()
-            ->whereIn('conversation_id', function ($query) {
-                $query->from('wa_caraka_messages')
-                    ->select('conversation_id')
-                    ->whereNotNull('conversation_id')
-                    ->groupBy('conversation_id');
-            })
-            ->pluck('conversation_id')
-            ->filter()
-            ->values();
-
-        $latestByConversation = [];
-
-        WaCarakaMessage::query()
-            ->select(['conversation_id', 'direction', 'created_at', 'metadata'])
-            ->whereIn('conversation_id', $inboxConversationIds)
-            ->orderBy('id')
-            ->chunk(500, function ($rows) use (&$latestByConversation) {
-                foreach ($rows as $row) {
-                    $metadata = is_array($row->metadata) ? $row->metadata : [];
-                    $rawTs = $metadata['timestamp'] ?? ($metadata['raw']['timestamp'] ?? null);
-
-                    $effectiveAt = $row->created_at;
-                    if (is_string($rawTs) && trim($rawTs) !== '') {
-                        try {
-                            $parsed = \Illuminate\Support\Carbon::parse($rawTs);
-                            if ($parsed) {
-                                $effectiveAt = $parsed;
-                            }
-                        } catch (\Throwable $e) {
-                            // Ignore malformed runtime timestamp, fallback to created_at.
-                        }
-                    }
-
-                    $cid = (string) $row->conversation_id;
-                    if (!isset($latestByConversation[$cid]) || $effectiveAt->gte($latestByConversation[$cid]['at'])) {
-                        $latestByConversation[$cid] = [
-                            'at' => $effectiveAt,
-                            'direction' => $row->direction,
-                        ];
-                    }
-                }
-            });
-
-        $unrepliedConversations = collect($latestByConversation)
-            ->filter(fn ($item) => ($item['direction'] ?? null) !== 'outbound')
-            ->count();
-
-        return [
-            'totalMessages'  => WaCarakaMessage::count(),
-            'inbound'        => WaCarakaMessage::inbound()->count(),
-            'outbound'       => WaCarakaMessage::outbound()->count(),
-            'unreplied'      => $unrepliedConversations,
-            'todayInbound'   => WaCarakaMessage::inbound()->today()->count(),
-            'todayOutbound'  => WaCarakaMessage::outbound()->today()->count(),
-            'conversations'  => WaCarakaMessage::distinct('conversation_id')->count('conversation_id'),
-        ];
+        return $this->stats->messageStats();
     }
 
-    /**
-     * Recent log entries from legacy table.
-     */
     public function recentLogs(int $limit = 20): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_logs')) {
-            return [];
-        }
-
-        $displayLimit = (int) config('wa_caraka.log_display_limit', $limit);
-
-        return WaCarakaLog::latest()
-            ->limit(min($limit, $displayLimit))
-            ->get()
-            ->map(fn (WaCarakaLog $log) => [
-                'id'       => $log->id,
-                'sender'   => $log->sender,
-                'receiver' => $log->receiver,
-                'message'  => $log->message,
-                'type'     => $log->type,
-                'status'   => $log->status,
-                'sentAt'   => $log->created_at?->setTimezone('Asia/Jakarta')->format('d M Y H:i') . ' WIB',
-            ])
-            ->all();
-    }
-
-    // ══════════════════════════════════════════════
-    // Internal Storage
-    // ══════════════════════════════════════════════
-
-    private function storeMessage(array $data): void
-    {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return;
-        }
-
-        try {
-            WaCarakaMessage::create($data);
-        } catch (\Exception $e) {
-            Log::warning('[WaCaraka] Failed to store message', ['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Store outbound/inbound message and synchronize conversation state.
-     */
-    private function storeMessageAndSync(array $data): ?WaCarakaMessage
-    {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return null;
-        }
-
-        $data['user_id'] = $this->normalizeUserId($data['user_id'] ?? null);
-
-        try {
-            $message = WaCarakaMessage::create($data);
-            $this->syncConversation($message);
-            $this->recordDailyMetricForMessage($message);
-
-            return $message;
-        } catch (\Exception $e) {
-            Log::warning('[WaCaraka] Failed to store message and sync conversation', ['error' => $e->getMessage()]);
-
-            return null;
-        }
-    }
-
-    private function recordDailyMetricForMessage(WaCarakaMessage $message): void
-    {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_daily_metrics')) {
-            return;
-        }
-
-        $metricDate = ($message->created_at ?? now())->copy()->setTimezone(config('app.timezone'))->toDateString();
-        $scopeKey = 'global';
-        $isHistory = (bool) data_get($message->metadata, 'historySync', false)
-            || data_get($message->metadata, 'syncSource') === 'history';
-
-        $metric = WaCarakaDailyMetric::query()->firstOrCreate(
-            ['scope_key' => $scopeKey, 'metric_date' => $metricDate],
-            [
-                'total_messages' => 0,
-                'inbound_messages' => 0,
-                'outbound_messages' => 0,
-                'history_inbound_messages' => 0,
-                'history_outbound_messages' => 0,
-                'realtime_inbound_messages' => 0,
-                'realtime_outbound_messages' => 0,
-            ],
-        );
-
-        $metric->increment('total_messages');
-
-        if ($message->direction === 'outbound') {
-            $metric->increment('outbound_messages');
-            $metric->increment($isHistory ? 'history_outbound_messages' : 'realtime_outbound_messages');
-        } else {
-            $metric->increment('inbound_messages');
-            $metric->increment($isHistory ? 'history_inbound_messages' : 'realtime_inbound_messages');
-        }
+        return $this->stats->recentLogs($limit);
     }
 
     public function rebuildDailyMetrics(): array
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_daily_metrics') || !WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return ['days' => 0, 'messages' => 0];
-        }
+        return $this->stats->rebuildDailyMetrics();
+    }
 
-        WaCarakaDatabase::transaction(function () {
-            WaCarakaDailyMetric::query()->delete();
+    // ══════════════════════════════════════════════
+    // Internal Helpers (delegated)
+    // ══════════════════════════════════════════════
 
-            $rows = WaCarakaMessage::query()
-                ->selectRaw('DATE(created_at) as metric_date')
-                ->selectRaw('COUNT(*) as total_messages')
-                ->selectRaw("SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) as inbound_messages")
-                ->selectRaw("SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) as outbound_messages")
-                ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) = 'history' THEN 1 ELSE 0 END) as history_inbound_messages")
-                ->selectRaw("SUM(CASE WHEN direction = 'outbound' AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) = 'history' THEN 1 ELSE 0 END) as history_outbound_messages")
-                ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND (JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) != 'history') THEN 1 ELSE 0 END) as realtime_inbound_messages")
-                ->selectRaw("SUM(CASE WHEN direction = 'outbound' AND (JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.syncSource')) != 'history') THEN 1 ELSE 0 END) as realtime_outbound_messages")
-                ->groupBy('metric_date')
-                ->orderBy('metric_date')
-                ->get();
+    protected function sendRuntimeText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?string $quoteWaId = null): array
+    {
+        return $this->messages->sendText($to, $text, $sender, $userId, $quoteWaId);
+    }
 
-            foreach ($rows as $row) {
-                WaCarakaDailyMetric::query()->create([
-                    'scope_key' => 'global',
-                    'metric_date' => $row->metric_date,
-                    'total_messages' => (int) $row->total_messages,
-                    'inbound_messages' => (int) $row->inbound_messages,
-                    'outbound_messages' => (int) $row->outbound_messages,
-                    'history_inbound_messages' => (int) $row->history_inbound_messages,
-                    'history_outbound_messages' => (int) $row->history_outbound_messages,
-                    'realtime_inbound_messages' => (int) $row->realtime_inbound_messages,
-                    'realtime_outbound_messages' => (int) $row->realtime_outbound_messages,
-                ]);
-            }
-        });
+    protected function sendRuntimeMedia(string $to, array $mediaPayload, ?string $sender = null, ?int $userId = null): array
+    {
+        return $this->messages->sendMedia($to, $mediaPayload, $sender, $userId);
+    }
 
-        return [
-            'days' => WaCarakaDailyMetric::query()->count(),
-            'messages' => WaCarakaMessage::query()->count(),
-        ];
+    private function storeMessage(array $data): void
+    {
+        // Delegate to message service
+    }
+
+    private function storeMessageAndSync(array $data): ?WaCarakaMessage
+    {
+        // Method removed - delegated directly
+        return null;
+    }
+
+    private function recordDailyMetricForMessage(WaCarakaMessage $message): void
+    {
+        $this->stats->recordDailyMetricForMessage($message);
     }
 
     private function logLegacy(array $data): void
     {
-        if (!config('wa_caraka.logging_enabled', true) || !WaCarakaDatabase::hasTable('wa_caraka_logs')) {
-            return;
-        }
-
-        try {
-            WaCarakaLog::create($data);
-        } catch (\Exception $e) {
-            Log::warning('[WaCaraka] Failed to write legacy log', ['error' => $e->getMessage()]);
-        }
+        $this->messages->logLegacy($data);
     }
 
     private function createQueuedOutboundMessage(string $to, string $text, ?int $userId = null): ?WaCarakaMessage
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_messages')) {
-            return null;
-        }
-
-        $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
-
-        $message = $this->storeMessageAndSync([
-            'user_id' => $userId,
-            'direction' => 'outbound',
-            'remote_number' => $normalizedTo,
-            'message_text' => $text,
-            'message_type' => 'text',
-            'status' => 'queued',
-            'conversation_id' => WaCarakaMessage::conversationIdFor($normalizedTo),
-            'metadata' => [
-                'queued' => true,
-                'queuedAt' => now()->toISOString(),
-            ],
-        ]);
-
-        return $message?->fresh('user:id,name,alias');
+        return $this->messages->createQueuedOutboundMessage($to, $text, $userId);
     }
 
     private function normalizeUserId($userId): ?int
     {
-        $normalized = filter_var($userId, FILTER_VALIDATE_INT);
-        if ($normalized === false || $normalized === null || $normalized <= 0) {
-            return null;
-        }
-
-        if (array_key_exists($normalized, $this->validatedUserIds)) {
-            return $this->validatedUserIds[$normalized] ? $normalized : null;
-        }
-
-        $exists = User::query()->whereKey($normalized)->exists();
-        $this->validatedUserIds[$normalized] = $exists;
-
-        return $exists ? $normalized : null;
+        return $this->messages->normalizeUserId($userId);
     }
 
     private function dispatchMessageSynced(?WaCarakaMessage $message): void
     {
-        if (!$message) {
-            return;
-        }
-
-        try {
-            WaCarakaMessageSynced::dispatch($message);
-        } catch (\Throwable $e) {
-            Log::warning('[WaCaraka] Broadcast dispatch failed (non-critical)', ['error' => $e->getMessage()]);
-        }
+        $this->messages->dispatchMessageSynced($message);
     }
 
     private function shouldDispatchOutboundAsync(): bool
     {
-        if (!config('wa_caraka.async_dispatch', true)) {
-            return false;
-        }
-
-        if (app()->runningUnitTests()) {
-            return false;
-        }
-
-        return config('queue.default') !== 'sync';
+        return $this->messages->shouldDispatchOutboundAsync();
     }
 
-    /**
-     * Sync the wa_caraka_conversations record for a message.
-     * Creates the conversation row if it does not exist yet,
-     * and increments unread_count + updates last_activity_at for inbound.
-     * Called for both inbound (webhook) and outbound (send/broadcast).
-     */
     private function syncConversation(WaCarakaMessage $message): void
     {
-        if (!WaCarakaDatabase::hasTable('wa_caraka_conversations')) {
-            return;
-        }
+        $this->conversations->syncConversation($message);
+    }
 
-        try {
-            $activityAt = $this->resolveMessageActivityAt($message);
-            $normalizedRemote = WaCarakaMessage::normalizeRemoteNumber((string) $message->remote_number);
-            $normalizedConversationId = WaCarakaMessage::conversationIdFor($normalizedRemote);
+    private function cacheProfilePhotoLocally(string $cdnUrl, string $remoteNumber): ?string
+    {
+        return $this->conversations->cacheProfilePhotoLocally($cdnUrl, $remoteNumber);
+    }
 
-            if ($normalizedRemote !== '' && $message->remote_number !== $normalizedRemote) {
-                $message->remote_number = $normalizedRemote;
-            }
-
-            if ($message->conversation_id !== $normalizedConversationId) {
-                $message->conversation_id = $normalizedConversationId;
-            }
-
-            if ($message->isDirty(['remote_number', 'conversation_id'])) {
-                $message->save();
-            }
-
-            $convo = WaCarakaConversation::query()
-                ->where('conversation_id', $message->conversation_id)
-                ->first();
-
-            if (!$convo) {
-                // Prevent duplicate threads for same WA chat when legacy/new conversation keys differ.
-                $convo = WaCarakaConversation::query()
-                    ->get()
-                    ->filter(fn (WaCarakaConversation $item) => WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedRemote)
-                    ->sortByDesc(fn (WaCarakaConversation $item) => optional($item->last_activity_at)?->getTimestamp() ?? 0)
-                    ->first();
-            }
-
-            if (!$convo) {
-                $convo = WaCarakaConversation::create([
-                    'conversation_id'  => $message->conversation_id,
-                    'remote_number'    => $normalizedRemote,
-                    'status'           => 'pending',
-                    'last_activity_at' => $activityAt,
-                ]);
-            } elseif ($convo->conversation_id !== $message->conversation_id) {
-                $canonicalConversationId = $convo->conversation_id;
-
-                WaCarakaMessage::query()
-                    ->where('conversation_id', $canonicalConversationId)
-                    ->orWhere('conversation_id', $message->conversation_id)
-                    ->update(['conversation_id' => $canonicalConversationId]);
-
-                $message->conversation_id = $canonicalConversationId;
-                $message->save();
-            }
-
-            $metadata = is_array($message->metadata) ? $message->metadata : [];
-            $isHistorySync = (bool) ($metadata['historySync'] ?? false) || (($metadata['syncSource'] ?? null) === 'history');
-            $resolvedName = $metadata['groupName']
-                ?? $metadata['groupSubject']
-                ?? $metadata['senderName']
-                ?? $metadata['participantName']
-                ?? $metadata['pushName']
-                ?? ($metadata['raw']['meta']['notifyName'] ?? null)
-                ?? ($metadata['raw']['notifyName'] ?? null)
-                ?? null;
-
-                // Prioritize name sources: groupName/groupSubject > senderName/participantName/pushName > notifyName
-                // Always update name if we found a new one and it's better than what we have
-                // OR if the current name is empty (never set)
-                $shouldUpdateName = false;
-                if ($resolvedName) {
-                    if (!$convo->remote_name) {
-                        // First time setting a name
-                        $shouldUpdateName = true;
-                        $convo->remote_name = $resolvedName;
-                    } elseif ($convo->remote_name !== $resolvedName) {
-                        // Name changed - update if the new one is not generic/fallback
-                        // (e.g., prefer actual names over JID numbers)
-                        if (!is_numeric($resolvedName) || !is_numeric($convo->remote_name)) {
-                            $shouldUpdateName = true;
-                            $convo->remote_name = $resolvedName;
-                        }
-                    }
-                }
-
-                $lastActivityAt = $convo->last_activity_at;
-                if (!$lastActivityAt || $activityAt->greaterThan($lastActivityAt)) {
-                    $lastActivityAt = $activityAt;
-                }
-
-                $updateData = [
-                    'last_activity_at' => $lastActivityAt,
-                    'remote_number' => $normalizedRemote,
-                ];
-                if ($shouldUpdateName) {
-                    $updateData['remote_name'] = $convo->remote_name;
-                }
-
-                if ($message->direction === 'inbound') {
-                    // Increment unread only for newly created messages
-                    if ($message->wasRecentlyCreated) {
-                        $convo->increment('unread_count');
-                    }
-                    $convo->update($updateData);
-                } else {
-                    // Real-time outbound opens the conversation; history import should not
-                    // re-open every old thread when we backfill the initial archive.
-                    if (!$isHistorySync) {
-                        $updateData['status'] = $convo->status === 'pending' ? 'open' : $convo->status;
-                    }
-                    $convo->update($updateData);
-            }
-
-            $freshConversation = $convo->fresh(['owner:id,name,alias', 'pendingHandover.requestor:id,name,alias']);
-            if ($freshConversation) {
-                WaCarakaConversationUpdated::dispatch($freshConversation);
-            }
-        } catch (\Exception $e) {
-            Log::warning('[WaCaraka] Failed to sync conversation', [
-                'conversation_id' => $message->conversation_id,
-                'error'           => $e->getMessage(),
-            ]);
-        }
+    private function resolveConversationForLid(string $lidRemote): ?\App\Models\WaCarakaConversation
+    {
+        return $this->conversations->resolveConversationForLid($lidRemote);
     }
 
     private function resolveMessageActivityAt(WaCarakaMessage $message): \Illuminate\Support\Carbon
     {
-        $metadata = is_array($message->metadata) ? $message->metadata : [];
-        $rawTimestamp = $metadata['timestamp'] ?? ($metadata['raw']['timestamp'] ?? null);
+        return $this->conversations->resolveMessageActivityAt($message);
+    }
 
-        if (is_numeric($rawTimestamp)) {
-            $value = (int) $rawTimestamp;
-            // Heuristic: runtime can send ms timestamp.
-            if ($value > 9999999999) {
-                $value = (int) floor($value / 1000);
-            }
-            try {
-                return \Illuminate\Support\Carbon::createFromTimestamp($value);
-            } catch (\Throwable $e) {
-                // fallback below
-            }
-        }
+    private function messageContext(WaCarakaMessage $message): array
+    {
+        return $this->conversations->messageContext($message);
+    }
 
-        if (is_string($rawTimestamp) && trim($rawTimestamp) !== '') {
-            try {
-                return \Illuminate\Support\Carbon::parse($rawTimestamp);
-            } catch (\Throwable $e) {
-                // fallback below
-            }
-        }
+    private function compactMessageMetadata(array $metadata): array
+    {
+        return $this->conversations->compactMessageMetadata($metadata);
+    }
 
-        return $message->created_at ?? now();
+    // ══════════════════════════════════════════════
+    // Direct access to sub-services (for advanced use)
+    // ══════════════════════════════════════════════
+
+    public function http(): WaCarakaHttpClient
+    {
+        return $this->http;
+    }
+
+    public function messages(): WaCarakaMessageService
+    {
+        return $this->messages;
+    }
+
+    public function conversationsService(): WaCarakaConversationService
+    {
+        return $this->conversations;
+    }
+
+    public function statsService(): WaCarakaStatsService
+    {
+        return $this->stats;
     }
 }

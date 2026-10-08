@@ -15,6 +15,7 @@
  *   });
  */
 import { onUnmounted, readonly, ref } from 'vue';
+import { ensureReverb } from '@/reverbLoader';
 
 const connected = ref(false);
 const reconnecting = ref(false);
@@ -51,17 +52,22 @@ function stopSync() {
  * @returns {() => void} unsubscribe
  */
 function subscribeQueue(type, callback) {
-    const echo = window.Echo;
-    if (!echo) {
-        console.warn('[useReverb] Echo belum tersedia. Reverb mungkin tidak diaktifkan.');
-        return () => {};
-    }
+    const channelName = `lawangsewu.queue.${type}`;
+    let active = true;
+    let subscribedEcho = null;
 
-    const channel = echo.private(`lawangsewu.queue.${type}`);
-    channel.listen('.queue.updated', callback);
+    ensureReverb().then((echo) => {
+        if (!active || !echo) {
+            return;
+        }
+
+        subscribedEcho = echo;
+        echo.private(channelName).listen('.queue.updated', callback);
+    });
 
     return () => {
-        echo.leave(`lawangsewu.queue.${type}`);
+        active = false;
+        (subscribedEcho ?? window.Echo)?.leave(channelName);
     };
 }
 

@@ -92,7 +92,9 @@ Fokus pada:
 - Allowlist integrity
 
 ### `/audit [modul]`
-Audit modul spesifik: `ptsp`, `sidang`, `chat`, `guestbook`, `cctv`, `admin`
+Audit modul spesifik:
+- **Portal lama:** `ptsp`, `sidang`, `chat`, `guestbook`, `cctv`, `admin`
+- **Modul baru:** `wacaraka`, `tdms`, `pakpp`, `sipp`, `pilar`, `omnichannel`, `satellite`
 
 ---
 
@@ -114,5 +116,9 @@ User: /audit security
 → @qa scan seluruh route untuk missing auth middleware
 → @qa cek semua input validation
 → @qa cek SQL injection vectors
+→ @qa cek media upload di WaCaraka & TDMS
+→ @qa cek WebSocket channel auth di Reverb
 → Report dengan health score dan rekomendasi
 ```
+
+<!-- developed by dbprakom™ -->

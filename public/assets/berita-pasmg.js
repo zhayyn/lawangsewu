@@ -5,15 +5,11 @@
     }
     root.dataset.loaded = '1';
 
-    const wpCatIdBerita = Number(root.dataset.wpCatBerita || '12');
+    const wpCatIdBerita = Number(root.dataset.wpCatBerita || '6');
     const wpCatIdPengumuman = Number(root.dataset.wpCatPengumuman || '7');
-    const wpCatIdArtikel = Number(root.dataset.wpCatArtikel || '6');
-    // Mapping dikunci sesuai kondisi kategori WP saat ini:
-    // - Berita tampil dari ID kategori artikel
-    // - Artikel tampil dari ID kategori berita
-    const effectiveCatBerita = wpCatIdArtikel;
-    const effectiveCatArtikel = wpCatIdBerita;
-    const wpApiUrl = String(root.dataset.wpApiUrl || 'https://wp.pa-semarang.go.id').replace(/\/$/, '');
+    const wpCatIdArtikel = Number(root.dataset.wpCatArtikel || '12');
+
+    const wpApiUrl = String(root.dataset.wpApiUrl || 'https://pa-semarang.go.id').replace(/\/$/, '');
     const paFrontendUrl = String(root.dataset.paFrontendUrl || 'https://pa-semarang.go.id').replace(/\/$/, '');
     const thumbLocalFallback = String(root.dataset.thumbFallback || '/widgets/assets/ma-fallback.jpg');
 
@@ -145,7 +141,7 @@
                 const rawTitle = post.title && post.title.rendered ? post.title.rendered : '';
                 const cleanTitle = rawTitle.replace(/^[\?\s]+/, '').trim();
 
-                const finalLink = String(post.link || '').replace('wp.pa-semarang.go.id', 'pa-semarang.go.id');
+                const finalLink = String(post.link || '');
 
                 return {
                     link: finalLink,
@@ -334,9 +330,9 @@
     applyPaBaseUrl();
     setupTabs('pa-tabs', 'data-tab', '.tab-pane');
     setupRssTabs();
-    renderCategoryStack(effectiveCatBerita, 'pa-berita-list', 'Berita');
+    renderCategoryStack(wpCatIdBerita, 'pa-berita-list', 'Berita');
     renderCategoryStack(wpCatIdPengumuman, 'pa-pengumuman-list', 'Pengumuman');
-    renderCategoryStack(effectiveCatArtikel, 'pa-artikel-list', 'Artikel');
+    renderCategoryStack(wpCatIdArtikel, 'pa-artikel-list', 'Artikel');
     renderExternalRss('ma');
 
     const accentObserver = new IntersectionObserver((entries) => {

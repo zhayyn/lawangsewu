@@ -559,30 +559,37 @@
         node.kecList.innerHTML = '<div class="tr-empty">Memproses data kecamatan, mohon tunggu...</div>';
         node.kelList.innerHTML = '<div class="tr-empty">Klik kecamatan untuk menampilkan daftar kelurahan.</div>';
 
-        const kecamatanList = await getKecamatan(AUTO_CITY);
+        const res = await fetch('/data-radius-semarang.json');
+        if (!res.ok) throw new Error('Gagal memuat JSON statis');
+        const data = await res.json();
+
+        const kecamatanList = [];
         const kelurahanByKecamatan = new Map();
 
-        for (let i = 0; i < kecamatanList.length; i++) {
-            const kecamatan = kecamatanList[i];
-            node.status.textContent = `Memuat data ${i + 1}/${kecamatanList.length}: ${kecamatan.label}`;
-            const kelurahanList = await getKelurahan(kecamatan.value);
-            const kelurahanDetails = buildKelurahanDetails(kecamatan.label, kelurahanList);
-            kelurahanByKecamatan.set(kecamatan.value, kelurahanDetails);
+        for (const kec of data) {
+            kecamatanList.push({ value: kec.id_kecamatan, label: kec.kecamatan });
+            
+            const forced = forcedNominalByKecamatan(kec.kecamatan);
+            const details = kec.kelurahan.map(k => {
+                const nominal = forced !== null ? forced : normalizeNominal(k.biaya_raw);
+                return { label: k.nama, nominal };
+            });
+            kelurahanByKecamatan.set(kec.id_kecamatan, sortByLabel(details));
         }
 
-        state.kecamatanList = kecamatanList;
+        state.kecamatanList = sortByLabel(kecamatanList);
         state.kelurahanByKecamatan = kelurahanByKecamatan;
         if (!state.selectedKecamatan || !state.kecamatanList.some((item) => item.value === state.selectedKecamatan)) {
-            state.selectedKecamatan = kecamatanList.length ? kecamatanList[0].value : '';
+            state.selectedKecamatan = state.kecamatanList.length ? state.kecamatanList[0].value : '';
         }
 
-        renderKecamatanList(kecamatanList);
+        renderKecamatanList(state.kecamatanList);
         if (state.selectedKecamatan) {
             renderKelurahanList(state.selectedKecamatan);
         }
 
-        const allHaveKelurahan = kecamatanList.every((item) => (kelurahanByKecamatan.get(item.value) || []).length > 0);
-        return kecamatanList.length >= MIN_EXPECTED_KECAMATAN && allHaveKelurahan;
+        const allHaveKelurahan = state.kecamatanList.every((item) => (kelurahanByKecamatan.get(item.value) || []).length > 0);
+        return state.kecamatanList.length >= MIN_EXPECTED_KECAMATAN && allHaveKelurahan;
     }
 
     async function autoReloadInBackground() {

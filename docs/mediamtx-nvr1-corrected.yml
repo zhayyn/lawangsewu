@@ -1,0 +1,328 @@
+###############################################################################
+# mediamtx.yml — Konfigurasi MediaMTX untuk CCTV Lawangsewu
+#
+# NVR 1 : Hikvision DS-7616NI-Q1(E)  |  IP: 192.168.77.24  |  Port RTSP: 5566
+#
+# PENTING — Konvensi nomor channel Hikvision NVR:
+#   Channels/<id><tipe>
+#   <id>   = nomor channel × 100  (ch1=100, ch2=200, dst.)
+#   <tipe> = 01 → Main Stream (HD, ~4MP/1080p)
+#            02 → Sub Stream  (SD, ~640×480 / 720p rendah)
+#
+# Mapping terakhir diverifikasi via ISAPI pada 2026-06-02
+# (GET /ISAPI/ContentMgmt/InputProxy/channels)
+###############################################################################
+
+paths:
+
+  # ─── NVR 1 · Channel 13 ── R. Kepaniteraan (IP kamera: 192.168.77.5) ───────
+  kepaniteraan-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1302
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  kepaniteraan-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1301
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 4 ── R. PTSP Tampa (IP kamera: 192.168.77.8) ──────────
+  ptsp-tampa-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/402
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  ptsp-tampa-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/401
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 10 ── R. Mediasi (IP kamera: 192.168.77.7) ─────────────
+  mediasi-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1002
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  mediasi-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1001
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 15 ── Resepsionis (IP kamera: 192.168.77.29) ───────────
+  resepsionis-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1502
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  resepsionis-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1501
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 8 ── R. PTSP (IP kamera: 192.168.77.4) ────────────────
+  ptsp-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/802
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  ptsp-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/801
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 16 ── R. Sidang 2 (IP kamera: 192.168.77.12) ───────────
+  sidang-2-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1602
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  sidang-2-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1601
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 12 ── R. Tunggu Sidang (IP kamera: 192.168.77.15) ──────
+  tunggu-sidang-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1202
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  tunggu-sidang-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1201
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 7 ── Parkir Pegawai (IP kamera: 192.168.77.13) ─────────
+  parkir-pegawai-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/702
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  parkir-pegawai-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/701
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 11 ── R. Tunggu Sidang / Kantin (IP kamera: 192.168.77.14) ─
+  # Nama di NVR: "R. Tunggu Sidang Kantin" → Nama tampilan: "R. Tunggu Sidang / Kantin"
+  tunggu-sidang-2-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1102
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  tunggu-sidang-2-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1101
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 3 ── Halaman Apel (IP kamera: 192.168.77.3) ─────────────
+  halaman-apel-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/302
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  halaman-apel-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/301
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 5 ── R. Sidang 3 (IP kamera: 192.168.77.6) ─────────────
+  sidang-3-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/502
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  sidang-3-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/501
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 6 ── R. Hakim (IP kamera: 192.168.77.9) ────────────────
+  r-hakim-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/602
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-hakim-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/601
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 9 ── R. Sidang Utama (IP kamera: 192.168.77.33) ─────────
+  sidang-utama-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/902
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  sidang-utama-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/901
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 14 ── Ruang Tamu (IP kamera: 192.168.77.10) ────────────
+  # CATATAN: Nama di NVR baru: "Ruang Tamu Terbuka" — dikonfirmasi sama fisiknya
+  ruang-tamu-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1402
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  ruang-tamu-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1401
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 1 ── Mushola (IP kamera: 192.168.77.11) ────────────────
+  mushola-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/102
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  mushola-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/101
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  # ─── NVR 1 · Channel 2 ── R. Kesekretariatan (IP kamera: 192.168.77.77) ─────
+  kesekretariatan-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/202
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  kesekretariatan-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/201
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  ###############################################################################
+  # NVR 2 — Ruang Pimpinan & Internal (cam-17 s/d cam-24)
+  # CATATAN: Channel NVR 2 belum diaudit. Isi sesuai konfigurasi lama atau
+  # lakukan audit dengan cara yang sama (ISAPI ke IP NVR 2).
+  ###############################################################################
+
+  r-ketua-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1702
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-ketua-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1701
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-jurusita-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1802
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-jurusita-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1801
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-panitera-pen-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1902
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-panitera-pen-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/1901
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  media-center-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2002
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  media-center-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2001
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-arsipp-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2102
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-arsipp-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2101
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-sekretaris-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2202
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-sekretaris-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2201
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-panitera-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2302
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-panitera-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2301
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-wakil-ketua-sd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2402
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s
+
+  r-wakil-ketua-hd:
+    source: rtsp://admin:Pasmg2026%21@192.168.77.24:5566/Streaming/Channels/2401
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 30s

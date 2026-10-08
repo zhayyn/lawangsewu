@@ -8,6 +8,33 @@ $y = (int)date('Y');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Statistik Perkara</title>
+
+    <meta property="og:title" content="Statistik Komposisi Perkara - Lawangsewu">
+    <meta property="og:description" content="Visualisasi data real-time komposisi jenis perkara tahun berjalan di Pengadilan Agama Semarang.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lawangsewu.pa-semarang.go.id/statistik-perkara">
+    
+    <!-- Warning: Ensure the route is registered in routes/web.php -->
+    <meta property="og:image" content="https://lawangsewu.pa-semarang.go.id/og-image/case-statistics.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="800">
+    <meta property="og:image:height" content="400">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Statistik Komposisi Perkara - Lawangsewu">
+    <meta name="twitter:image" content="https://lawangsewu.pa-semarang.go.id/og-image/case-statistics.png">
+    
+    <?php if ($ga_id = config('services.google.analytics_id')): ?>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=<?= htmlspecialchars($ga_id) ?>"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '<?= htmlspecialchars($ga_id) ?>');
+    </script>
+    <?php endif; ?>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -67,6 +94,29 @@ $y = (int)date('Y');
         .tv-mode .tv-slide { display: none; }
         .tv-mode .tv-slide.active { display: block; }
         .tv-mode .table-wrap.active { max-height: 72vh; }
+        /* ── TV/Kiosk mode override (dipanggil via ?tvmode=1 dari tvmedia) ── */
+        body.tvkiosk { overflow: hidden; }
+        body.tvkiosk .container { margin: 10px auto 10px; padding: 0 10px; }
+        body.tvkiosk .head { padding: 12px 16px; border-radius: 10px; }
+        body.tvkiosk .head h1 { font-size: 20px; }
+        body.tvkiosk .head p { font-size: 12px; }
+        body.tvkiosk .cards { gap: 7px; margin-top: 8px; }
+        body.tvkiosk .card { padding: 8px; border-radius: 8px; }
+        body.tvkiosk .card .value { font-size: 20px; }
+        body.tvkiosk .card .label { font-size: 11px; }
+        body.tvkiosk .kpi-strip { gap: 7px; margin-top: 7px; }
+        body.tvkiosk .kpi { padding: 7px 10px; border-radius: 8px; }
+        body.tvkiosk .kpi .v { font-size: 17px; }
+        body.tvkiosk .panel { margin-top: 8px; border-radius: 10px; }
+        body.tvkiosk .toolbar { padding: 8px 10px; }
+        body.tvkiosk .grid { padding: 8px; gap: 8px; }
+        body.tvkiosk .chart-box { padding: 6px; }
+        body.tvkiosk .chart-box h3 { font-size: 12px; margin-bottom: 5px; }
+        body.tvkiosk .table-wrap { max-height: 52vh; }
+        body.tvkiosk th, body.tvkiosk td { padding: 6px 8px; font-size: 12px; }
+        body.tvkiosk .footnote { margin: 6px 0 8px; font-size: 11px; }
+        body.tvkiosk .tools .btn-tv,
+        body.tvkiosk .tools #tvDuration { display: none !important; }
         @media (max-width: 980px) { .cards, .kpi-strip { grid-template-columns: repeat(2, 1fr);} .grid { grid-template-columns: 1fr; } .input{min-width:180px;} }
         @media (max-width: 640px) { .container { padding: 0 10px; } .card .value { font-size: 20px; } .tools{ width:100%; } .input{ min-width: 0; flex:1; } }
     </style>
@@ -114,7 +164,9 @@ $y = (int)date('Y');
             </div>
             <div class="chart-box">
                 <h3>Komposisi Jenis Perkara Tahun Berjalan</h3>
-                <canvas id="chartType" height="120"></canvas>
+                <div style="position: relative; height: 260px;">
+                    <canvas id="chartType"></canvas>
+                </div>
                 <div class="legend-wrap" id="legendType"></div>
             </div>
         </div>
@@ -141,6 +193,12 @@ $y = (int)date('Y');
     </div>
 
     <div class="footnote">Sumber: SIPP (via adapter Lawangsewu)</div>
+    <div style="text-align: center; margin-bottom: 30px;">
+        <a href="https://lawangsewu.pa-semarang.go.id/statistik-perkara" target="_blank" class="btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-size: 14px;">
+            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Lihat Selengkapnya Data Statistik
+        </a>
+    </div>
 </div>
 
 <script>
@@ -152,7 +210,23 @@ const btnRefresh = document.getElementById('btnRefresh');
 const searchJenis = document.getElementById('searchJenis');
 const btnTvMode = document.getElementById('btnTvMode');
 const tvDuration = document.getElementById('tvDuration');
+
+// Determine Lawangsewu base URL for API calls
+// Prioritize absolute URL to Lawangsewu API to support embed in external sites (WordPress)
+const getLawangsewuApiBase = () => {
+    // Check if already in Lawangsewu domain
+    if (window.location.hostname.includes('lawangsewu') || window.location.pathname.includes('/lawangsewu')) {
+        return undefined; // Use relative URLs
+    }
+    // Return absolute URL to Lawangsewu when embedded elsewhere (e.g., WordPress)
+    return 'https://lawangsewu.pa-semarang.go.id';
+};
+
+const LAWANGSEWU_BASE = getLawangsewuApiBase();
+
 const API_CANDIDATES = [
+    ...(LAWANGSEWU_BASE ? [`${LAWANGSEWU_BASE}/widgets/views/php/api/statistik-data.php`] : []),
+    '/widgets/views/php/api/statistik-data.php',
     '/api/statistik-data',
     '/lawangsewu/api/statistik-data',
     '/lawangsewu/statistik-data',
@@ -310,13 +384,24 @@ function renderCharts(year, totals, rows) {
             responsive: true,
             plugins: { legend: { display: false } },
             interaction: { mode: 'index', intersect: false },
-            scales: { y: { beginAtZero: true } }
+            scales: { 
+                y: { 
+                    min: 300,
+                    title: {
+                        display: true,
+                        text: 'Jumlah Perkara',
+                        font: { size: 12 },
+                        color: '#6b7280'
+                    }
+                } 
+            }
         }
     });
 
-    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0)).slice(0, 12);
+    const sorted = [...rows].sort((a,b) => Number(b.th0||0) - Number(a.th0||0));
     const rowColors = sorted.map(r => colorByLabel(r.jenis));
     const rowLabels = sorted.map(r => r.jenis || '-');
+
     if (typeChart) typeChart.destroy();
     typeChart = new Chart(typeEl, {
         type: 'bar',
@@ -327,18 +412,60 @@ function renderCharts(year, totals, rows) {
                 label: 'Jumlah Perkara',
                 data: sorted.map(r => Number(r.th0 || 0)),
                 backgroundColor: rowColors,
-                borderColor: rowColors,
-                borderWidth: 1.5,
-                borderRadius: 8,
-                maxBarThickness: 44
+                borderRadius: 5,
+                borderSkipped: false,
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: false } },
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const val = context.raw;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                            return ` ${context.label}: ${fmt(val)} (${pct}%)`;
+                        }
+                    }
+                }
+            },
             scales: {
-                y: { beginAtZero: true },
-                x: { ticks: { maxRotation: 45, minRotation: 30 } }
+                x: {
+                    ticks: {
+                        maxRotation: 40,
+                        minRotation: 30,
+                        font: { size: 10 },
+                        color: '#4b5563',
+                        callback: function(val, idx) {
+                            const lbl = rowLabels[idx] || '';
+                            return lbl.length > 18 ? lbl.slice(0, 16) + '…' : lbl;
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: {
+                    type: 'logarithmic',
+                    min: 1,
+                    title: {
+                        display: true,
+                        text: 'Jumlah (skala log)',
+                        font: { size: 11 },
+                        color: '#6b7280'
+                    },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#6b7280',
+                        callback: (val) => {
+                            const niceTicks = [1, 5, 10, 50, 100, 500, 1000, 5000];
+                            return niceTicks.includes(val) ? val.toLocaleString('id-ID') : '';
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                }
             }
         }
     });
@@ -424,6 +551,7 @@ async function fetchStatistikPerkara(year) {
 }
 
 async function loadData() {
+    console.log("Statistik Perkara: Mengambil data...");
     statusText.textContent = 'Mengambil data statistik dari Server 10...';
     dataMeta.innerHTML = '';
     errorBox.style.display = 'none';
@@ -432,6 +560,7 @@ async function loadData() {
     try {
         const year = new Date().getFullYear();
         const json = await fetchStatistikPerkara(year);
+        console.log("Statistik Perkara: Data diterima dari", json._source, json);
 
         cachedRows = normalizeRows(Array.isArray(json.rows) ? json.rows : []);
         const apiTotals = {
@@ -510,9 +639,16 @@ function startDataAutoRefresh() {
 
 document.addEventListener('DOMContentLoaded', () => {
     tvSlides.forEach(slide => slide.classList.add('active'));
-    loadData().then(startDataAutoRefresh);
+    // Auto-start TV mode + kiosk layout jika dipanggil dari tvmedia (?tvmode=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('tvmode') === '1') {
+        document.body.classList.add('tvkiosk');
+        loadData().then(() => { startTvMode(); startDataAutoRefresh(); });
+    } else {
+        loadData().then(startDataAutoRefresh);
+    }
 });
 </script>
 </body>
 </html>
-<?php /* developed by dubes favour-it */ ?>
+<!-- developed by zhayyn™ -->

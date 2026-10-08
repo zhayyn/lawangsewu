@@ -30,8 +30,8 @@ class QueueJobExceptionOccurredListener
 
             // Track with distributed tracing
             DistributedTracingService::logError(
-                $event->exception,
-                "Queue Job Exception: {$jobClass}"
+                "Queue Job Exception: {$jobClass}",
+                $event->exception
             );
 
             // Alert on exception

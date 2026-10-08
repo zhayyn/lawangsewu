@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Caddyfile — Lawangsewu Reverse Proxy
+#
+# APP_DOMAIN  = domain/IP server (default: localhost)
+# TLS_EMAIL   = email untuk Let's Encrypt (isi "internal" untuk self-signed)
+#
+# Contoh domain publik : APP_DOMAIN=lawangsewu.example.go.id TLS_EMAIL=admin@example.go.id
+# Contoh lokal/intranet: APP_DOMAIN=localhost TLS_EMAIL=internal
+# ─────────────────────────────────────────────────────────────────────────────
+
+{env.APP_DOMAIN} {
+    # ── TLS ───────────────────────────────────────────────────────────────────
+    tls {env.TLS_EMAIL}
+
+    # ── Encode gzip ───────────────────────────────────────────────────────────
+    encode gzip
+
+    # ── Static files (public/) ────────────────────────────────────────────────
+    root * /var/www/public
+
+    # ── Reverb WebSocket proxy ────────────────────────────────────────────────
+    @websocket {
+        path /app/*
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket worker:8080
+
+    # ── PHP-FPM (Laravel) ─────────────────────────────────────────────────────
+    php_fastcgi app:9000 {
+        index index.php
+    }
+
+    # ── File server untuk assets ──────────────────────────────────────────────
+    file_server
+
+    # ── Security headers ──────────────────────────────────────────────────────
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # ── Logs ──────────────────────────────────────────────────────────────────
+    log {
+        output file /var/www/storage/logs/caddy-access.log
+        level INFO
+    }
+}

@@ -1,7 +1,16 @@
 <script setup>
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
+import AppToast from '@/Components/lawangsewu/AppToast.vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+
+// ─── Toast ref ────────────────────────────────────────────────────────────────
+const toast = ref(null);
+const t = {
+    ok  : (title, msg) => toast.value?.success(title, msg),
+    err : (title, msg) => toast.value?.error(title, msg),
+    info: (title, msg) => toast.value?.info(title, msg),
+};
 
 const props = defineProps({
     appMeta: { type: Object, default: () => ({}) },
@@ -39,6 +48,9 @@ const broadcastResult = ref(null);
 // Settings
 const bgInput = ref(props.config.background || '');
 const bgSaving = ref(false);
+const closingTemplate = ref(props.config.closingTemplate || '');
+const closingTemplateSaving = ref(false);
+const closingTemplateSaved = ref(false);
 
 const isConnected = computed(() => Boolean(runtimeHealth.value?.connected || runtimeHealth.value?.status === 'connected'));
 
@@ -51,20 +63,27 @@ const callApi = async (action, method = 'get', body = null) => {
         opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(body || {});
     }
-    // Use CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     if (csrfToken) opts.headers['X-CSRF-TOKEN'] = csrfToken;
 
     const url = route('admin.wacaraka.api', { action });
     const res = await fetch(url, opts);
-    return res.json();
+    const data = await res.json();
+    // Jika backend mengembalikan ok:false, lempar error agar ditangkap caller
+    if (data?.ok === false) {
+        const err = new Error(data?.error || data?.message || 'Terjadi kesalahan.');
+        err.detail = data?.detail ?? null;
+        throw err;
+    }
+    return data;
 };
 
 const refreshHealth = async () => {
     try {
         const data = await callApi('health');
-        runtimeHealth.value = data || {};
-        deviceStatus.value = data?.connected || data?.status === 'connected' ? 'connected' : 'disconnected';
+        runtimeHealth.value = data?.data ?? data ?? {};
+        const raw = runtimeHealth.value;
+        deviceStatus.value = raw?.connected || raw?.status === 'connected' ? 'connected' : 'disconnected';
     } catch {
         deviceStatus.value = 'error';
     }
@@ -72,98 +91,141 @@ const refreshHealth = async () => {
 
 const refreshStats = async () => {
     try {
-        localStats.value = await callApi('stats');
-        localMsgStats.value = await callApi('message-stats');
+        const [s, m] = await Promise.all([callApi('stats'), callApi('message-stats')]);
+        localStats.value    = s?.data ?? s ?? {};
+        localMsgStats.value = m?.data ?? m ?? {};
     } catch { /* silent */ }
 };
 
 const refreshLogs = async () => {
     try {
-        logs.value = await callApi('logs');
+        const d = await callApi('logs');
+        logs.value = d?.data ?? d ?? [];
     } catch { /* silent */ }
 };
 
 const refreshConvos = async () => {
     try {
-        convos.value = await callApi('conversations');
+        const d = await callApi('conversations');
+        convos.value = d?.data ?? d ?? [];
     } catch { /* silent */ }
 };
 
-const refreshAll = async () => {
+const refreshAll = async (silent = false) => {
     if (loading.value) return;
     loading.value = true;
     try {
         await Promise.all([refreshHealth(), refreshStats(), refreshLogs(), refreshConvos()]);
+        if (!silent) t.ok('Data diperbarui', 'Status device dan statistik telah disinkronkan.');
+    } catch (e) {
+        if (!silent) t.err('Refresh gagal', e.message);
     } finally {
         loading.value = false;
     }
 };
 
-const deviceAction = async (action, label) => {
+// Label & pesan untuk setiap aksi
+const ACTION_META = {
+    'restart'       : { ok: 'Device di-restart',        okMsg: 'Runtime WA Caraka sedang memulai ulang.',        fail: 'Restart gagal' },
+    'reconnect'     : { ok: 'Reconnect dikirim',         okMsg: 'Device mencoba terhubung kembali ke WhatsApp.',   fail: 'Reconnect gagal' },
+    'disconnect'    : { ok: 'Device diputus',            okMsg: 'Sesi WhatsApp telah diakhiri.',                   fail: 'Disconnect gagal' },
+    'history/clear' : { ok: 'History dihapus',           okMsg: 'Riwayat pesan runtime telah dibersihkan.',        fail: 'Gagal menghapus history' },
+    'inbox/clear'   : { ok: 'Inbox dihapus',             okMsg: 'Seluruh pesan inbox telah dihapus dari database.', fail: 'Gagal menghapus inbox' },
+};
+
+const deviceAction = async (action, _label) => {
     if (loading.value) return;
     loading.value = true;
+    const meta = ACTION_META[action] ?? { ok: 'Berhasil', okMsg: '', fail: 'Aksi gagal' };
     try {
         await callApi(action, 'post');
-        setTimeout(refreshAll, 1000);
+        t.ok(meta.ok, meta.okMsg);
+        setTimeout(() => refreshAll(true), 1200);
+    } catch (e) {
+        t.err(meta.fail, e.message);
     } finally {
         loading.value = false;
     }
+};
+
+const confirmDeleteInbox = async () => {
+    if (!window.confirm('Yakin ingin menghapus SELURUH pesan inbox dari database? Aksi ini tidak bisa di-undo!')) return;
+    await deviceAction('inbox/clear', 'Delete Inbox');
 };
 
 const sendMessage = async () => {
     const to = sendTo.value.trim();
     const text = sendText.value.trim();
-    if (!to || !text) return;
+    if (!to || !text) { t.err('Form tidak lengkap', 'Nomor tujuan dan isi pesan wajib diisi.'); return; }
     sendState.value = 'sending';
     try {
         await callApi('send-text', 'post', { to, text });
         sendState.value = 'sent';
         sendText.value = '';
+        t.ok('Pesan terkirim', `Pesan berhasil dikirim ke ${to}.`);
         await refreshStats();
-    } catch {
+        setTimeout(() => { sendState.value = 'idle'; }, 3000);
+    } catch (e) {
         sendState.value = 'error';
+        t.err('Pesan gagal terkirim', e.message);
+        setTimeout(() => { sendState.value = 'idle'; }, 4000);
     }
 };
 
 const sendBroadcast = async () => {
     const raw = broadcastRecipients.value.trim();
     const text = broadcastText.value.trim();
-    if (!raw || !text) return;
+    if (!raw || !text) { t.err('Form tidak lengkap', 'Daftar nomor dan isi pesan wajib diisi.'); return; }
     const recipients = raw.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
     broadcastState.value = 'sending';
     broadcastResult.value = null;
     try {
         const data = await callApi('broadcast', 'post', { recipients, text });
         broadcastState.value = 'sent';
-        broadcastResult.value = data;
+        broadcastResult.value = data?.data ?? data;
+        const res = broadcastResult.value;
+        t.ok(
+            `Broadcast selesai — ${res?.succeeded ?? 0}/${res?.total ?? recipients.length} berhasil`,
+            res?.failed ? `${res.failed} nomor gagal dikirim.` : 'Semua pesan berhasil terkirim.'
+        );
         await refreshStats();
-    } catch (err) {
+        setTimeout(() => { broadcastState.value = 'idle'; }, 4000);
+    } catch (e) {
         broadcastState.value = 'error';
-        broadcastResult.value = { error: err.message };
+        broadcastResult.value = { error: e.message };
+        t.err('Broadcast gagal', e.message);
+        setTimeout(() => { broadcastState.value = 'idle'; }, 5000);
     }
 };
 
+const bgSaved = ref(false);
 const saveBackground = async () => {
     bgSaving.value = true;
+    bgSaved.value = false;
     try {
         await callApi('save-background', 'post', { background: bgInput.value });
-        // update local config
-        // config.background is a prop, we can't mutate it directly but the user will see it saved
-        const btn = document.getElementById('saveBgBtn');
-        if (btn) {
-            btn.innerText = '✓ Tersimpan';
-            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
-            btn.classList.remove('bg-slate-800', 'hover:bg-slate-700');
-            setTimeout(() => {
-                btn.innerText = 'Simpan';
-                btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
-                btn.classList.add('bg-slate-800', 'hover:bg-slate-700');
-            }, 2000);
-        }
-    } catch (err) {
-        alert('Gagal menyimpan background');
+        bgSaved.value = true;
+        t.ok('Background tersimpan', bgInput.value ? 'Tampilan chat telah diperbarui.' : 'Background dikembalikan ke default.');
+        setTimeout(() => { bgSaved.value = false; }, 3000);
+    } catch (e) {
+        t.err('Gagal menyimpan background', e.message);
     } finally {
         bgSaving.value = false;
+    }
+};
+
+const saveClosingTemplate = async () => {
+    closingTemplateSaving.value = true;
+    closingTemplateSaved.value = false;
+    try {
+        await callApi('save-closing-template', 'post', { template: closingTemplate.value });
+        closingTemplateSaved.value = true;
+        t.ok('Template tersimpan', 'Pesan salam penutup berhasil diperbarui.');
+        setTimeout(() => { closingTemplateSaved.value = false; }, 3000);
+    } catch (e) {
+        t.err('Gagal menyimpan template', e.message);
+    } finally {
+        closingTemplateSaving.value = false;
     }
 };
 
@@ -179,11 +241,10 @@ const refreshQr = async () => {
 const startQrPoll = async () => {
     if (generatingQr.value || qrPoll) return;
     generatingQr.value = true;
-    
+    t.info('Menyiapkan QR', 'Memulai ulang runtime dan menunggu kode QR...');
     try {
-        // Apabila habis diconnect, device mati dan butuh trigger restart untuk membangkitkan QR
         await callApi('restart', 'post');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Beri waktu runtime node.js untuk inisialisasi
+        await new Promise(resolve => setTimeout(resolve, 2000));
         await refreshQr();
 
         if (!qrPoll) {
@@ -191,13 +252,15 @@ const startQrPoll = async () => {
                 if (isConnected.value) {
                     stopQrPoll();
                     generatingQr.value = false;
+                    t.ok('Device terhubung!', 'WhatsApp berhasil dipasangkan via QR Code.');
                 } else {
                     await refreshQr();
                 }
             }, 3000);
         }
-    } catch {
+    } catch (e) {
         generatingQr.value = false;
+        t.err('Gagal generate QR', e.message);
     }
 };
 
@@ -225,6 +288,7 @@ onUnmounted(() => {
 
 <template>
     <Head title="Admin · WA Caraka Manager" />
+    <AppToast ref="toast" />
 
     <LawangsewuLayout current-route="admin.wacaraka.index" :nav-groups="navGroups" :app-meta="appMeta">
         <template #header>
@@ -282,11 +346,11 @@ onUnmounted(() => {
 
             <!-- Tab Nav -->
             <div class="flex gap-1 mb-6 bg-white rounded-xl border border-slate-200 p-1 shadow-sm w-fit">
-                <button v-for="tab in ['overview', 'device', 'send', 'broadcast', 'logs']" :key="tab"
+                <button v-for="tab in ['overview', 'device', 'send', 'broadcast', 'logs', 'settings']" :key="tab"
                         @click="activeTab = tab"
                         class="px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all"
                         :class="activeTab === tab ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:bg-slate-100'">
-                    {{ tab === 'overview' ? 'Ringkasan' : tab === 'device' ? 'Device' : tab === 'send' ? 'Kirim Pesan' : tab === 'broadcast' ? 'Broadcast' : 'Log Pesan' }}
+                    {{ tab === 'overview' ? 'Ringkasan' : tab === 'device' ? 'Device' : tab === 'send' ? 'Kirim Pesan' : tab === 'broadcast' ? 'Broadcast' : tab === 'logs' ? 'Log Pesan' : 'Pengaturan' }}
                 </button>
             </div>
 
@@ -307,7 +371,7 @@ onUnmounted(() => {
                             <h4 class="text-xs font-bold text-slate-600 mb-2">Tampilan Chat (Background)</h4>
                             <div class="flex gap-2">
                                 <input v-model="bgInput" type="text" placeholder="URL Gambar atau Warna (ex: #efeae2)" class="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-400">
-                                <button id="saveBgBtn" @click="saveBackground" :disabled="bgSaving" class="bg-slate-800 text-white rounded-xl px-4 py-2 text-xs font-bold hover:bg-slate-700 disabled:opacity-50 transition-colors">Simpan</button>
+                                <button @click="saveBackground" :disabled="bgSaving" class="rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 transition-colors" :class="bgSaved ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-800 text-white hover:bg-slate-700'">{{ bgSaving ? 'Menyimpan...' : bgSaved ? '✓ Tersimpan' : 'Simpan' }}</button>
                             </div>
                             <p class="text-[10px] text-slate-400 mt-1">Isi URL gambar (harus diawali http/https) atau warna. Kosongkan untuk menggunakan background default.</p>
                         </div>
@@ -339,11 +403,12 @@ onUnmounted(() => {
                     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                         <h3 class="text-sm font-bold text-slate-700 mb-4">Device Control</h3>
                         <div class="flex flex-wrap gap-2 mb-6">
-                            <button @click="refreshAll" :disabled="loading" class="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold hover:bg-blue-100 transition disabled:opacity-50">Refresh</button>
+                            <button @click="() => refreshAll(false)" :disabled="loading" class="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold hover:bg-blue-100 transition disabled:opacity-50">{{ loading ? '↻ Memuat...' : 'Refresh' }}</button>
                             <button @click="deviceAction('restart', 'Restart')" :disabled="loading" class="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold hover:bg-amber-100 transition disabled:opacity-50">Restart</button>
                             <button @click="deviceAction('reconnect', 'Reconnect')" :disabled="loading" class="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold hover:bg-emerald-100 transition disabled:opacity-50">Reconnect</button>
                             <button @click="deviceAction('disconnect', 'Disconnect')" :disabled="loading" class="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold hover:bg-rose-100 transition disabled:opacity-50">Disconnect</button>
                             <button @click="deviceAction('history/clear', 'Clear History')" :disabled="loading" class="px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-100 transition disabled:opacity-50">Clear History</button>
+                            <button @click="confirmDeleteInbox" :disabled="loading" class="px-4 py-2 bg-rose-600 text-white border border-rose-700 rounded-xl text-xs font-bold hover:bg-rose-700 transition disabled:opacity-50">Delete Inbox</button>
                         </div>
                         <div>
                             <p class="text-xs font-bold text-slate-400 uppercase mb-2">Runtime Health Payload</p>
@@ -448,6 +513,37 @@ onUnmounted(() => {
                     </div>
                 </div>
             </section>
+            <!-- Tab: Settings -->
+            <section v-if="activeTab === 'settings'" class="max-w-2xl space-y-6">
+                <!-- Chat Background -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1">Tampilan Chat (Background)</h3>
+                    <p class="text-xs text-slate-400 mb-4">URL gambar atau kode warna untuk latar belakang area chat operator.</p>
+                    <div class="flex gap-2">
+                        <input v-model="bgInput" type="text" placeholder="URL Gambar atau Warna (ex: #efeae2)" class="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-400">
+                        <button @click="saveBackground" :disabled="bgSaving" class="rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 transition-colors" :class="bgSaved ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'">{{ bgSaving ? 'Menyimpan...' : bgSaved ? '✓ Tersimpan' : 'Simpan' }}</button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">Kosongkan untuk menggunakan background default.</p>
+                </div>
+
+                <!-- Closing Template -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1">Template Pesan Salam Penutup</h3>
+                    <p class="text-xs text-slate-400 mb-4">Pesan ini akan dikirimkan secara otomatis ke kontak WA ketika operator menekan tombol <strong>"Selesai + Salam"</strong> saat menutup percakapan. Tombol <strong>"Selesai Saja"</strong> tidak akan mengirimkan pesan ini.</p>
+                    <textarea v-model="closingTemplate" rows="6" placeholder="Tulis template pesan penutup di sini..." class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 resize-none font-mono"></textarea>
+                    <div class="mt-3 flex items-center gap-3">
+                        <button @click="saveClosingTemplate" :disabled="closingTemplateSaving" class="rounded-xl px-5 py-2 text-xs font-bold disabled:opacity-50 transition-colors" :class="closingTemplateSaved ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'">
+                            {{ closingTemplateSaving ? 'Menyimpan...' : closingTemplateSaved ? '✓ Tersimpan' : 'Simpan Template' }}
+                        </button>
+                        <span class="text-[10px] text-slate-400">{{ closingTemplate.length }}/2000 karakter</span>
+                    </div>
+                    <div class="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Preview</p>
+                        <p class="whitespace-pre-wrap text-sm text-slate-700">{{ closingTemplate || '(template kosong)' }}</p>
+                    </div>
+                </div>
+            </section>
+
             </div>
         </div>
     </LawangsewuLayout>

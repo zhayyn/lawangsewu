@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TV Media Standalone — Dockerfile
+# Image ringan: Nginx + PHP-FPM untuk menjalankan tvmedia.php mandiri
+# Build: docker build -f docker/tvmedia/Dockerfile.standalone -t tvmedia-standalone .
+# ─────────────────────────────────────────────────────────────────────────────
+FROM php:8.3-fpm-alpine AS base
+
+# Install Nginx dan ekstensi PHP minimal
+RUN apk add --no-cache nginx supervisor curl \
+    libpng-dev libjpeg-turbo-dev freetype-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo_mysql opcache \
+    && rm -rf /var/cache/apk/*
+
+# Copy config Nginx untuk standalone
+COPY docker/tvmedia/nginx-standalone.conf /etc/nginx/http.d/default.conf
+COPY docker/tvmedia/supervisord-standalone.conf /etc/supervisord.conf
+
+# Copy hanya file yang dibutuhkan TV Media
+WORKDIR /var/www/tvmedia
+
+COPY widgets/views/php/public/tvmedia.php ./tvmedia.php
+COPY public/                              ./public/
+
+# Direktori upload yang bisa di-mount
+RUN mkdir -p /var/www/storage/tvmedia \
+    && ln -s /var/www/storage/tvmedia /var/www/tvmedia/public/storage/tvmedia \
+    && chown -R www-data:www-data /var/www
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

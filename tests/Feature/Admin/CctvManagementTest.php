@@ -27,6 +27,10 @@ class CctvManagementTest extends TestCase
             'name' => 'Lobby Utama',
             'zone' => 'Publik',
             'iframe_src' => 'https://example.test/cctv/lobby',
+            'primary_sd_src' => 'http://192.168.88.200:8889/lobby-sd/',
+            'primary_hd_src' => 'http://192.168.88.200:8889/lobby-hd/',
+            'fallback_src' => 'https://example.test/cctv/lobby',
+            'stream_provider' => 'mediamtx-relay',
             'sort_order' => 1,
             'is_active' => true,
             'is_featured' => true,
@@ -39,6 +43,8 @@ class CctvManagementTest extends TestCase
             ->has('cameras', 1)
             ->where('cameras.0.name', 'Lobby Utama')
             ->where('cameras.0.iframe_src', 'https://example.test/cctv/lobby')
+            ->where('cameras.0.primary_sd_src', 'http://192.168.88.200:8889/lobby-sd/')
+            ->where('cameras.0.primary_hd_src', 'http://192.168.88.200:8889/lobby-hd/')
         );
     }
 
@@ -56,6 +62,10 @@ class CctvManagementTest extends TestCase
             'name' => 'PTSP Awal',
             'zone' => 'Pelayanan',
             'iframe_src' => 'https://example.test/cctv/old',
+            'primary_sd_src' => 'http://192.168.88.200:8889/old-sd/',
+            'primary_hd_src' => 'http://192.168.88.200:8889/old-hd/',
+            'fallback_src' => 'https://example.test/cctv/old',
+            'stream_provider' => 'mediamtx-relay',
             'sort_order' => 3,
             'is_active' => true,
             'is_featured' => false,
@@ -65,6 +75,10 @@ class CctvManagementTest extends TestCase
             'name' => 'PTSP Front Desk',
             'zone' => 'PTSP',
             'iframe_src' => 'https://example.test/cctv/new-source',
+            'primary_sd_src' => 'http://192.168.88.200:8889/new-source-sd/',
+            'primary_hd_src' => 'http://192.168.88.200:8889/new-source-hd/',
+            'fallback_src' => 'https://example.test/cctv/new-source',
+            'stream_provider' => 'mediamtx-relay',
             'sort_order' => 1,
             'is_active' => true,
             'is_featured' => true,
@@ -77,6 +91,10 @@ class CctvManagementTest extends TestCase
             'name' => 'PTSP Front Desk',
             'zone' => 'PTSP',
             'iframe_src' => 'https://example.test/cctv/new-source',
+            'primary_sd_src' => 'http://192.168.88.200:8889/new-source-sd/',
+            'primary_hd_src' => 'http://192.168.88.200:8889/new-source-hd/',
+            'fallback_src' => 'https://example.test/cctv/new-source',
+            'stream_provider' => 'mediamtx-relay',
             'sort_order' => 1,
             'is_featured' => true,
         ]);

@@ -90,3 +90,6 @@ Sebelum menyerahkan ke user, pastikan:
 - [ ] Middleware stack benar (auth → verified → active → role:xxx)
 - [ ] Test cases mencakup happy path DAN error path
 - [ ] Tidak ada konflik dengan fitur existing
+- [ ] Ripple analysis: cek dampak ke WaCaraka, TDMS, SIPP jika fitur menyentuh data bersama
+
+<!-- developed by dbprakom™ -->

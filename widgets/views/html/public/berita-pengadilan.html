@@ -5,14 +5,14 @@
         /* Tema PA Semarang (Hijau) */
         --pa-green: #1e6a3a;
         --pa-green-soft: #eaf7ee;
-        
+
         /* Tema RSS Peradilan (Oranye) */
         --pa-orange: #ff8a00;
         --pa-orange-grad: linear-gradient(135deg, #ff8a00, #ff6200);
         --pa-orange-soft: #fff4df;
         --pa-orange-border: #ffd8a8;
         --pa-orange-text: #7a4b00;
-        
+
         /* Warna Dasar */
         --pa-ink: #1f2937;
         --pa-muted: #64748b;
@@ -121,11 +121,12 @@
         flex-direction: column;
         gap: 10px;
     }
-    
+
     .tab-pane {
         display: none;
         flex-direction: column;
     }
+
     .tab-pane.active {
         display: flex;
     }
@@ -140,9 +141,11 @@
         font-weight: 700;
         line-height: 1.3;
     }
+
     .simple-list-item:last-child {
         border-bottom: none;
     }
+
     .simple-list-item a {
         color: var(--pa-ink);
         text-decoration: none;
@@ -150,6 +153,7 @@
         padding: 0 2px;
         transition: color 0.15s;
     }
+
     .simple-list-item a:hover {
         color: var(--pa-green);
         text-decoration: underline;
@@ -165,6 +169,7 @@
         background: linear-gradient(180deg, #ffffff, #f9fcff);
         box-shadow: 0 10px 24px rgba(2, 24, 43, 0.06);
     }
+
     .featured-hero img {
         width: 100%;
         height: 188px;
@@ -173,6 +178,7 @@
         background: #e9eef3;
         border-bottom: 1px solid #e5edf4;
     }
+
     .featured-body {
         padding: 12px 14px 14px;
     }
@@ -199,8 +205,11 @@
         margin-bottom: 8px;
         transition: color 0.2s ease;
     }
-    .featured-link:hover { color: var(--pa-green); }
-    
+
+    .featured-link:hover {
+        color: var(--pa-green);
+    }
+
     .featured-excerpt {
         margin: 0 0 10px;
         color: #475569;
@@ -225,15 +234,18 @@
         display: flex;
         flex-direction: column;
     }
+
     .list-item.list-item-compact {
         min-height: 0;
         padding: 10px 12px;
     }
+
     .list-item:hover {
         background: #f0fdf4;
         border-color: #bbf7d0;
         transform: translateY(-2px);
     }
+
     .list-item a:not(.btn-detail) {
         text-decoration: none;
         color: var(--pa-ink);
@@ -246,13 +258,18 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
-    .list-item a:not(.btn-detail):hover { color: var(--pa-green); }
+
+    .list-item a:not(.btn-detail):hover {
+        color: var(--pa-green);
+    }
+
     .list-meta {
         margin-top: 6px;
         color: var(--pa-muted);
         font-size: 9px;
         font-weight: 600;
     }
+
     .list-excerpt {
         margin: 6px 0 0;
         color: #4b5563;
@@ -282,6 +299,7 @@
         margin-top: 8px;
         align-self: flex-start;
     }
+
     .btn-detail:hover {
         background: #1e6a3a;
         border-color: #1e6a3a;
@@ -290,7 +308,8 @@
 
     /* Tombol Lihat Semua di Bawah Panel */
     .lihat-semua-btn {
-        margin: auto 12px 12px 12px; /* margin-top: auto menarik tombol ke bawah */
+        margin: auto 12px 12px 12px;
+        /* margin-top: auto menarik tombol ke bawah */
         display: block;
         text-align: center;
         text-decoration: none;
@@ -303,6 +322,7 @@
         padding: 8px 14px;
         transition: all 0.2s ease;
     }
+
     .lihat-semua-btn:hover {
         background: var(--pa-green);
         color: #fff;
@@ -316,6 +336,7 @@
         border-radius: 14px;
         overflow: hidden;
     }
+
     .rss-body {
         padding: 10px 12px 0;
         height: 100%;
@@ -472,9 +493,17 @@
     }
 
     @keyframes accent-shimmer {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
+
+        0%,
+        100% {
+            background-position: 0% 50%;
+        }
+
+        50% {
+            background-position: 100% 50%;
+        }
     }
+
     .rss-loader {
         color: var(--pa-muted);
         font-size: 13px;
@@ -489,29 +518,28 @@
             height: auto !important;
             min-height: 0 !important;
         }
-        .news-top { grid-template-columns: 1fr; }
+
+        .news-top {
+            grid-template-columns: 1fr;
+        }
+
         .rss-columns {
             grid-template-columns: 1fr;
             gap: 8px;
         }
+
         .rss-feed-shell {
             padding: 12px 14px 8px;
         }
     }
 </style>
 
-<div
-    id="berita-pasmg-root"
-    data-wp-api-url="https://wp.pa-semarang.go.id"
-    data-pa-frontend-url="https://pa-semarang.go.id"
-    data-wp-cat-berita="6"
-    data-wp-cat-pengumuman="7"
-    data-wp-cat-artikel="12"
-    data-thumb-fallback="/widgets/assets/ma-fallback.jpg"
->
+<div id="berita-pasmg-root" data-wp-api-url="https://pa-semarang.go.id" data-pa-frontend-url="https://pa-semarang.go.id"
+    data-wp-cat-berita="6" data-wp-cat-pengumuman="7" data-wp-cat-artikel="12"
+    data-thumb-fallback="/widgets/assets/ma-fallback.jpg">
     <div class="news-wrap">
         <section class="news-top">
-            
+
             <article class="panel">
                 <div class="panel-head">
                     <h3 class="panel-title">Berita PA Semarang</h3>
@@ -519,7 +547,8 @@
                 <div id="pa-berita-list" class="berita-grid">
                     <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat berita terbaru...</div>
                 </div>
-                <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/berita" target="_blank" rel="noopener">Lihat Semua Berita</a>
+                <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/berita" target="_blank" rel="noopener">Lihat
+                    Semua Berita</a>
             </article>
 
             <article class="panel">
@@ -535,14 +564,16 @@
                     <div id="pa-pengumuman-list">
                         <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat pengumuman...</div>
                     </div>
-                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/pengumuman" target="_blank" rel="noopener">Lihat Semua Pengumuman</a>
+                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/pengumuman" target="_blank"
+                        rel="noopener">Lihat Semua Pengumuman</a>
                 </div>
 
                 <div id="pa-artikel" class="tab-pane">
                     <div id="pa-artikel-list">
                         <div class="rss-loader"><i class="fas fa-spinner fa-spin"></i> Memuat artikel...</div>
                     </div>
-                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/arsip-artikel" target="_blank" rel="noopener">Lihat Semua Artikel</a>
+                    <a class="lihat-semua-btn" href="#" data-pa-path="/kategori/arsip-artikel" target="_blank"
+                        rel="noopener">Lihat Semua Artikel</a>
                 </div>
             </article>
         </section>
@@ -613,7 +644,7 @@
             }
         }
 
-        const LOWERCASE_WORDS = new Set(['dan','di','ke','dari','yang','untuk','pada','dengan','oleh','atau','ini','itu','se','tak','tidak','akan','telah','juga','bagi','atas','dalam','tentang','secara','saat','antara','setelah','sebelum','terhadap','melalui','hingga','sampai','seperti','namun','tetapi','bila','jika','karena','sehingga','agar','supaya','bahwa','maupun']);
+        const LOWERCASE_WORDS = new Set(['dan', 'di', 'ke', 'dari', 'yang', 'untuk', 'pada', 'dengan', 'oleh', 'atau', 'ini', 'itu', 'se', 'tak', 'tidak', 'akan', 'telah', 'juga', 'bagi', 'atas', 'dalam', 'tentang', 'secara', 'saat', 'antara', 'setelah', 'sebelum', 'terhadap', 'melalui', 'hingga', 'sampai', 'seperti', 'namun', 'tetapi', 'bila', 'jika', 'karena', 'sehingga', 'agar', 'supaya', 'bahwa', 'maupun']);
 
         function toTitleCase(text) {
             if (!text) return '';
@@ -680,7 +711,7 @@
 
                     const rawTitle = post.title && post.title.rendered ? post.title.rendered : '';
                     const cleanTitle = rawTitle.replace(/^[\?\s]+/, '').trim(); // Fix Bug Joomla
-                    const finalLink = String(post.link || '').replace('wp.pa-semarang.go.id', 'pa-semarang.go.id');
+                    const finalLink = String(post.link || '');
 
                     return { link: finalLink, title: cleanTitle, date: post.date, image: imageUrl, description: cleanExcerpt };
                 });
@@ -844,12 +875,12 @@
         applyPaBaseUrl();
         setupTabs('pa-tabs', 'data-tab', '.tab-pane');
         setupRssTabs();
-        
+
         // Render Konten PA Lokal
         renderCategoryStack(wpCatIdBerita, 'pa-berita-list', 'Berita');
         renderCategoryStack(wpCatIdPengumuman, 'pa-pengumuman-list', 'Pengumuman');
         renderCategoryStack(wpCatIdArtikel, 'pa-artikel-list', 'Artikel');
-        
+
         // Render Konten RSS Eksternal Pertama
         renderExternalRss('ma');
 

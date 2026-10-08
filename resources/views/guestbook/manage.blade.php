@@ -76,6 +76,11 @@
                                             <a href="{{ route('lawangsewu.guestbook.detail', $entry->id) }}" class="btn-action btn-detail" title="Lihat detail">
                                                 <span>👁️</span>
                                             </a>
+                                            @if(auth()->user()?->isSuperAdmin())
+                                                <button type="button" class="btn-action btn-edit" data-entry-id="{{ $entry->id }}" data-entry-name="{{ $entry->name }}" data-entry-institution="{{ $entry->institution }}" title="Edit nama dan instansi">
+                                                    <span>✏️</span>
+                                                </button>
+                                            @endif
                                             <button type="button" class="btn-action btn-delete" data-entry-id="{{ $entry->id }}" title="Hapus entri ini">
                                                 <span>🗑️</span>
                                             </button>
@@ -226,6 +231,33 @@
             <button type="button" class="btn btn-secondary" id="modal-cancel">Batalkan</button>
             <button type="button" class="btn btn-danger" id="modal-confirm">Hapus</button>
         </div>
+    </div>
+</div>
+
+<!-- Edit Info Modal -->
+<div id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-form">
+        <div class="modal-header">
+            <h3>Edit Data Tamu</h3>
+            <small class="modal-subtitle">Hanya nama dan asal instansi yang dapat diubah</small>
+        </div>
+        <form id="edit-form" class="modal-form-content">
+            @csrf
+            <div class="form-group">
+                <label for="edit-name">Nama Tamu</label>
+                <input type="text" id="edit-name" name="nama" class="form-control" placeholder="Nama lengkap tamu" required maxlength="120">
+                <span class="form-error" id="edit-name-error"></span>
+            </div>
+            <div class="form-group">
+                <label for="edit-institution">Asal Instansi</label>
+                <input type="text" id="edit-institution" name="instansi" class="form-control" placeholder="Nama instansi atau organisasi" required maxlength="160">
+                <span class="form-error" id="edit-institution-error"></span>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-cancel">Batalkan</button>
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -730,6 +762,35 @@
     gap: 0.75rem;
 }
 
+.modal-subtitle {
+    display: block;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin-top: 0.3rem;
+}
+
+.modal-form-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.form-error {
+    display: block;
+    color: #dc2626;
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+}
+
+.btn-action.btn-edit {
+    background: #dbeafe;
+}
+
+.btn-action.btn-edit:hover {
+    background: #bfdbfe;
+}
+
 @media (max-width: 768px) {
     .manage-header h1 {
         font-size: 1.5rem;
@@ -843,11 +904,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalMessage = document.getElementById('delete-message');
     const modalConfirmBtn = document.getElementById('modal-confirm');
     const modalCancelBtn = document.getElementById('modal-cancel');
+    const editModal = document.getElementById('edit-modal');
+    const editForm = document.getElementById('edit-form');
+    const editNameInput = document.getElementById('edit-name');
+    const editInstitutionInput = document.getElementById('edit-institution');
+    const editCancelBtn = document.getElementById('edit-cancel');
     const settingsForm = document.getElementById('settings-form');
     const saveStatus = document.getElementById('save-status');
     const searchInput = document.getElementById('search-entries');
 
     let pendingDeleteAction = null;
+    let pendingEditAction = null;
 
     // Select all functionality
     selectAllCheckbox?.addEventListener('change', function() {
@@ -880,6 +947,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const selected = Array.from(entryCheckboxes).filter(cb => cb.checked).length;
         selectedCountSpan.textContent = selected;
         bulkActionsBar.style.display = selected > 0 ? 'flex' : 'none';
+    }
+
+    // Edit buttons
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const entryId = this.dataset.entryId;
+            const entryName = this.dataset.entryName;
+            const entryInstitution = this.dataset.entryInstitution;
+            
+            editNameInput.value = entryName;
+            editInstitutionInput.value = entryInstitution;
+            clearEditErrors();
+            
+            pendingEditAction = { id: entryId };
+            editModal.style.display = 'flex';
+        });
+    });
+
+    // Clear edit form errors
+    function clearEditErrors() {
+        document.getElementById('edit-name-error').textContent = '';
+        document.getElementById('edit-institution-error').textContent = '';
     }
 
     // Individual delete buttons
@@ -969,11 +1058,95 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Edit form submission
+    editForm?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        if (!pendingEditAction) return;
+
+        const { id } = pendingEditAction;
+        const nama = editNameInput.value.trim();
+        const instansi = editInstitutionInput.value.trim();
+
+        if (!nama) {
+            document.getElementById('edit-name-error').textContent = 'Nama wajib diisi.';
+            return;
+        }
+
+        if (!instansi) {
+            document.getElementById('edit-institution-error').textContent = 'Asal instansi wajib diisi.';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/buku-tamu/kelola/${id}/update-info`, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    nama: nama,
+                    instansi: instansi
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (data.errors) {
+                    if (data.errors.nama) {
+                        document.getElementById('edit-name-error').textContent = data.errors.nama[0];
+                    }
+                    if (data.errors.instansi) {
+                        document.getElementById('edit-institution-error').textContent = data.errors.instansi[0];
+                    }
+                }
+                if (response.status === 403) {
+                    alert(data.message || 'Anda tidak memiliki izin untuk mengubah data ini.');
+                } else {
+                    alert(data.message || 'Gagal mengubah data.');
+                }
+                return;
+            }
+
+            // Update table row
+            const row = document.querySelector(`[data-entry-id="${id}"]`);
+            if (row) {
+                row.querySelector('.entry-name').textContent = data.name;
+                row.dataset.entryName = data.name;
+                row.querySelector('.col-institution').textContent = data.institution;
+                row.dataset.entryInstitution = data.institution;
+            }
+
+            alert(data.message);
+            editModal.style.display = 'none';
+            pendingEditAction = null;
+        } catch (error) {
+            alert('Terjadi kesalahan: ' + error.message);
+        }
+    });
+
+    // Edit cancel button
+    editCancelBtn?.addEventListener('click', function() {
+        editModal.style.display = 'none';
+        pendingEditAction = null;
+        clearEditErrors();
+    });
+
     // Close modal on escape
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && deleteModal.style.display !== 'none') {
-            deleteModal.style.display = 'none';
-            pendingDeleteAction = null;
+        if (e.key === 'Escape') {
+            if (deleteModal.style.display !== 'none') {
+                deleteModal.style.display = 'none';
+                pendingDeleteAction = null;
+            }
+            if (editModal.style.display !== 'none') {
+                editModal.style.display = 'none';
+                pendingEditAction = null;
+                clearEditErrors();
+            }
         }
     });
 

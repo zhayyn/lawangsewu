@@ -60,6 +60,13 @@ return [
             'category' => 'Monitoring',
             'default_roles' => ['admin'],
         ],
+        [
+            'key' => 'admin.network-monitor',
+            'name' => 'Network Monitor',
+            'description' => 'View network interfaces, bandwidth, connections, and CCTV stream health',
+            'category' => 'Monitoring',
+            'default_roles' => ['admin'],
+        ],
 
         // Dashboard Access
         [
@@ -124,8 +131,8 @@ return [
         ],
         [
             'key' => 'nav.wacaraka',
-            'name' => 'Menu: WA Live PTSP',
-            'description' => 'Tampilkan menu WA Live PTSP di navigasi',
+            'name' => 'Menu: Omnichannel PTSP',
+            'description' => 'Tampilkan menu Omnichannel PTSP di navigasi',
             'category' => 'Navigasi',
             'default_roles' => ['operator', 'useradmin', 'admin'],
         ],

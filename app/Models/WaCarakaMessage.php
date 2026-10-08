@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,6 +17,12 @@ class WaCarakaMessage extends WaCarakaModel
 {
     use HasFactory;
 
+    /**
+     * Set globally by WaCarakaController or WaCarakaPersonalController
+     * to automatically filter all queries by source ('office' or 'personal').
+     */
+    public static ?string $activeSource = null;
+
     protected $fillable = [
         'user_id',
         'direction',
@@ -28,6 +35,7 @@ class WaCarakaMessage extends WaCarakaModel
         'conversation_id',
         'metadata',
         'replied_at',
+        'source',
     ];
 
     protected $casts = [
@@ -80,6 +88,25 @@ class WaCarakaMessage extends WaCarakaModel
     }
 
     // ──────────────────────────────────────────────
+    // Booted
+    // ──────────────────────────────────────────────
+
+    protected static function booted()
+    {
+        static::addGlobalScope('source_filter', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if (static::$activeSource) {
+                $builder->where('source', static::$activeSource);
+            }
+        });
+
+        static::creating(function (WaCarakaMessage $message) {
+            if (static::$activeSource && empty($message->source)) {
+                $message->source = static::$activeSource;
+            }
+        });
+    }
+
+    // ──────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────
 
@@ -97,7 +124,7 @@ class WaCarakaMessage extends WaCarakaModel
      * Generate a stable conversation ID from a remote identifier.
      * Keep chat type (group/personal/lid) in the key to avoid collisions.
      */
-    public static function conversationIdFor(string $remoteNumber): string
+    public static function conversationIdFor(string $remoteNumber, ?string $source = null): string
     {
         $normalized = static::normalizeRemoteNumber($remoteNumber);
 
@@ -112,11 +139,13 @@ class WaCarakaMessage extends WaCarakaModel
             $kind = 'lid';
         }
 
+        $activeSrc = $source ?: static::$activeSource ?: 'office';
+
         // Keep only compact digits for readability, plus hash for uniqueness.
         $digits = preg_replace('/\D/', '', $normalized) ?: '0';
-        $hash = substr(sha1($normalized), 0, 10);
+        $hash = substr(sha1($normalized . '_' . $activeSrc), 0, 10);
 
-        return sprintf('wa_%s_%s_%s', $kind, $digits, $hash);
+        return sprintf('wa_%s_%s_%s_%s', $activeSrc, $kind, $digits, $hash);
     }
 
     public static function normalizeRemoteNumber(?string $remoteNumber): string
@@ -156,5 +185,57 @@ class WaCarakaMessage extends WaCarakaModel
         }
 
         return $digits;
+    }
+
+    /**
+     * Resolve a recipient phone number to its LID JID if it has an LID mapping.
+     * Keep group JIDs and already LID JIDs untouched.
+     */
+    public static function resolveRecipientJid(string $to, ?string $source = null): string
+    {
+        $normalized = static::normalizeRemoteNumber($to);
+        
+        if ($normalized === '') {
+            return '';
+        }
+        
+        $activeSrc = $source ?: static::$activeSource ?: 'office';
+        if ($activeSrc !== 'personal') {
+            return $normalized;
+        }
+        
+        if (str_ends_with($normalized, '@lid') || str_ends_with($normalized, '@g.us')) {
+            return $normalized;
+        }
+        
+        // Remove @s.whatsapp.net or other suffix to get phone number digits
+        $phone = preg_replace('/@[^@]+$/', '', $normalized);
+        $phoneDigits = preg_replace('/\D/', '', $phone) ?: $phone;
+        
+        // Check database mappings
+        // Case A: remote_number is phone, resolved_number is LID
+        $lidJid = \App\Models\WaCarakaConversation::withoutGlobalScopes()
+            ->where('remote_number', $phoneDigits)
+            ->where('resolved_number', 'like', '%@lid')
+            ->value('resolved_number');
+            
+        if (!$lidJid) {
+            // Case B: remote_number is LID, resolved_number is phone
+            $lidJid = \App\Models\WaCarakaConversation::withoutGlobalScopes()
+                ->where('resolved_number', $phoneDigits)
+                ->where('remote_number', 'like', '%@lid')
+                ->value('remote_number');
+        }
+            
+        if ($lidJid) {
+            return $lidJid;
+        }
+        
+        // Fallback static map for hayyudin
+        if ($phoneDigits === '6281317361689') {
+            return '243138182570075@lid';
+        }
+        
+        return $normalized;
     }
 }

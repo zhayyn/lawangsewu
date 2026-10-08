@@ -53,8 +53,14 @@ class WaCarakaChatbotService
                 return $this->handleMenuCommand($from, $text, $menu);
             }
 
-            // Step 3: Not a menu command → send default menu
-            return $this->buildDefaultMenu();
+            // Step 3: Not a menu command → fallback to Ollama AI
+            try {
+                $aiReply = app(\App\Services\OllamaService::class)->generateReply($text);
+                return $aiReply;
+            } catch (\Exception $e) {
+                // If Ollama fails, fallback to standard menu
+                return $this->buildDefaultMenu();
+            }
 
         } catch (\Exception $e) {
             Log::error('[WaCaraka:Chatbot] Error processing message', [

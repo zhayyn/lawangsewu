@@ -1,0 +1,291 @@
+<!-- Widget Statistik Perkara – Real-time dari Lawangsewu -->
+<!-- developed by zhayyn™ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    .widget-statistik-minimalis {
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        padding: 25px;
+        max-width: 900px;
+        margin: 0 auto;
+        border-top: 4px solid #1e5631;
+    }
+
+    .statistik-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+        margin-bottom: 22px;
+    }
+
+    @media (min-width: 768px) {
+        .statistik-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .canvas-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+        padding: 15px;
+        background: #f9fbf9;
+        border-radius: 8px;
+        border: 1px solid #eef2e6;
+    }
+
+    .stat-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6b7280;
+        font-size: 13px;
+        gap: 8px;
+    }
+
+    .stat-loading::before {
+        content: '';
+        width: 16px;
+        height: 16px;
+        border: 2px solid #e5e7eb;
+        border-top-color: #1e5631;
+        border-radius: 50%;
+        animation: stat-spin 0.8s linear infinite;
+        display: inline-block;
+    }
+
+    @keyframes stat-spin { to { transform: rotate(360deg); } }
+
+    .btn-eksternal {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        padding: 12px 0;
+        background: linear-gradient(135deg, #1e5631, #27ae60);
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-eksternal:hover {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+        color: #ffffff;
+        text-decoration: none;
+    }
+</style>
+
+<div class="widget-statistik-minimalis">
+    <div class="statistik-grid">
+        <div class="canvas-container" id="stat-wrap-tren">
+            <div class="stat-loading" id="stat-loader-tren">Memuat data...</div>
+            <canvas id="grafikTrenTahunan" style="display:none;"></canvas>
+        </div>
+        <div class="canvas-container" id="stat-wrap-komposisi">
+            <div class="stat-loading" id="stat-loader-komposisi">Memuat data...</div>
+            <canvas id="grafikKomposisiPerkara" style="display:none;"></canvas>
+        </div>
+    </div>
+    <a class="btn-eksternal"
+       href="https://lawangsewu.pa-semarang.go.id/statistik-perkara"
+       target="_blank"
+       rel="noopener noreferrer">
+        📊 Lihat Selengkapnya Data Statistik
+    </a>
+</div>
+
+<script>
+(function () {
+    // ── Konfigurasi ──────────────────────────────────────────────
+    const API_URL = 'https://lawangsewu.pa-semarang.go.id/widgets/views/php/api/statistik-data.php';
+    const TAHUN   = new Date().getFullYear();
+
+    const WARNA = {
+        'Cerai Gugat'                         : '#7ED321',
+        'Cerai Talak'                         : '#00B8D9',
+        'Asal Usul Anak'                      : '#00C2FF',
+        'Dispensasi Kawin'                    : '#6366F1',
+        'Izin Poligami'                       : '#F97316',
+        'Kewarisan'                           : '#EC4899',
+        'Lain-Lain'                           : '#A855F7',
+        'Perwalian'                           : '#14B8A6',
+        'P3HP/Penetapan Ahli Waris'           : '#7A5AF8',
+        'Pengesahan Perkawinan/Istbat Nikah'  : '#22C55E',
+        'Penguasaan Anak'                     : '#E11D48',
+        'Wali Adhol'                          : '#FFB020',
+    };
+    const PALETTE = ['#00C2FF','#7ED321','#00B8D9','#FFB020','#7A5AF8','#EC4899',
+                     '#F97316','#22C55E','#6366F1','#E11D48','#14B8A6','#A855F7'];
+
+    function warna(label) {
+        if (WARNA[label]) return WARNA[label];
+        let h = 0;
+        for (let i = 0; i < label.length; i++) { h = ((h << 5) - h) + label.charCodeAt(i); h |= 0; }
+        return PALETTE[Math.abs(h) % PALETTE.length];
+    }
+
+    function showCanvas(loaderEl, canvasEl) {
+        loaderEl.style.display = 'none';
+        canvasEl.style.display = 'block';
+    }
+
+    function gambarGrafikTren(rows, totals) {
+        const canvas  = document.getElementById('grafikTrenTahunan');
+        const loader  = document.getElementById('stat-loader-tren');
+        if (!canvas) return;
+
+        const labels = [TAHUN-4, TAHUN-3, TAHUN-2, TAHUN-1, TAHUN];
+        const values = [totals.th4, totals.th3, totals.th2, totals.th1, totals.th0].map(Number);
+
+        showCanvas(loader, canvas);
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Total Penerimaan',
+                    data: values,
+                    borderColor: '#00bcd4',
+                    backgroundColor: 'rgba(0, 188, 212, 0.15)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#1e5631',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Tren Penerimaan 5 Tahun',
+                        font: { size: 14, family: "'Inter', sans-serif" },
+                        color: '#0f5132'
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        ticks: { font: { size: 11 } },
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: { ticks: { font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    function gambarGrafikKomposisi(rows) {
+        const canvas  = document.getElementById('grafikKomposisiPerkara');
+        const loader  = document.getElementById('stat-loader-komposisi');
+        if (!canvas) return;
+
+        // Ambil top 6 jenis perkara tahun berjalan
+        const sorted = [...rows]
+            .sort((a, b) => Number(b.th0 || 0) - Number(a.th0 || 0))
+            .slice(0, 6);
+
+        const labels = sorted.map(r => r.jenis || r.label || '-');
+        const data   = sorted.map(r => Number(r.th0 || 0));
+        const colors = labels.map(warna);
+
+        showCanvas(loader, canvas);
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    backgroundColor: colors,
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Komposisi Tahun Berjalan',
+                        font: { size: 14, family: "'Inter', sans-serif" },
+                        color: '#0f5132'
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11 }, padding: 8 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: ${ctx.raw.toLocaleString('id-ID')} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Ambil data real dari Lawangsewu API ──────────────────────
+    function ambilDataDanRender() {
+        if (typeof Chart === 'undefined') {
+            setTimeout(ambilDataDanRender, 500);
+            return;
+        }
+
+        const url = `${API_URL}?hal=perkara&tahun=${TAHUN}&t=${Date.now()}`;
+
+        fetch(url, { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+            .then(json => {
+                if (!json || !json.ok) throw new Error('Data tidak valid');
+
+                const rows   = Array.isArray(json.rows) ? json.rows : [];
+                const totals = json.totals || { th4:0, th3:0, th2:0, th1:0, th0:0 };
+
+                // Fallback hitung totals dari rows jika API belum sinkron
+                if (!totals.th0 && rows.length) {
+                    ['th4','th3','th2','th1','th0'].forEach(k => {
+                        totals[k] = rows.reduce((s, r) => s + Number(r[k] || 0), 0);
+                    });
+                }
+
+                gambarGrafikTren(rows, totals);
+                gambarGrafikKomposisi(rows);
+            })
+            .catch(err => {
+                console.warn('[Statistik Widget] Gagal ambil data:', err);
+                // Tampilkan pesan error ringan pada loader
+                ['stat-loader-tren','stat-loader-komposisi'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = 'Data tidak tersedia';
+                });
+            });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ambilDataDanRender);
+    } else {
+        ambilDataDanRender();
+    }
+
+})();
+/* developed by zhayyn™ */
+</script>

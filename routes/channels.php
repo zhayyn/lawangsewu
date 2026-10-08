@@ -25,6 +25,15 @@ Broadcast::channel('lawangsewu.wacaraka.inbox', function ($user) {
     return $user->isSuperAdmin() || in_array($user->role, ['operator', 'admin'], true);
 });
 
+// WA Personal inbox — superadmin only (WA nomor pribadi via runtime WSL)
+Broadcast::channel('lawangsewu.wa-personal.inbox', function ($user) {
+    if (! $user) {
+        return false;
+    }
+
+    return (bool) $user->isSuperAdmin();
+});
+
 // Queue real-time update channels (PTSP dan Sidang)
 Broadcast::channel('lawangsewu.queue.ptsp', function ($user) {
     if (! $user) {

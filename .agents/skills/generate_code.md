@@ -111,3 +111,15 @@ Ikuti urutan pembangunan ini:
 
 - File kode langsung di struktur proyek
 - Task progress tracker (checklist)
+
+## Catatan Modul Kompleks
+
+Beberapa modul Lawangsewu punya subfolder khusus:
+- **WaCaraka:** `Pages/Lawangsewu/WaCaraka/` (Index.vue + Reports.vue)
+- **TDMS:** `Pages/Lawangsewu/Tdms/` (Assets, Maintenance, ServiceRecords, dll)
+- **PelayananPtsp:** `Pages/Lawangsewu/PelayananPtsp/`
+- **Omnichannel:** `Controllers/Omnichannel/` + `Services/Omnichannel/`
+
+Jika menambah halaman untuk modul-modul ini, ikuti struktur subfolder yang sudah ada.
+
+<!-- developed by dbprakom™ -->

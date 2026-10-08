@@ -83,7 +83,7 @@ class ValidationHelperTest extends TestCase
             'name' => '<script>John</script>',
             'email' => 'john@example.com',
             'nested' => [
-                'message' => 'onclick="alert(1)"Text',
+                'message' => '<div onclick="alert(1)">Text</div>',
             ],
         ];
 

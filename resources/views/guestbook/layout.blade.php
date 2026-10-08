@@ -298,7 +298,7 @@
 
         <div class="site-header-right">
             <a class="site-pill" href="{{ route('lawangsewu.guestbook.form') }}" target="_top"><i class="bi bi-book-half"></i> Form Tamu</a>
-            <a class="site-pill" href="{{ route('lawangsewu.guestbook.list', ['period' => 'all']) }}" target="_top"><i class="bi bi-clock-history"></i> Riwayat</a>
+            <a class="site-pill" href="{{ route('dashboard') }}" target="_top"><i class="bi bi-house-door"></i> Dashboard</a>
         </div>
     </div>
 </header>

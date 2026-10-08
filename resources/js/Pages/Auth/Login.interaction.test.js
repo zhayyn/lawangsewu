@@ -39,12 +39,15 @@ function mountLogin(props = {}) {
             ...props,
         },
         global: {
+            mocks: {
+                route: globalThis.route,
+            },
             stubs: {
                 GuestLayout: { template: '<div><slot /></div>' },
                 Checkbox: { template: '<input type="checkbox" />' },
                 ThemeToggle: { template: '<button type="button">theme</button>' },
                 InputError: { props: ['message'], template: '<div>{{ message }}</div>' },
-                InputLabel: { props: ['value', 'for'], template: '<label :for="for">{{ value }}</label>' },
+                InputLabel: { props: ['value', 'for'], template: '<label>{{ value }}</label>' },
                 PrimaryButton: { template: '<button type="submit"><slot /></button>' },
                 TextInput: {
                     props: ['modelValue', 'type', 'id', 'required', 'autocomplete', 'autofocus', 'placeholder'],
@@ -106,9 +109,9 @@ describe('Login.vue interactions', () => {
         expect(wrapper.get('[data-testid="password-input"]').attributes('type')).toBe('password');
     });
 
-    test('shows stable touch redirect mode message for iPad devices', async () => {
+    test('does not force touch devices into redirect mode copy', async () => {
         const wrapper = mountLogin();
 
-        expect(wrapper.text()).toContain('Browser ini memakai alur Google yang paling stabil untuk perangkat sentuh.');
+        expect(wrapper.text()).not.toContain('Browser ini memakai alur Google yang paling stabil untuk perangkat sentuh.');
     });
 });

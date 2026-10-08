@@ -1,6 +1,9 @@
 <?php
 /* developed by zhayyn™ */
 
+// ⚠️ CRITICAL: Set timezone untuk ensure date consistency
+date_default_timezone_set('Asia/Jakarta');
+
 if (function_exists('opcache_reset')) {
     opcache_reset();
 }
@@ -57,9 +60,18 @@ if (isset($_GET['format_jadwal'])) {
     $error_log = array();
     $allRows = array();
 
+    // Helper: Check if today is a working day (Monday-Friday)
+    $isWorkingDay = function(): bool {
+        $dayOfWeek = (int) date('N'); // 1 = Monday, 7 = Sunday
+        return $dayOfWeek >= 1 && $dayOfWeek <= 5; // True untuk Senin-Jumat
+    };
+
     $buildRows = function (array $rawRows): array {
         $rows = array();
         $no = 1;
+        
+        $currentHour = (int)date('H');
+        $defaultStatus = ($currentHour < 9) ? 'Terjadwal' : 'Menunggu Sidang';
 
         foreach ($rawRows as $rawRow) {
             $noPerkara = trim((string) ($rawRow['noPerkara'] ?? $rawRow['nomor_perkara'] ?? ''));
@@ -69,15 +81,18 @@ if (isset($_GET['format_jadwal'])) {
 
             $agenda = trim((string) ($rawRow['agenda'] ?? ''));
             $ruangSidang = trim((string) ($rawRow['ruangSidang'] ?? $rawRow['ruang_sidang'] ?? ''));
-            // Check both 'status' and 'keterangan' fields, prioritize 'status' if present
+            
             $keterangan = trim((string) ($rawRow['status'] ?? $rawRow['keterangan'] ?? ''));
+            if ($keterangan === '' || strtolower($keterangan) === 'null') {
+                $keterangan = $defaultStatus;
+            }
 
             $rows[] = array(
                 'no' => $no++,
                 'noPerkara' => $noPerkara,
                 'agenda' => $agenda !== '' ? $agenda : 'Sidang',
                 'ruangSidang' => $ruangSidang !== '' ? $ruangSidang : 'Ruang Sidang',
-                'keterangan' => $keterangan !== '' ? $keterangan : 'Terjadwal',
+                'keterangan' => $keterangan,
             );
         }
 
@@ -199,15 +214,21 @@ if (isset($_GET['format_jadwal'])) {
             )
         );
 
+        // Set timezone di MySQL untuk ensure consistency dengan PHP timezone
+        $pdo->exec("SET SESSION time_zone = '+07:00'");
+
         try {
+            // Use explicit date instead of CURDATE() to ensure timezone consistency
+            $todayDate = date('Y-m-d');
             $stmtSipp = $pdo->prepare(
                 'SELECT p.nomor_perkara, pjs.agenda, pjs.ruangan AS ruang_sidang,
                         pjs.keterangan AS keterangan_manual, pjs.dihadiri_oleh
                  FROM perkara_jadwal_sidang pjs
                  LEFT JOIN perkara p ON p.perkara_id = pjs.perkara_id
-                 WHERE pjs.tanggal_sidang = CURDATE()
+                 WHERE DATE(pjs.tanggal_sidang) = :today_date
                  ORDER BY COALESCE(pjs.jam_sidang, "00:00:00") ASC, pjs.urutan ASC, pjs.id ASC'
             );
+            $stmtSipp->bindParam(':today_date', $todayDate, PDO::PARAM_STR);
             $stmtSipp->execute();
             $sippRows = $stmtSipp->fetchAll();
             if (is_array($sippRows) && count($sippRows) > 0) {
@@ -217,12 +238,23 @@ if (isset($_GET['format_jadwal'])) {
                 // - Menunggu Sidang jika belum ada data kehadiran
                 foreach ($sippRows as &$row) {
                     $ket = trim((string)($row['keterangan_manual'] ?? ''));
-                    if ($ket !== '') {
+                    $dihadiri = trim((string)($row['dihadiri_oleh'] ?? ''));
+                    
+                    $isDihadiriEmpty = ($dihadiri === '' || strtolower($dihadiri) === 'null' || $dihadiri === '[]');
+                    $isKetEmpty = ($ket === '' || strtolower($ket) === 'null');
+
+                    if (!$isKetEmpty) {
                         $row['status'] = $ket;
-                    } elseif ($row['dihadiri_oleh'] !== null) {
-                        $row['status'] = 'Selesai Sidang';
+                    } elseif (!$isDihadiriEmpty) {
+                        // SIPP mencatat sidang ini sudah dihadiri (selesai)
+                        // TAPI abaikan jika ini sebelum jam 9 pagi (pasti data palsu/testing)
+                        if ((int)date('H') < 9) {
+                            $row['status'] = ''; // Biarkan kosong, buildRows akan mengisinya dgn Terjadwal
+                        } else {
+                            $row['status'] = 'Selesai Sidang';
+                        }
                     } else {
-                        $row['status'] = 'Menunggu Sidang';
+                        $row['status'] = ''; // Biarkan kosong agar buildRows pakai default status
                     }
                 }
                 unset($row);
@@ -236,7 +268,8 @@ if (isset($_GET['format_jadwal'])) {
 
         if (count($allRows) === 0) {
             try {
-                $stmtLocal = $pdo->prepare('SELECT nomor_perkara, agenda, ruang_sidang, keterangan FROM jadwal_persidangan_local WHERE tanggal_sidang = CURDATE() ORDER BY urutan ASC, id ASC');
+                $stmtLocal = $pdo->prepare('SELECT nomor_perkara, agenda, ruang_sidang, keterangan FROM jadwal_persidangan_local WHERE DATE(tanggal_sidang) = :today_date ORDER BY urutan ASC, id ASC');
+                $stmtLocal->bindParam(':today_date', $todayDate, PDO::PARAM_STR);
                 $stmtLocal->execute();
                 $localRows = $stmtLocal->fetchAll();
                 if (is_array($localRows) && count($localRows) > 0) {
@@ -358,6 +391,36 @@ if (isset($_GET['format_jadwal'])) {
     }
     unset($row);
 
+    // ⚠️ AUTO-CLOSE RULES:
+    $currentHour = (int) date('H');
+    
+    // 1. Setelah jam 16:00 (4 Sore), status yang masih "Menunggu Sidang" atau "Terjadwal" otomatis jadi Selesai Sidang
+    if ($currentHour >= 16) {
+        foreach ($allRows as &$row) {
+            if ($row['keterangan'] === 'Menunggu Sidang' || $row['keterangan'] === 'Terjadwal') {
+                $row['keterangan'] = 'Selesai Sidang';
+            }
+        }
+        unset($row);
+        $error_log[] = 'After-hours (16:00+): pending sessions marked as completed';
+    }
+
+    // 2. Jika jam sudah >= 18:00 (6 PM), paksa SEMUA sidang (termasuk yang tersangkut Sedang Sidang) dianggap selesai
+    if ($currentHour >= 18) {
+        foreach ($allRows as &$row) {
+            $row['keterangan'] = 'Selesai Sidang';
+        }
+        unset($row);
+        $error_log[] = 'After-hours (18:00+): all sessions forcibly marked as completed';
+    }
+
+    // ⚠️ FILTER: Jika hari ini adalah weekend (Sabtu/Minggu), kosongkan jadwal
+    // Ini mencegah data stale dari fallback sources ditampilkan saat libur
+    if (!$isWorkingDay()) {
+        $allRows = array();
+        $error_log[] = 'Weekend detected: no sessions expected';
+    }
+
     $totalRows = count($allRows);
 
     ?>
@@ -426,6 +489,27 @@ if (isset($_GET['format_jadwal'])) {
             }
             .no-data { text-align: center; padding: 40px; color: #999; font-style: italic; }
 
+            /* Judul jadwal persidangan */
+            .jadwal-title {
+                text-align: center;
+                background: linear-gradient(135deg, #084228, #0d6b41);
+                color: white;
+                padding: 16px 20px;
+                margin: -10px -10px 12px -10px;
+                border-radius: 8px 8px 0 0;
+                font-size: 18px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                box-shadow: 0 2px 8px rgba(8, 66, 40, 0.15);
+            }
+            .jadwal-title .total-badge {
+                color: #ffd700;
+                font-weight: 800;
+                margin-left: 8px;
+                font-size: 20px;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            }
+
             /* Status keterangan sidang */
             .status-sedang   { color: #c0392b; font-weight: 700; }
             .status-selesai  { color: #27ae60; font-weight: 600; }
@@ -440,6 +524,9 @@ if (isset($_GET['format_jadwal'])) {
         </style>
     </head>
     <body>
+        <div class="jadwal-title">
+            Jadwal Persidangan Hari Ini <span class="total-badge">(Total <?php echo $totalRows; ?>)</span>
+        </div>
         <div class="jadwal-table-wrapper">
             <table class="jadwal-table" data-total-rows="<?php echo $totalRows; ?>">
             <thead>
@@ -475,7 +562,8 @@ if (isset($_GET['format_jadwal'])) {
                 $formatKeterangan = function (string $ket): string {
                     if ($ket === 'Sedang Sidang')  return '<span class="status-sedang">&#9654; Sedang Sidang</span>';
                     if ($ket === 'Selesai Sidang') return '<span class="status-selesai">&#10003; Selesai Sidang</span>';
-                    if ($ket === 'Menunggu Sidang' || $ket === 'Terjadwal') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                    if ($ket === 'Menunggu Sidang') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                    if ($ket === 'Terjadwal') return '<span class="status-menunggu">Terjadwal</span>';
                     return '<span class="status-manual">' . htmlspecialchars($ket) . '</span>';
                 };
 
@@ -542,17 +630,30 @@ if (isset($_GET['format_jadwal'])) {
         // ================================================================
         (function() {
             var previousSedang = {}; // { no_perk: true } dari polling sebelumnya
+            var pollInterval = null;
+            var isPageVisible = true;
 
             function fmtKet(status) {
                 if (status === 'Sedang Sidang')  return '<span class="status-sedang">&#9654; Sedang Sidang</span>';
                 if (status === 'Selesai Sidang') return '<span class="status-selesai">&#10003; Selesai Sidang</span>';
                 if (status === 'Menunggu Sidang') return '<span class="status-menunggu">Menunggu Sidang</span>';
+                if (status === 'Terjadwal') return '<span class="status-menunggu">Terjadwal</span>';
                 return '<span class="status-manual">' + status.replace(/[<>&"]/g, function(c) {
                     return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];
                 }) + '</span>';
             }
 
+            function isAfterHour18() {
+                var now = new Date();
+                return now.getHours() >= 18;
+            }
+
             function pollAntrian() {
+                // Jangan polling jika sudah jam 18:00 atau tab tidak aktif
+                if (isAfterHour18() || !isPageVisible) {
+                    return;
+                }
+
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', '?proxy=bawah&t=' + Date.now(), true);
                 xhr.onreadystatechange = function() {
@@ -576,14 +677,16 @@ if (isset($_GET['format_jadwal'])) {
 
                             if (currentSedang[np]) {
                                 td.innerHTML = fmtKet('Sedang Sidang');
-                            } else if (previousSedang[np]) {
-                                // Barusan selesai dipanggil
-                                td.innerHTML = fmtKet('Selesai Sidang');
-                                td.setAttribute('data-base', 'Selesai Sidang');
-                            } else if (base === 'Sedang Sidang') {
-                                // Server render was Sedang, now gone
-                                td.innerHTML = fmtKet('Selesai Sidang');
-                                td.setAttribute('data-base', 'Selesai Sidang');
+                            } else if (previousSedang[np] || base === 'Sedang Sidang') {
+                                // Barusan selesai dipanggil, atau server-rendered Sedang tapi kini hilang
+                                var h = new Date().getHours();
+                                if (h < 9) {
+                                    td.innerHTML = fmtKet('Terjadwal');
+                                    td.setAttribute('data-base', 'Terjadwal');
+                                } else {
+                                    td.innerHTML = fmtKet('Selesai Sidang');
+                                    td.setAttribute('data-base', 'Selesai Sidang');
+                                }
                             }
                             // Jika base adalah Selesai Sidang dari server (dihadiri_oleh) -> biarkan
                             // Jika Menunggu Sidang dan tidak di antrian -> biarkan
@@ -595,9 +698,18 @@ if (isset($_GET['format_jadwal'])) {
                 xhr.send();
             }
 
-            // Poll segera dan setiap 30 detik
+            // Detect page visibility (tab aktif/tidak aktif)
+            document.addEventListener('visibilitychange', function() {
+                isPageVisible = !document.hidden;
+                if (isPageVisible && !isAfterHour18()) {
+                    // Tab aktif lagi & belum jam 18:00 -> poll segera
+                    pollAntrian();
+                }
+            });
+
+            // Poll segera dan setiap 90 detik (optimized)
             pollAntrian();
-            setInterval(pollAntrian, 30000);
+            pollInterval = setInterval(pollAntrian, 90000);
         })();
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -710,7 +822,6 @@ if (isset($_GET['format_jadwal'])) {
     </div>
 
     <div style="margin: 15px; border-radius: 15px; overflow: hidden; border: 1px solid #eaeaea; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-        <div class="bg-hijau-elegan" style="padding: 10px; text-align: center; font-size: 14px; font-weight: bold;">JADWAL PERSIDANGAN HARI INI</div>
         <iframe id="sippFrame" src="?format_jadwal=1&t=0" width="100%" height="480px" frameborder="0" scrolling="no" style="display:block; border: none;"></iframe>
     </div>
 </div>
@@ -723,9 +834,15 @@ if (isset($_GET['format_jadwal'])) {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('tgl_indo').innerText = new Date().toLocaleDateString('id-ID', options);
 
-    setInterval(updateData, 5000);
+    var QUEUE_POLL_INTERVAL_MS = 30000;
+    var isQueueRequestRunning = false;
+    var lastRoomQueueSignature = '';
+
+    setInterval(updateClock, 1000);
+    setInterval(updateData, QUEUE_POLL_INTERVAL_MS);
     setInterval(refreshSIPP, 900000);
 
+    updateClock();
     updateData();
 
     function refreshSIPP() {
@@ -733,10 +850,45 @@ if (isset($_GET['format_jadwal'])) {
         sippFrame.src = '?format_jadwal=1&t=' + new Date().getTime();
     }
 
+    function updateClock() {
+        var d = new Date();
+        document.getElementById("jam").textContent = d.toLocaleTimeString([], {hour12: false});
+    }
+
+    function setTextIfChanged(element, value) {
+        if (!element) return;
+        var nextValue = value == null ? '' : String(value);
+        if (element.textContent !== nextValue) {
+            element.textContent = nextValue;
+        }
+    }
+
+    function buildRoomQueueSignature(list) {
+        if (!Array.isArray(list)) return '';
+
+        var rooms = [];
+        for (var i = 0; i < list.length; i++) {
+            var rs = parseInt(list[i].r_sidang);
+            if (rs >= 1 && rs <= 3) {
+                rooms.push([
+                    rs,
+                    list[i].no_antrian || '',
+                    list[i].no_perk || ''
+                ]);
+            }
+        }
+
+        rooms.sort(function(a, b) { return a[0] - b[0]; });
+        return JSON.stringify(rooms);
+    }
+
     // PENYEMPURNAAN PROXY BROWSER MENGGUNAKAN NATIVE JS
     function updateData() {
-        var d = new Date();
-        document.getElementById("jam").innerHTML = d.toLocaleTimeString([], {hour12: false});
+        if (document.hidden || isQueueRequestRunning) {
+            return;
+        }
+
+        isQueueRequestRunning = true;
 
         // Kita gunakan PHP Proxy kita sendiri agar kebal CORS!
         var cacheKiller = '&t=' + new Date().getTime();
@@ -747,7 +899,6 @@ if (isset($_GET['format_jadwal'])) {
             if (this.readyState == 4 && this.status == 200) {
                 try {
                     var obj = JSON.parse(this.responseText);
-                    console.log("Status Sidang:", obj); // Untuk pantauan di F12
 
                     if (obj && parseInt(obj.jml_sidang) > 0) {
 
@@ -758,33 +909,61 @@ if (isset($_GET['format_jadwal'])) {
                                 try {
                                     var objBawah = JSON.parse(this.responseText);
                                     if (objBawah !== null) {
+                                        var signature = buildRoomQueueSignature(objBawah);
+                                        if (signature === lastRoomQueueSignature) {
+                                            return;
+                                        }
+                                        lastRoomQueueSignature = signature;
+
                                         for (var i = 0; i < objBawah.length; i++) {
                                             var rs = parseInt(objBawah[i].r_sidang);
                                             // Hanya proses ruang 1, 2, 3
                                             if (rs >= 1 && rs <= 3) {
                                                 var noEl = document.getElementById("no" + rs);
                                                 var perkEl = document.getElementById("noperk" + rs);
-                                                if(noEl) noEl.innerHTML = objBawah[i].no_antrian;
-                                                if(perkEl) perkEl.innerHTML = objBawah[i].no_perk;
+                                                setTextIfChanged(noEl, objBawah[i].no_antrian);
+                                                setTextIfChanged(perkEl, objBawah[i].no_perk);
                                             }
                                         }
                                     }
                                 } catch(e) {}
+                                finally {
+                                    isQueueRequestRunning = false;
+                                }
+                            } else if (this.readyState == 4) {
+                                isQueueRequestRunning = false;
                             }
                         };
                         reqBawah.open("GET", "?proxy=bawah" + cacheKiller, true);
+                        reqBawah.onerror = function() {
+                            isQueueRequestRunning = false;
+                        };
                         reqBawah.send();
 
+                    } else {
+                        isQueueRequestRunning = false;
                     }
                 } catch(e) {
                     // Jika memang JSON kosong karena di server asli belum ada yg dipanggil
+                    isQueueRequestRunning = false;
                 }
+            } else if (this.readyState == 4) {
+                isQueueRequestRunning = false;
             }
         };
         // Tembak ke file kita sendiri, bukan ke antrian.pa-semarang (Bypass CORS)
         reqAda.open("GET", "?proxy=ada_sidang" + cacheKiller, true);
+        reqAda.onerror = function() {
+            isQueueRequestRunning = false;
+        };
         reqAda.send();
     }
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            updateData();
+        }
+    });
 </script>
 </body>
 </html>

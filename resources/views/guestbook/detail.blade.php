@@ -94,6 +94,7 @@
                         <div class="col-md-6"><div class="field-label">Nama Lengkap</div><div>{{ $entry->name }}</div></div>
                         <div class="col-md-6"><div class="field-label">Jabatan</div><div>{{ $entry->position }}</div></div>
                         <div class="col-md-6"><div class="field-label">Instansi</div><div>{{ $entry->institution }}</div></div>
+                        <div class="col-md-6"><div class="field-label">Nomor HP</div><div>{{ $entry->phone ?: '-' }}</div></div>
                         <div class="col-md-12"><div class="field-label">Keperluan</div><div>{{ $entry->purpose ?: '-' }}</div></div>
                         <div class="col-md-6"><div class="field-label">Tanggal Kunjungan</div><div>{{ \Illuminate\Support\Carbon::parse($entry->checkin)->format('d/m/Y') }}</div></div>
                         <div class="col-md-6"><div class="field-label">Jam Check In</div><div>{{ \Illuminate\Support\Carbon::parse($entry->checkin)->format('H:i:s') }}</div></div>

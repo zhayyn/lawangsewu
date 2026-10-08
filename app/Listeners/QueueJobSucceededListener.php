@@ -16,22 +16,22 @@ class QueueJobSucceededListener
     public function handle(JobProcessed $event)
     {
         try {
-            $jobClass = get_class($event->job->resolveName());
-            $duration = $event->job->getReleaseTimestamp() - $event->job->getFailedAtTimestamp();
+            // resolveName() mengembalikan string nama class, bukan object
+            $jobClass = $event->job->resolveName();
+            $jobName  = class_basename($jobClass);
 
             // Record success metrics
             PrometheusMetricsService::recordQueueJob(
-                class_basename($jobClass),
+                $jobName,
                 'succeeded',
-                $duration ?? 0
+                0
             );
 
             // Log success
             Log::info('Queue job succeeded', [
-                'job' => class_basename($jobClass),
+                'job' => $jobName,
                 'job_id' => $event->job->getJobId(),
                 'attempts' => $event->job->attempts(),
-                'duration_ms' => $duration,
             ]);
         } catch (\Exception $e) {
             Log::error('Error in QueueJobSucceededListener', [

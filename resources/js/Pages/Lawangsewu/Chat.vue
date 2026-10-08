@@ -1,6 +1,7 @@
 <script setup>
 import ChatBubble from '@/Components/lawangsewu/ChatBubble.vue';
 import LawangsewuLayout from '@/Layouts/LawangsewuLayout.vue';
+import { ensureReverb } from '@/reverbLoader';
 import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -170,8 +171,8 @@ const handleVisibilityChange = () => {
     schedulePolling();
 };
 
-const connectEcho = () => {
-    const echo = window.Echo;
+const connectEcho = async () => {
+    const echo = await ensureReverb();
 
     if (!echo) {
         return;
@@ -657,14 +658,14 @@ watch(() => props.initialMessages, (newMessages) => {
                                     :message="{
                                         ...msg,
                                         user_id: msg.user_id,
-                                        alias: msg.user.alias || msg.user.name,
-                                        realName: msg.user.name,
-                                        avatar: msg.user.avatar,
+                                        alias: msg.user?.alias || msg.user?.name || 'Operator',
+                                        realName: msg.user?.name || 'Operator',
+                                        avatar: msg.user?.avatar || null,
                                         body: msg.content,
                                         attachment: msg.metadata?.attachment || msg.attachment || null,
                                         time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                     }"
-                                    :own="msg.user_id === user.id"
+                                    :own="msg.user_id === user?.id"
                                 />
                                 <div v-if="isSuperAdmin" class="flex" :class="msg.user_id === user.id ? 'justify-end' : 'justify-start'">
                                     <button
@@ -710,7 +711,7 @@ watch(() => props.initialMessages, (newMessages) => {
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 py-2 shadow-sm sm:gap-3 sm:rounded-[20px] sm:px-3">
+                                <div class="chat-input-wrapper flex items-center gap-2 rounded-[18px] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 py-2 shadow-sm sm:gap-3 sm:rounded-[20px] sm:px-3" style="--input-radius: 20px;">
                                     <input
                                         ref="fileInput"
                                         type="file"
@@ -838,7 +839,7 @@ watch(() => props.initialMessages, (newMessages) => {
                         <div class="flex items-center gap-4 mb-5">
                             <img v-if="user.avatar" :src="user.avatar" class="h-12 w-12 rounded-2xl border-2 border-blue-500/20 shadow-lg shadow-blue-500/10">
                             <div v-else class="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black">
-                                {{ (user.alias || user.name)[0].toUpperCase() }}
+                                {{ ((user.alias || user.name || '?')[0] || '?').toUpperCase() }}
                             </div>
                             <div class="min-w-0">
                                 <p class="text-sm font-black text-[var(--text-1)] truncate capitalize">{{ user.alias || user.name }}</p>
@@ -858,7 +859,7 @@ watch(() => props.initialMessages, (newMessages) => {
                                 <div class="relative">
                                     <img v-if="u.avatar" :src="u.avatar" class="h-8 w-8 rounded-lg object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all">
                                     <div v-else class="h-8 w-8 rounded-lg bg-[var(--surface-3)] text-[var(--text-3)] font-black text-[10px] flex items-center justify-center">
-                                        {{ (u.alias || u.name)[0].toUpperCase() }}
+                                        {{ ((u.alias || u.name || '?')[0] || '?').toUpperCase() }}
                                     </div>
                                     <div class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-1)] bg-emerald-500 shadow-sm"></div>
                                 </div>

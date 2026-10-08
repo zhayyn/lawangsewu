@@ -34,6 +34,12 @@ class GuestbookFlowTest extends TestCase
     {
         Storage::fake('public');
 
+        $this->mock(\App\Services\WaCarakaService::class, function ($mock) {
+            $mock->shouldReceive('queueText')
+                 ->once()
+                 ->with('081234567890', \Mockery::type('string'), 'PA Semarang');
+        });
+
         $user = User::factory()->create([
             'is_active' => true,
             'role' => 'operator',
@@ -44,6 +50,7 @@ class GuestbookFlowTest extends TestCase
             'id' => '20260406010101999',
             'nama' => 'Andi Saputra',
             'jabatan' => 'Staff',
+            'nomor_hp' => '081234567890',
             'kategori_instansi' => 'INSTANSI_PERUSAHAAN',
             'instansi' => 'Pemerintah Kota Semarang',
             'keperluan' => 'Koordinasi pelayanan',

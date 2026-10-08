@@ -61,7 +61,7 @@ class LegacyPendopoSyncService
 
     public function dashboardSummary(): array
     {
-        return Cache::remember('pendopo:dashboard-summary:v1', now()->addSeconds(45), function () {
+        return Cache::remember('pendopo:dashboard-summary:v2', now()->addSeconds(45), function () {
             return $this->buildDashboardSummary();
         });
     }
@@ -97,6 +97,10 @@ class LegacyPendopoSyncService
                 'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
                 'data' => $monthlySummary,
             ],
+            'profile_summary' => [
+                'positions' => $this->profileBreakdown('position', 6),
+                'institutions' => $this->profileBreakdown('institution_category', 6),
+            ],
             'recent_entries' => GuestbookEntry::query()
                 ->orderByDesc('checkin')
                 ->limit(10)
@@ -115,6 +119,63 @@ class LegacyPendopoSyncService
             'photo_count' => $this->countPhotos(public_path('guestbook/photos')),
             'legacy' => $this->legacyDatasetSummary(),
         ];
+    }
+
+    private function profileBreakdown(string $column, int $limit = 6): array
+    {
+        $total = GuestbookEntry::query()
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->where($column, '!=', '-')
+            ->count();
+
+        if ($total === 0) {
+            return [
+                'total' => 0,
+                'items' => [],
+            ];
+        }
+
+        $rows = GuestbookEntry::query()
+            ->selectRaw("{$column} as label, COUNT(*) as total")
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->where($column, '!=', '-')
+            ->groupBy($column)
+            ->orderByDesc('total')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => [
+                'label' => $this->profileLabel((string) $row->label),
+                'total' => (int) $row->total,
+                'percentage' => round(((int) $row->total / max($total, 1)) * 100, 1),
+            ])
+            ->values();
+
+        $shown = $rows->sum('total');
+        if ($total > $shown) {
+            $rows->push([
+                'label' => 'Lainnya',
+                'total' => $total - $shown,
+                'percentage' => round((($total - $shown) / max($total, 1)) * 100, 1),
+            ]);
+        }
+
+        return [
+            'total' => $total,
+            'items' => $rows->all(),
+        ];
+    }
+
+    private function profileLabel(string $label): string
+    {
+        return match ($label) {
+            'MAHKAMAH_AGUNG' => 'Mahkamah Agung',
+            'INSTANSI_PERUSAHAAN' => 'Instansi / Perusahaan',
+            'UNIVERSITAS_SEKOLAH' => 'Universitas / Sekolah',
+            'PERSEORANGAN' => 'Perseorangan',
+            default => $label,
+        };
     }
 
     public function archiveLegacy(): ?string

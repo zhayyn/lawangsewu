@@ -80,17 +80,17 @@ const displayNavGroups = computed(() => {
                     badge: 'Admin',
                 },
                 {
-                    label: 'Laporan',
-                    short: 'LR',
-                    routeKey: 'admin-laporan',
-                    href: safeRoute('admin.laporan.index', '/admin/laporan'),
-                    badge: 'Admin',
-                },
-                {
                     label: 'Tailscale Network',
                     short: 'TS',
                     routeKey: 'tailscale',
                     href: safeRoute('lawangsewu.tailscale.index', '/tailscale'),
+                    badge: 'Superadmin',
+                },
+                {
+                    label: 'WA Caraka Admin',
+                    short: 'WA⚙',
+                    routeKey: 'wacaraka.admin',
+                    href: safeRoute('admin.wacaraka.index', '/admin/wa-caraka'),
                     badge: 'Superadmin',
                 },
                 {
@@ -413,14 +413,6 @@ onMounted(() => {
 
                                 <div class="hidden items-center gap-2 md:flex">
                                     <Link
-                                        v-if="isSuperAdmin"
-                                        :href="route('admin.users.index')"
-                                        class="secondary-button"
-                                    >
-                                        Kelola User
-                                    </Link>
-
-                                    <Link
                                         :href="route('logout')"
                                         method="post"
                                         as="button"
@@ -479,14 +471,6 @@ onMounted(() => {
 
                     <div class="space-y-5 border-b border-[var(--border)] pb-5">
                         <div class="space-y-2">
-                            <Link
-                                v-if="isSuperAdmin"
-                                :href="route('admin.users.index')"
-                                class="secondary-button w-full"
-                                @click="isSidebarOpen = false"
-                            >
-                                Kelola User
-                            </Link>
                             <Link
                                 :href="route('logout')"
                                 method="post"

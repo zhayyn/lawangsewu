@@ -33,8 +33,7 @@ class WaCarakaServiceTest extends TestCase
     public function test_health_check_handles_connection_failure(): void
     {
         Http::fake([
-            '*' => Http::sequence()
-                ->push(new ConnectionException('Connection refused')),
+            '*' => fn() => throw new ConnectionException('Connection refused'),
         ]);
 
         $result = $this->service->health();
@@ -77,9 +76,11 @@ class WaCarakaServiceTest extends TestCase
 
     public function test_post_request_includes_authentication_token(): void
     {
-        Http::fake();
+        Http::fake([
+            '*' => Http::response([], 200),
+        ]);
 
-        $this->service->post('/test', ['data' => 'value']);
+        $this->service->sendText('628123456789', 'test');
 
         Http::assertSent(function ($request) {
             if (!empty(config('wa_caraka.token'))) {
@@ -141,7 +142,7 @@ class WaCarakaServiceTest extends TestCase
 
         $this->assertTrue($result['ok']);
         Http::assertSent(function ($request) {
-            return $request->isMethod('POST') && 
+            return $request->method() === 'POST' && 
                    str_contains($request->url(), 'refresh-qr');
         });
     }

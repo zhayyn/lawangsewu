@@ -53,6 +53,7 @@ const inlineError = ref('');
 
 const showCreateForm = ref(false);
 const selectedPermissionUserId = ref(null);
+const deleteModalState = reactive({ isOpen: false, userId: null });
 const newUserForm = useForm({
     name: '',
     email: '',
@@ -302,6 +303,36 @@ const saveUser = (userId) => {
         },
     });
 };
+const requestDeleteUser = (userId) => {
+    deleteModalState.userId = userId;
+    deleteModalState.isOpen = true;
+};
+
+const cancelDeleteUser = () => {
+    deleteModalState.isOpen = false;
+    deleteModalState.userId = null;
+};
+
+const deleteUser = () => {
+    if (!deleteModalState.userId) return;
+
+    inlineError.value = '';
+
+    router.post(`/admin/users/${deleteModalState.userId}`, {
+        _method: 'delete'
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            cancelDeleteUser();
+        },
+        onError: (errors) => {
+            cancelDeleteUser();
+            const firstError = Object.values(errors || {}).find(Boolean);
+            inlineError.value = firstError || 'Gagal menghapus pengguna.';
+        },
+    });
+};
 
 const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -414,6 +445,7 @@ const permissionStateClass = (value) => {
                             </h3>
                             <p class="mt-2 text-xs text-[var(--text-3)] font-semibold">
                                 Hanya email akun Google dalam daftar ini yang boleh mendaftar via Google. Superadmin tetap diizinkan.
+                                Email yang sudah <span class="text-emerald-600 font-bold">Aktif</span> berarti sudah berhasil login — entry allowlist-nya masih bisa dihapus karena tidak lagi diperlukan.
                             </p>
                         </div>
                         <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-amber-600">
@@ -455,14 +487,36 @@ const permissionStateClass = (value) => {
                                 <tr>
                                     <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Email</th>
                                     <th class="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Catatan</th>
+                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Status Akun</th>
                                     <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Auto Aktif</th>
                                     <th class="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-[var(--border)]">
-                                <tr v-for="entry in allowlist" :key="entry.id">
-                                    <td class="px-4 py-3 font-semibold text-[var(--text-1)]">{{ entry.email }}</td>
+                                <tr v-for="entry in allowlist" :key="entry.id" :class="entry.is_registered ? 'opacity-60' : ''">
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold text-[var(--text-1)] text-sm">{{ entry.email }}</p>
+                                        <p v-if="entry.user_name" class="text-[11px] text-[var(--text-3)] mt-0.5">{{ entry.user_name }}</p>
+                                    </td>
                                     <td class="px-4 py-3 text-[var(--text-2)]">{{ entry.note || '-' }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <!-- Badge status akun: sudah login atau belum -->
+                                        <span v-if="entry.is_registered && entry.is_active_user"
+                                              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            Aktif
+                                        </span>
+                                        <span v-else-if="entry.is_registered && !entry.is_active_user"
+                                              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            Menunggu Aktivasi
+                                        </span>
+                                        <span v-else
+                                              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500 border border-slate-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                            Belum Login
+                                        </span>
+                                    </td>
                                     <td class="px-4 py-3 text-center">
                                         <button
                                             type="button"
@@ -484,7 +538,7 @@ const permissionStateClass = (value) => {
                                     </td>
                                 </tr>
                                 <tr v-if="allowlist.length === 0">
-                                    <td colspan="3" class="px-4 py-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
+                                    <td colspan="5" class="px-4 py-6 text-center text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-3)] opacity-40">
                                         Belum ada email di allowlist
                                     </td>
                                 </tr>
@@ -652,8 +706,11 @@ const permissionStateClass = (value) => {
                                             v-model="formState[user.id].alias"
                                             type="text"
                                             class="input-surface !py-1.5 !text-xs !rounded-xl w-full opacity-70"
-                                            placeholder="Alias (opsional)..."
+                                            placeholder="Alias / emoji ✦ (opsional)..."
                                             :disabled="!user.can_manage"
+                                            autocapitalize="none"
+                                            autocorrect="off"
+                                            spellcheck="false"
                                         />
                                     </div>
                                 </td>
@@ -705,14 +762,24 @@ const permissionStateClass = (value) => {
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button
-                                        type="button"
-                                        class="github-button !py-2 !px-4 !text-[11px] !bg-indigo-600 hover:!bg-indigo-700"
-                                        @click="saveUser(user.id)"
-                                        :disabled="!user.can_manage"
-                                    >
-                                        Update
-                                    </button>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            class="github-button !py-2 !px-4 !text-[11px] !bg-indigo-600 hover:!bg-indigo-700"
+                                            @click="saveUser(user.id)"
+                                            :disabled="!user.can_manage"
+                                        >
+                                            Update
+                                        </button>
+                                        <button
+                                            v-if="user.can_manage"
+                                            type="button"
+                                            class="github-button !py-2 !px-4 !text-[11px] !bg-rose-600 hover:!bg-rose-700"
+                                            @click="requestDeleteUser(user.id)"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </div>
                                     <p v-if="!user.can_manage" class="mt-1 text-[10px] font-bold uppercase tracking-widest text-amber-600">
                                         Hanya superadmin utama
                                     </p>
@@ -872,6 +939,53 @@ const permissionStateClass = (value) => {
                 </div>
             </div>
         </div>
+
+        <!-- Futuristic Delete Confirmation Modal -->
+        <div v-if="deleteModalState.isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <!-- Backdrop blur -->
+            <div 
+                class="absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity" 
+                @click="cancelDeleteUser"
+            ></div>
+            
+            <!-- Modal Content -->
+            <div 
+                class="relative w-full max-w-md overflow-hidden rounded-3xl border border-rose-500/30 bg-slate-900/80 p-8 shadow-[0_0_40px_-10px_rgba(225,29,72,0.3)] backdrop-blur-xl transform transition-all scale-100 opacity-100"
+            >
+                <div class="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-rose-600/20 blur-3xl"></div>
+                <div class="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl"></div>
+                
+                <div class="relative z-10 flex flex-col items-center text-center">
+                    <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    
+                    <h3 class="mb-2 text-xl font-black tracking-wider text-white">Konfirmasi Hapus</h3>
+                    <p class="mb-8 text-sm font-medium leading-relaxed text-slate-300">
+                        Yakin ingin menghapus pengguna ini? <br>
+                        <span class="text-rose-400">Semua data terkait (kecuali riwayat login/audit) mungkin akan ikut terhapus atau menjadi yatim piatu. Tindakan ini tidak bisa dibatalkan.</span>
+                    </p>
+                    
+                    <div class="flex w-full gap-3">
+                        <button 
+                            @click="cancelDeleteUser"
+                            class="flex-1 rounded-xl border border-slate-600 bg-slate-800/50 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-300 transition-all hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        >
+                            Batal
+                        </button>
+                        <button 
+                            @click="deleteUser"
+                            class="flex-1 rounded-xl border border-rose-500 bg-rose-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-[0_0_15px_rgba(225,29,72,0.4)] transition-all hover:bg-rose-500 hover:shadow-[0_0_25px_rgba(225,29,72,0.6)] focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        >
+                            Eksekusi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </AuthenticatedLayout>
 </template>
 

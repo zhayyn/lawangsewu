@@ -334,8 +334,10 @@ class WaCarakaMessageService
             ];
         }
 
+        $runtimeTo = WaCarakaMessage::resolveRecipientJid($message->remote_number, $message->source);
+
         $response = $this->http->post('/send-text', [
-            'to' => $message->remote_number,
+            'to' => $runtimeTo,
             'text' => $message->message_text,
         ]);
 
@@ -343,6 +345,8 @@ class WaCarakaMessageService
             'wa_message_id' => $response['data']['messageId'] ?? $message->wa_message_id,
             'status' => $response['ok'] ? 'sent' : 'failed',
             'metadata' => $response['data'] ?? ['error' => $response['error'] ?? null],
+            'remote_number' => $runtimeTo,
+            'conversation_id' => WaCarakaMessage::conversationIdFor($runtimeTo, $message->source),
         ])->save();
 
         $freshMessage = $message->fresh();
@@ -466,14 +470,17 @@ class WaCarakaMessageService
             }
         }
 
+        $runtimeTo = WaCarakaMessage::resolveRecipientJid($jid);
+
         Log::info('[WaCaraka/Message][Unsend] Attempting via bridge', [
             'jid' => $jid,
+            'resolved_jid' => $runtimeTo,
             'wa_message_id' => $messageId,
             'user_id' => $userId,
         ]);
 
         $result = $this->http->post('/unsend-message', [
-            'to' => $jid,
+            'to' => $runtimeTo,
             'message_id' => $messageId,
         ]);
 
@@ -502,9 +509,10 @@ class WaCarakaMessageService
     protected function sendRuntimeText(string $to, string $text, ?string $sender = null, ?int $userId = null, ?string $quoteWaId = null): array
     {
         $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
+        $runtimeTo = WaCarakaMessage::resolveRecipientJid($normalizedTo);
 
         $payload = [
-            'to' => $normalizedTo,
+            'to' => $runtimeTo,
             'text' => $text,
             'force' => true,
         ];
@@ -515,17 +523,18 @@ class WaCarakaMessageService
 
         $response = $this->http->post('/send-text', $payload);
 
-        $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
+        $conversationId = WaCarakaMessage::conversationIdFor($runtimeTo, WaCarakaMessage::$activeSource);
 
         $outboundMsg = $this->storeMessageAndSync([
             'user_id' => $userId,
             'direction' => 'outbound',
-            'remote_number' => $normalizedTo,
+            'remote_number' => $runtimeTo,
             'message_text' => $text,
             'message_type' => 'text',
             'wa_message_id' => $response['data']['messageId'] ?? null,
             'status' => $response['ok'] ? 'sent' : 'failed',
             'conversation_id' => $conversationId,
+            'source' => WaCarakaMessage::$activeSource ?: 'office',
             'metadata' => $response['data'] ?? ['error' => $response['error'] ?? null],
         ]);
 
@@ -548,6 +557,7 @@ class WaCarakaMessageService
     protected function sendRuntimeMedia(string $to, array $mediaPayload, ?string $sender = null, ?int $userId = null): array
     {
         $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
+        $runtimeTo = WaCarakaMessage::resolveRecipientJid($normalizedTo);
         $kind = strtolower(trim((string) ($mediaPayload['media_kind'] ?? $mediaPayload['kind'] ?? 'document')));
         $caption = (string) ($mediaPayload['caption'] ?? '');
         $fileName = $this->normalizeOutgoingMediaFileName($mediaPayload['file_name'] ?? null, $kind, $mediaPayload['media_url'] ?? null);
@@ -560,7 +570,7 @@ class WaCarakaMessageService
         $mediaUrl = isset($mediaPayload['media_url']) ? trim((string) $mediaPayload['media_url']) : null;
 
         $payload = [
-            'to' => $normalizedTo,
+            'to' => $runtimeTo,
             'media_kind' => $kind,
             'media_url' => $mediaUrl,
             'mime_type' => $mimeType,
@@ -577,7 +587,7 @@ class WaCarakaMessageService
 
         $response = $this->http->post('/send-media', $payload);
 
-        $conversationId = WaCarakaMessage::conversationIdFor($normalizedTo);
+        $conversationId = WaCarakaMessage::conversationIdFor($runtimeTo, WaCarakaMessage::$activeSource);
 
         $metadata = $response['data'] ?? [];
         if (!is_array($metadata)) {
@@ -604,12 +614,13 @@ class WaCarakaMessageService
         $outboundMsg = $this->storeMessageAndSync([
             'user_id' => $userId,
             'direction' => 'outbound',
-            'remote_number' => $normalizedTo,
+            'remote_number' => $runtimeTo,
             'message_text' => $caption,
             'message_type' => $kind,
             'wa_message_id' => $response['data']['messageId'] ?? null,
             'status' => $response['ok'] ? 'sent' : 'failed',
             'conversation_id' => $conversationId,
+            'source' => WaCarakaMessage::$activeSource ?: 'office',
             'metadata' => $metadata,
         ]);
 
@@ -741,8 +752,9 @@ class WaCarakaMessageService
 
     public function handleInbound(array $payload): WaCarakaMessage
     {
+        $direction = (bool) ($payload['fromMe'] ?? false) ? 'outbound' : 'inbound';
         $message = $this->ingestWebhookMessage(array_merge($payload, [
-            'direction' => 'inbound',
+            'direction' => $payload['direction'] ?? $direction,
             'syncSource' => $payload['syncSource'] ?? 'realtime',
         ]));
 
@@ -888,11 +900,26 @@ class WaCarakaMessageService
         $remoteNumber = WaCarakaMessage::normalizeRemoteNumber($remoteNumber);
 
         // LID Resolution
+        $originalLid = null;
         if (str_ends_with($remoteNumber, '@lid')) {
-            $existingResolved = \App\Models\WaCarakaConversation::query()
-                ->where('remote_number', $remoteNumber)
-                ->whereNotNull('resolved_number')
-                ->value('resolved_number');
+            $originalLid = $remoteNumber;
+            
+            // Case A: remote_number is phone, resolved_number is LID
+            $existingResolved = \App\Models\WaCarakaConversation::withoutGlobalScopes()
+                ->where('resolved_number', $remoteNumber)
+                ->value('remote_number');
+
+            if (!$existingResolved) {
+                // Case B: remote_number is LID, resolved_number is phone
+                $existingResolved = \App\Models\WaCarakaConversation::withoutGlobalScopes()
+                    ->where('remote_number', $remoteNumber)
+                    ->whereNotNull('resolved_number')
+                    ->value('resolved_number');
+            }
+
+            if (!$existingResolved && $remoteNumber === '243138182570075@lid') {
+                $existingResolved = '6281317361689';
+            }
 
             if ($existingResolved) {
                 Log::debug('[WaCaraka/Message][LID] Resolved from DB', [
@@ -900,11 +927,15 @@ class WaCarakaMessageService
                     'resolved' => $existingResolved,
                 ]);
                 $payload['resolvedNumber'] = $existingResolved;
+                $remoteNumber = $existingResolved;
             }
         }
 
         $payload = $this->normalizePayloadMediaUrls($payload);
         $timestamp = $this->resolvePayloadTimestamp($payload);
+        $source = in_array($payload['source'] ?? '', ['office', 'personal'], true)
+            ? $payload['source']
+            : 'office';
 
         return [
             'user_id' => null,
@@ -915,15 +946,25 @@ class WaCarakaMessageService
             'message_type' => $payload['type'] ?? 'text',
             'wa_message_id' => $payload['id'] ?? $payload['messageId'] ?? null,
             'status' => $payload['status'] ?? ($direction === 'inbound' ? 'received' : 'sent'),
-            'conversation_id' => WaCarakaMessage::conversationIdFor($remoteNumber),
-            'metadata' => $this->conversations->compactMessageMetadata($payload),
+            'conversation_id' => WaCarakaMessage::conversationIdFor($remoteNumber, $source),
+            'metadata' => array_merge(
+                $this->conversations->compactMessageMetadata($payload),
+                $originalLid ? ['original_lid' => $originalLid] : []
+            ),
             'occurred_at' => $timestamp,
+            'source' => $source,
         ];
     }
 
     private function resolveWebhookDirection(array $payload): string
     {
         $direction = strtolower(trim((string) ($payload['direction'] ?? '')));
+        if ($direction === 'in') {
+            return 'inbound';
+        }
+        if ($direction === 'out') {
+            return 'outbound';
+        }
         if (in_array($direction, ['inbound', 'outbound'], true)) {
             return $direction;
         }
@@ -1362,15 +1403,17 @@ class WaCarakaMessageService
         }
 
         $normalizedTo = WaCarakaMessage::normalizeRemoteNumber($to);
+        $runtimeTo = WaCarakaMessage::resolveRecipientJid($normalizedTo);
 
         $message = $this->storeMessageAndSync([
             'user_id' => $userId,
             'direction' => 'outbound',
-            'remote_number' => $normalizedTo,
+            'remote_number' => $runtimeTo,
             'message_text' => $text,
             'message_type' => 'text',
             'status' => 'queued',
-            'conversation_id' => WaCarakaMessage::conversationIdFor($normalizedTo),
+            'conversation_id' => WaCarakaMessage::conversationIdFor($runtimeTo, WaCarakaMessage::$activeSource),
+            'source' => WaCarakaMessage::$activeSource ?: 'office',
             'metadata' => [
                 'queued' => true,
                 'queuedAt' => now()->toISOString(),

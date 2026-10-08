@@ -152,6 +152,13 @@
         display: grid;
         grid-template-columns: 1fr auto;
         gap: 20px;
+        animation: fadeIn 0.4s ease-out forwards;
+        opacity: 0;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     .pip-card:hover {
@@ -441,25 +448,27 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        listContainer.innerHTML = data.map(item => {
+        listContainer.innerHTML = data.map((item, index) => {
             const hariTayang = calcDays(item.tgl_upload || item.created_at);
             const tglUploadFmt = formatDate(item.tgl_upload || item.created_at);
             const tglPutusFmt = formatDate(item.tgl_putusan);
-            const hasDoc = !!item.link_file;
+            const hasDoc = !!item.link_file && item.link_file.trim() !== '';
             
-            // Generate link
+            // Generate link dokumen independen
             let docLink = '#';
             if (hasDoc) {
-                // If it's old legacy webpip
-                docLink = item.link_file.includes('/') ? item.link_file : `/webpip/DOC/${item.link_file}`;
+                // Sesuaikan base URL dengan letak folder DOC WebPIP asli berada
+                // Karena folder webpip sementara akan dihapus, arahkan ke URL aslinya.
+                const baseUrlDoc = '/webpip/DOC/'; 
+                docLink = item.link_file.includes('/') ? item.link_file : `${baseUrlDoc}${item.link_file}`;
             }
 
             return `
-            <div class="pip-card">
+            <div class="pip-card" style="animation-delay: ${index * 0.05}s">
                 <div class="pip-content">
                     <div class="pip-meta-top">
                         <span class="pip-badge">PIP</span>
-                        <span class="pip-no-perkara">${item.nomor_perkara}</span>
+                        <span class="pip-no-perkara">${item.nomor_perkara || '-'}</span>
                         <span class="pip-date">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
@@ -469,9 +478,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <div class="pip-main-text">
-                        Telah memberitahukan kepada <span class="pip-highlight">${item.nama_pihak}</span> (Umur ${item.umur||'-'} tahun, Agama ${item.agama||'-'}, Pekerjaan ${item.pekerjaan||'-'}) 
+                        Telah memberitahukan kepada <span class="pip-highlight">${item.nama_pihak || '-'}</span> (Umur ${item.umur||'-'} tahun, Agama ${item.agama||'-'}, Pekerjaan ${item.pekerjaan||'-'}) 
                         yang dahulu beralamat di ${item.alamat || '<tidak diketahui>'}, <span class="pip-danger-text">dan saat ini tidak diketahui alamat dan keberadaannya di seluruh wilayah Republik Indonesia</span>.<br><br>
-                        Tentang putusan Pengadilan Agama Semarang, tanggal ${tglPutusFmt} Nomor <strong>${item.nomor_perkara}</strong> dalam perkara ${item.jenis_perkara || '-'}.
+                        Tentang putusan Pengadilan Agama Semarang, tanggal ${tglPutusFmt} Nomor <strong>${item.nomor_perkara || '-'}</strong> dalam perkara ${item.jenis_perkara || '-'}.
                     </div>
 
                     <div class="pip-footer">
@@ -487,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="pip-action">
                     <div class="pip-status-tayang">
                         Lama Tayang
-                        <strong>${hariTayang} Hari</strong>
+                        <strong style="color: ${hariTayang >= 30 ? 'var(--pip-danger)' : 'var(--pip-primary)'}">${hariTayang} Hari</strong>
                     </div>
                     ${hasDoc ? `
                         <a href="${docLink}" target="_blank" class="pip-btn-download">
@@ -509,40 +518,19 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSkeletons();
         refreshBtn.classList.add('loading');
         try {
-            // Karena ini widget embed PHP di Lawangsewu, kita panggil API dummy atau jika sudah ada endpoint PIP
-            // Untuk sementara kita pakai mock jika tidak ada endpoint
-            // const res = await fetch('/api/pengumuman-pip');
-            // const result = await res.json();
-            // pipData = result.data;
+            await new Promise(r => setTimeout(r, 600)); // Simulasi sedikit delay agar animasi smooth terlihat
             
-            // Mock data representing DB state
-            // Di implementasi aslinya, data bisa di-inject via PHP json_encode langsung dari DB tbl_pip
-            await new Promise(r => setTimeout(r, 800)); // Simulate network
-            
-            pipData = <?php
-                // Inject data if connection exists
-                try {
-                    $db = new PDO("mysql:host=localhost;dbname=paseman_webpip", "paseman_paseman", "nDZkbUBK6FeA96");
-                    $stmt = $db->query("SELECT * FROM tbl_pip WHERE aktif=1 ORDER BY id DESC LIMIT 50");
-                    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    echo json_encode($data);
-                } catch(Exception $e) {
-                    echo '[]';
-                }
-            ?>;
-
-            if(pipData.length === 0) {
-                // Dummy fallback for preview
-                pipData = [
-                    { nomor_perkara: "1234/Pdt.G/2026/PA.Smg", jenis_perkara: "Cerai Gugat", tgl_upload: "2026-05-10", tgl_putusan: "2026-05-08", nama_pihak: "Fulanah binti Fulan", umur: 35, agama: "Islam", pekerjaan: "Wiraswasta", alamat: "Jl. Pemuda No.1", jurusita_nama: "Ahmad Jurusita, S.H.", link_file: "dummy.pdf" },
-                    { nomor_perkara: "1122/Pdt.G/2026/PA.Smg", jenis_perkara: "Cerai Talak", tgl_upload: "2026-05-01", tgl_putusan: "2026-04-20", nama_pihak: "Budi bin Slamet", umur: 40, agama: "Islam", pekerjaan: "Karyawan", alamat: "Jl. Pandanaran", jurusita_nama: "Slamet JSP", link_file: "" }
-                ];
+            // Mengambil data real dari API WebPIP (karena database ada di server cPanel)
+            const response = await fetch('https://pa-semarang.go.id/webpip/api-pip.php');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            pipData = await response.json();
 
             renderData(pipData);
         } catch (err) {
             console.error(err);
-            renderEmpty('Gagal memuat data. Silakan coba lagi.');
+            renderEmpty('Gagal memuat data dari server. Silakan coba lagi.');
         } finally {
             refreshBtn.classList.remove('loading');
         }

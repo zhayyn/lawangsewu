@@ -1,0 +1,28 @@
+{
+  "name": "wa-runtime-personal",
+  "version": "1.0.0",
+  "description": "WA Caraka Personal Runtime - Baileys Bridge",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.17",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "dotenv": "^16.4.7",
+    "form-data": "^4.0.1",
+    "node-fetch": "^3.3.2",
+    "jimp": "^1.6.0",
+    "sharp": "^0.33.5",
+    "link-preview-js": "^3.0.5",
+    "uuid": "^11.0.5",
+    "axios": "^1.7.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -147,6 +147,7 @@ class LawangsewuPortal
                 'label' => 'Monitoring',
                 'items' => [
                     ['label' => 'Monitor Sistem', 'short' => 'MS', 'routeKey' => 'admin-system-monitor', 'href' => self::routeOrNull('admin.system-monitor.index'), 'badge' => 'Admin'],
+                    ['label' => 'Pasemarang Sync', 'short' => 'PS', 'routeKey' => 'admin-pasemarang-sync', 'href' => self::routeOrNull('admin.pasemarang-sync.index'), 'badge' => 'Admin'],
                     ['label' => 'Monitor Jaringan', 'short' => 'MJ', 'routeKey' => 'admin-network-monitor', 'href' => self::routeOrNull('admin.network-monitor.index'), 'badge' => 'Admin'],
                     ['label' => 'Tailscale Network', 'short' => 'TN', 'routeKey' => 'tailscale', 'href' => self::routeOrNull('lawangsewu.tailscale.index'), 'badge' => 'Admin'],
                 ],
@@ -182,7 +183,9 @@ class LawangsewuPortal
                     ...(self::isSuperAdmin()
                         ? [
                             ['label' => 'Kelola User', 'short' => 'KU', 'routeKey' => 'users', 'href' => route('admin.users.index'), 'badge' => 'Admin'],
-                            ['label' => 'OAuth2 SSO', 'short' => 'OA', 'routeKey' => 'oauth2', 'href' => route('admin.oauth2.index'), 'badge' => 'Admin']
+                            ['label' => 'OAuth2 SSO', 'short' => 'OA', 'routeKey' => 'oauth2', 'href' => route('admin.oauth2.index'), 'badge' => 'Admin'],
+                            ['label' => 'WA Personal', 'short' => 'WP', 'routeKey' => 'wa-personal', 'href' => self::routeOrNull('lawangsewu.wa-personal.index'), 'badge' => 'Superadmin'],
+                            ['label' => 'WA Personal Admin', 'short' => 'WA', 'routeKey' => 'wacaraka-personal', 'href' => self::routeOrNull('admin.wacaraka-personal.index'), 'badge' => 'Superadmin'],
                           ]
                         : []),
                 ],

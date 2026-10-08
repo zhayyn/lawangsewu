@@ -42,5 +42,12 @@ Route::middleware([\App\Http\Middleware\SecureWaWebhook::class, 'throttle:500,1'
         ->name('wacaraka.webhook.history-sync');
 });
 
+// WA Caraka Personal Webhook — Untuk runtime personal di WSL via Tailscale
+// Token verification dilakukan di dalam controller (token berbeda dari kantor)
+Route::middleware(['throttle:200,1'])->group(function () {
+    Route::post('/wa-caraka/webhook/inbound/personal', [WaCarakaWebhookController::class, 'inboundPersonal'])
+        ->name('wacaraka.webhook.inbound.personal');
+});
+
 use App\Http\Controllers\Omnichannel\WebHookController;
 Route::post('/omnichannel/web-chat', [WebHookController::class, 'receiveWebChat']);

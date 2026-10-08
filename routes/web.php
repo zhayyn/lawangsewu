@@ -7,6 +7,8 @@ use App\Http\Controllers\Admin\PendopoAdminController;
 use App\Http\Controllers\Admin\SystemMonitorController;
 use App\Http\Controllers\Admin\UserAccessController;
 use App\Http\Controllers\Admin\WaCarakaAdminController;
+use App\Http\Controllers\Admin\WaCarakaPersonalAdminController;
+use App\Http\Controllers\Admin\PasemarangSyncMonitorController;
 use App\Http\Controllers\GuestbookController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PtspQueueController;
@@ -21,6 +23,7 @@ use App\Http\Controllers\TdmsController;
 use App\Http\Controllers\PakPpController;
 use App\Http\Controllers\TvMediaController;
 use App\Http\Controllers\WaCarakaController;
+use App\Http\Controllers\WaCarakaPersonalController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -284,6 +287,22 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->group(function 
     Route::get('/tailscale/device/{deviceKey}', [TailscaleDashboardController::class, 'deviceDetail'])->name('lawangsewu.tailscale.device');
     Route::get('/tailscale/ping-all', [TailscaleDashboardController::class, 'pingAll'])->name('lawangsewu.tailscale.ping-all');
     Route::get('/tailscale/cli-info', [TailscaleDashboardController::class, 'tailscaleCliInfo'])->name('lawangsewu.tailscale.cli-info');
+
+    // ── WA Personal Inbox — superadmin only, terpisah dari PTSP ──────────────
+    Route::get('/wa-personal', [WaCarakaPersonalController::class, 'index'])
+        ->name('lawangsewu.wa-personal.index');
+    Route::match(['get', 'post'], '/wa-personal/api/{action}', [WaCarakaPersonalController::class, 'proxy'])
+        ->where('action', '.*')
+        ->name('lawangsewu.wa-personal.api');
+
+    // WA Personal Media Download (proxy dari runtime WSL via controller personal)
+    Route::get('/wa-personal/media/{path}', [WaCarakaPersonalController::class, 'downloadMedia'])
+        ->where('path', '.+')
+        ->name('lawangsewu.wa-personal.media');
+
+    // WA Personal Reports — gunakan WaCaraka Reports controller karena data DB dibedakan via source='personal'
+    Route::get('/wa-personal/reports', [WaCarakaPersonalController::class, 'reports'])
+        ->name('lawangsewu.wa-personal.reports');
 });
 
 Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')->name('admin.')->group(function () {
@@ -297,6 +316,7 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
 
     Route::middleware('permission:admin.system-monitor')->group(function () {
         Route::get('/system-monitor', [SystemMonitorController::class, 'index'])->name('system-monitor.index');
+        Route::get('/pasemarang-sync', [PasemarangSyncMonitorController::class, 'index'])->name('pasemarang-sync.index');
     });
 
     Route::middleware('permission:admin.network-monitor')->group(function () {
@@ -330,6 +350,12 @@ Route::middleware(['auth', 'verified', 'active', 'superadmin'])->prefix('admin')
     Route::match(['get', 'post'], '/wa-caraka/api/{action}', [WaCarakaAdminController::class, 'api'])
         ->where('action', '.*')
         ->name('wacaraka.api');
+
+    // WA Personal Admin (superadmin only) — duplikat WA Caraka Admin tapi untuk runtime personal (WSL)
+    Route::get('/wa-personal', [WaCarakaPersonalAdminController::class, 'index'])->name('wacaraka-personal.index');
+    Route::match(['get', 'post'], '/wa-personal/api/{action}', [WaCarakaPersonalAdminController::class, 'api'])
+        ->where('action', '.*')
+        ->name('wacaraka-personal.api');
 
     // OAuth2 SSO Admin
     Route::get('/oauth2', [\App\Http\Controllers\Admin\OAuth2AdminController::class, 'index'])->name('oauth2.index');

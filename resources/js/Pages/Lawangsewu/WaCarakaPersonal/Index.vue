@@ -891,7 +891,7 @@ const outgoingTickClass = (status) => ({
 // ─── API Helper ───────────────────────────────────────
 const callApi = async (action, options = {}) => {
     const method = options.method || 'get';
-    const url = route('lawangsewu.wacaraka.api', { action });
+    const url = route('lawangsewu.wa-personal.api', { action });
     const headers = {
         Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -947,7 +947,7 @@ const normalizeApiError = (status, rawError = null) => {
 
 const callApiWithXhr = (action, options = {}) => new Promise((resolve, reject) => {
     const method = String(options.method || 'get').toUpperCase();
-    const url = route('lawangsewu.wacaraka.api', { action });
+    const url = route('lawangsewu.wa-personal.api', { action });
     const query = options.params ? '?' + new URLSearchParams(options.params).toString() : '';
     const isFormData = typeof FormData !== 'undefined' && options.data instanceof FormData;
     const xhr = new XMLHttpRequest();
@@ -2553,7 +2553,7 @@ const clearAllConversationsAction = async () => {
 const openReportsPage = () => {
     const fallback = '/wa-caraka/reports';
     try {
-        const url = typeof route === 'function' ? route('lawangsewu.wacaraka.reports') : fallback;
+        const url = typeof route === 'function' ? route('lawangsewu.wa-personal.reports') : fallback;
         window.location.assign(url || fallback);
     } catch {
         window.location.assign(fallback);
@@ -2942,7 +2942,7 @@ const ticketStatusClass = (s) => ({ open: 'bg-amber-100 text-amber-700', replied
 const connectRealtime = async () => {
     const echo = await ensureReverb();
     if (!echo) { appendLog('Realtime: Reverb tidak aktif. Gunakan polling.'); return; }
-    echo.private('lawangsewu.wacaraka.inbox')
+    echo.private('lawangsewu.wa-personal.inbox')
         .listen('.wa-caraka.message.received', async (event) => {
             appendLog('Pesan masuk (Reverb)', event?.message?.remoteNumber && { from: event.message.remoteNumber });
             if (event?.message?.conversationId === activeConvoId.value) {
@@ -3082,14 +3082,14 @@ onUnmounted(() => {
     if (inboxRefreshTimerRef) clearTimeout(inboxRefreshTimerRef);
     stopQrPolling();
     window.removeEventListener('keydown', handleGlobalShortcuts);
-    window.Echo?.leave('lawangsewu.wacaraka.inbox');
+    window.Echo?.leave('lawangsewu.wa-personal.inbox');
 });
 </script>
 
 <template>
-    <Head title="WA Caraka" />
+    <Head title="WA Personal — Lawangsewu" />
 
-    <LawangsewuLayout current-route="wacaraka" :nav-groups="navGroups" :app-meta="appMeta">
+    <LawangsewuLayout current-route="wa-personal" :nav-groups="navGroups" :app-meta="appMeta">
 
         <!-- ░░ Operator Desk Banner ░░ -->
         <section class="relative overflow-hidden rounded-[1.75rem] border border-[var(--accent-border)] bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_36%),linear-gradient(145deg,rgba(5,10,23,0.96),rgba(15,23,42,0.95))] p-3.5 text-white shadow-[0_20px_60px_rgba(2,6,23,0.45)] lg:px-5 lg:py-3.5 mb-4">

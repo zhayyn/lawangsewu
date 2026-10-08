@@ -17,13 +17,16 @@ use Illuminate\Http\Client\Response;
 class WaCarakaHttpClient
 {
     protected string $baseUrl;
+    protected ?string $fallbackUrl;
     protected string $token;
     protected int $timeout;
+    protected bool $useBearerAuth = false;
 
     public function __construct(
         ?string $baseUrl = null,
         ?string $token = null,
-        int $timeout = 20
+        int $timeout = 20,
+        ?string $fallbackUrl = null
     ) {
         $this->baseUrl = rtrim(
             $baseUrl ?? config('wa_caraka.base_url', env('LW_WA_V2_BASE', 'http://127.0.0.1:8790')),
@@ -31,6 +34,8 @@ class WaCarakaHttpClient
         );
         $this->token = $token ?? config('wa_caraka.token', env('LW_WA_V2_TOKEN', ''));
         $this->timeout = $timeout;
+        // Fallback URL — null means use config default. '' means no fallback.
+        $this->fallbackUrl = $fallbackUrl;
     }
 
     // ══════════════════════════════════════════════
@@ -40,6 +45,38 @@ class WaCarakaHttpClient
     public function baseUrl(): string
     {
         return $this->baseUrl;
+    }
+
+    public function setBaseUrl(string $url): self
+    {
+        $this->baseUrl = rtrim($url, '/');
+        return $this;
+    }
+
+    /**
+     * Override fallback URL. Pass empty string to disable fallback entirely.
+     * Useful for Personal instance to prevent accidental PTSP runtime calls.
+     */
+    public function setFallbackUrl(?string $url): self
+    {
+        $this->fallbackUrl = $url === null ? null : (rtrim($url, '/') ?: '');
+        return $this;
+    }
+
+    /**
+     * Use Authorization: Bearer header instead of X-WA-V2-Token.
+     * Needed for WSL Personal runtime which uses standard Bearer auth.
+     */
+    public function setUseBearerAuth(bool $use = true): self
+    {
+        $this->useBearerAuth = $use;
+        return $this;
+    }
+
+    public function setToken(string $token): self
+    {
+        $this->token = $token;
+        return $this;
     }
 
     public function token(): string
@@ -66,9 +103,15 @@ class WaCarakaHttpClient
         ]);
 
         if (!empty($this->token)) {
-            $builder = $builder->withHeaders([
-                'X-WA-V2-Token' => $this->token,
-            ]);
+            if ($this->useBearerAuth) {
+                // WSL Personal runtime menggunakan Authorization: Bearer
+                $builder = $builder->withToken($this->token);
+            } else {
+                $builder = $builder->withHeaders([
+                    'X-WA-V2-Token' => $this->token,
+                    'x-api-token'   => $this->token,
+                ]);
+            }
         }
 
         return $builder;
@@ -83,12 +126,7 @@ class WaCarakaHttpClient
      */
     public function get(string $path, array $query = []): array
     {
-        $fallbackUrl = rtrim(
-            config('wa_caraka.base_url_fallback', env('LW_WA_V2_BASE_FALLBACK', 'http://127.0.0.1:8791')),
-            '/'
-        );
-
-        $urls = array_unique(array_filter([$this->baseUrl, $fallbackUrl]));
+        $urls = $this->resolveUrls();
 
         foreach (array_values($urls) as $i => $baseUrl) {
             try {
@@ -121,12 +159,7 @@ class WaCarakaHttpClient
      */
     public function post(string $path, array $data = []): array
     {
-        $fallbackUrl = rtrim(
-            config('wa_caraka.base_url_fallback', env('LW_WA_V2_BASE_FALLBACK', 'http://127.0.0.1:8791')),
-            '/'
-        );
-
-        $urls = array_unique(array_filter([$this->baseUrl, $fallbackUrl]));
+        $urls = $this->resolveUrls();
 
         foreach (array_values($urls) as $i => $baseUrl) {
             try {
@@ -148,6 +181,30 @@ class WaCarakaHttpClient
         }
 
         return $this->error('Gagal terhubung ke WA runtime');
+    }
+
+    // ══════════════════════════════════════════════
+    // Internal Helpers
+    // ══════════════════════════════════════════════
+
+    /**
+     * Resolve the ordered list of URLs to try (primary + optional fallback).
+     * If $fallbackUrl is explicitly set to '' (empty string), no fallback is used.
+     * If $fallbackUrl is null, the global config fallback is used.
+     */
+    private function resolveUrls(): array
+    {
+        if ($this->fallbackUrl === '') {
+            // Personal instance or single-endpoint — no fallback
+            return [$this->baseUrl];
+        }
+
+        $fallback = $this->fallbackUrl ?? rtrim(
+            config('wa_caraka.base_url_fallback', env('LW_WA_V2_BASE_FALLBACK', 'http://127.0.0.1:8791')),
+            '/'
+        );
+
+        return array_values(array_unique(array_filter([$this->baseUrl, $fallback])));
     }
 
     // ══════════════════════════════════════════════

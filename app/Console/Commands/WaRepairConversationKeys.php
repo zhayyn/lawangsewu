@@ -26,11 +26,11 @@ class WaRepairConversationKeys extends Command
 
         DB::transaction(function () use ($dryRun, &$messagePatched, &$conversationsCreated, &$conversationsUpdated) {
             WaCarakaMessage::query()
-                ->select(['id', 'remote_number', 'conversation_id'])
+                ->select(['id', 'remote_number', 'conversation_id', 'source'])
                 ->orderBy('id')
                 ->chunk(500, function ($rows) use ($dryRun, &$messagePatched) {
                     foreach ($rows as $row) {
-                        $targetConversationId = WaCarakaMessage::conversationIdFor((string) $row->remote_number);
+                        $targetConversationId = WaCarakaMessage::conversationIdFor((string) $row->remote_number, $row->source);
 
                         if ((string) $row->conversation_id === $targetConversationId) {
                             continue;
@@ -49,11 +49,11 @@ class WaRepairConversationKeys extends Command
                 });
 
             $grouped = WaCarakaMessage::query()
-                ->select('conversation_id', 'remote_number')
+                ->select('conversation_id', 'remote_number', 'source')
                 ->selectRaw('MAX(created_at) as last_activity_at')
                 ->selectRaw("SUM(CASE WHEN direction = 'inbound' AND replied_at IS NULL THEN 1 ELSE 0 END) as unread_count")
                 ->whereNotNull('conversation_id')
-                ->groupBy('conversation_id', 'remote_number')
+                ->groupBy('conversation_id', 'remote_number', 'source')
                 ->get();
 
             foreach ($grouped as $row) {
@@ -61,10 +61,12 @@ class WaRepairConversationKeys extends Command
                     'remote_number' => (string) $row->remote_number,
                     'last_activity_at' => $row->last_activity_at,
                     'unread_count' => (int) ($row->unread_count ?? 0),
+                    'source' => $row->source,
                 ];
 
                 $existing = WaCarakaConversation::query()
                     ->where('conversation_id', $row->conversation_id)
+                    ->where('source', $row->source)
                     ->first();
 
                 if (!$existing) {
@@ -85,6 +87,15 @@ class WaRepairConversationKeys extends Command
                 if (!$dryRun) {
                     $existing->fill($payload)->save();
                 }
+            }
+
+            // Hapus percakapan lama yang tidak memiliki pesan terkait lagi
+            if (!$dryRun) {
+                WaCarakaConversation::query()->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('wa_caraka_messages')
+                        ->whereColumn('wa_caraka_messages.conversation_id', 'wa_caraka_conversations.conversation_id');
+                })->delete();
             }
         });
 

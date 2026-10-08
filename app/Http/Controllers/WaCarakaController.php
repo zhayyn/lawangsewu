@@ -33,7 +33,10 @@ class WaCarakaController extends Controller
         protected WaCarakaService $wa,
         protected WaCarakaConversationService $conversations,
         protected WaCarakaTicketService $tickets,
-    ) {}
+    ) {
+        WaCarakaMessage::$activeSource = 'office';
+        WaCarakaConversation::$activeSource = 'office';
+    }
 
     public function index()
     {
@@ -75,10 +78,26 @@ class WaCarakaController extends Controller
             ], 403);
         }
 
+        // Guard: aksi khusus personal hanya untuk superadmin
+        $personalActions = ['personal-health', 'personal-qr', 'personal-reconnect', 'personal-logout'];
+        if (in_array($action, $personalActions, true) && !$user->isSuperAdmin()) {
+            return response()->json([
+                'ok'    => false,
+                'error' => 'Aksi ini hanya dapat dilakukan oleh superadmin.',
+            ], 403);
+        }
+
         $result = match ($action) {
-            'health' => $this->wa->health(),
-            'qr' => $this->wa->qr(),
+            'health'    => $this->wa->health(),
+            'qr'        => $this->wa->qr(),
             'refresh-qr' => $this->wa->refreshQr(),
+
+            // Personal instance — proxy langsung ke runtime WSL
+            'personal-health' => $this->proxyToPersonalRuntime('GET', '/health'),
+            'personal-qr'     => $this->proxyToPersonalRuntime('GET', '/qr'),
+            'personal-reconnect' => $this->proxyToPersonalRuntime('POST', '/reconnect'),
+            'personal-logout'    => $this->proxyToPersonalRuntime('POST', '/logout'),
+
             'restart' => $this->wa->restart(),
             'disconnect' => $this->wa->disconnect(),
             'reconnect' => $this->wa->reconnect(),
@@ -295,8 +314,8 @@ class WaCarakaController extends Controller
             'quote_wa_id'     => 'nullable|string|max:255',
         ]);
 
-        // Cari conversation berdasarkan conversation_id
-        $conversation = WaCarakaConversation::query()
+        // Cari conversation berdasarkan conversation_id (bypass source_filter karena satu conversation record bisa memayungi pesan dari berbagai source)
+        $conversation = WaCarakaConversation::withoutGlobalScope('source_filter')
             ->where('conversation_id', $validated['conversation_id'])
             ->first();
 
@@ -1290,8 +1309,57 @@ class WaCarakaController extends Controller
 
     private function findConversationOrFail(string $conversationId): WaCarakaConversation
     {
-        return WaCarakaConversation::query()
+        return WaCarakaConversation::withoutGlobalScope('source_filter')
             ->where('conversation_id', $conversationId)
             ->firstOrFail();
+    }
+
+    /**
+     * Proxy HTTP request ke runtime personal (WSL via Tailscale).
+     * Digunakan untuk health check, QR, dan manajemen koneksi instance personal.
+     */
+    private function proxyToPersonalRuntime(string $method, string $path, array $data = []): array
+    {
+        if (!config('wa_caraka.personal_enabled', false)) {
+            return ['ok' => false, 'status' => 503, 'error' => 'Instance personal belum diaktifkan. Set WA_CARAKA_PERSONAL_ENABLED=true di .env'];
+        }
+
+        $baseUrl = rtrim((string) config('wa_caraka.personal_base_url', 'http://127.0.0.1:8791'), '/');
+        $token   = (string) config('wa_caraka.personal_token', '');
+        $timeout = (int) config('wa_caraka.personal_timeout', 30);
+
+        $headers = ['Accept' => 'application/json'];
+        if ($token !== '') {
+            $headers['X-WA-V2-Token'] = $token;
+        }
+
+        try {
+            $client = Http::timeout($timeout)->withHeaders($headers);
+
+            $response = match (strtoupper($method)) {
+                'POST'  => $client->post($baseUrl . $path, $data),
+                default => $client->get($baseUrl . $path),
+            };
+
+            $json  = $response->json();
+            $error = $json['error'] ?? $json['message'] ?? null;
+
+            return [
+                'ok'     => $response->successful(),
+                'status' => $response->status(),
+                'data'   => $json,
+                'error'  => is_string($error) && $error !== '' ? $error : null,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('[WaCaraka/Personal] Runtime request failed', [
+                'path'  => $path,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'ok'     => false,
+                'status' => 502,
+                'error'  => 'Gagal terhubung ke runtime personal. Pastikan WSL aktif dan runtime berjalan.',
+            ];
+        }
     }
 }

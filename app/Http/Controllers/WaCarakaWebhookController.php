@@ -25,6 +25,9 @@ class WaCarakaWebhookController extends Controller
      */
     public function inbound(Request $request)
     {
+        \App\Models\WaCarakaMessage::$activeSource = 'office';
+        \App\Models\WaCarakaConversation::$activeSource = 'office';
+
         if ($auth = $this->verifyWebhookToken($request)) {
             return $auth;
         }
@@ -165,6 +168,160 @@ class WaCarakaWebhookController extends Controller
 
             return response()->json(['ok' => false, 'error' => 'Internal error.'], 500);
         }
+    }
+
+    /**
+     * Handle inbound message webhook dari WA bridge personal (runtime di WSL).
+     * Endpoint terpisah agar token-nya bisa berbeda dari instance kantor.
+     */
+    public function inboundPersonal(Request $request)
+    {
+        \App\Models\WaCarakaMessage::$activeSource = 'personal';
+        \App\Models\WaCarakaConversation::$activeSource = 'personal';
+
+        Log::info('[WaCaraka/Personal Webhook] Raw Inbound Webhook Received', [
+            'headers' => [
+                'x-webhook-token'  => $request->header('x-webhook-token'),
+                'authorization'    => $request->hasHeader('authorization'),
+                'x-wa-v2-token'    => $request->header('X-WA-V2-Token'),
+            ],
+            'payload' => $request->all(),
+        ]);
+
+        if ($auth = $this->verifyPersonalWebhookToken($request)) {
+            return $auth;
+        }
+
+        // Tandai payload ini dari instance personal sebelum diproses
+        $payload = $request->all();
+        $jsonError = null;
+        if (empty($payload)) {
+            $content = $request->getContent();
+            $payload = json_decode($content, true, 512, JSON_INVALID_UTF8_SUBSTITUTE) ?? [];
+        }
+
+        // Inject instance marker agar percakapan bisa dibedakan di UI dan database
+        $payload['_instance'] = 'personal';
+        $payload['source']    = 'personal'; // untuk kolom source di wa_caraka_conversations & wa_caraka_messages
+
+        $raw = is_array($payload['raw'] ?? null) ? $payload['raw'] : [];
+        
+        $from = '';
+        $fromCandidates = [
+            $payload['from'] ?? null,
+            $payload['jid'] ?? null,
+            $payload['remoteJid'] ?? null,
+            $payload['chatId'] ?? null,
+            $raw['remoteJid'] ?? null,
+            $raw['chatId'] ?? null,
+        ];
+        foreach ($fromCandidates as $candidate) {
+            $trimmed = trim((string) $candidate);
+            if ($trimmed !== '') {
+                $from = $trimmed;
+                break;
+            }
+        }
+
+        // Abaikan update status dari kontak (status@broadcast)
+        if ($from === 'status@broadcast' || ($payload['from'] ?? '') === 'status@broadcast' || ($payload['jid'] ?? '') === 'status@broadcast') {
+            return response()->json(['ok' => true, 'skipped' => true, 'reason' => 'status-broadcast'], 200);
+        }
+
+        if (!isset($payload['text']) && isset($payload['message'])) {
+            $payload['text'] = $payload['message'];
+        }
+        
+        // Normalisasi sender name dari field 'sender' (berada di root payload)
+        if (!isset($payload['pushName']) && isset($payload['sender'])) {
+            $payload['pushName'] = $payload['sender'];
+        }
+        // Teruskan juga ke sub-key jika dibutuhkan oleh service tertentu
+        if (!isset($payload['metadata']['pushName']) && isset($payload['sender'])) {
+            $payload['metadata']['pushName'] = $payload['sender'];
+        }
+
+        if (empty($payload['from'])) {
+            $payload['from'] = $from;
+        }
+
+        // Pastikan nomor lid/JID yang tidak punya to menjadi ke local
+        if (empty($payload['to'])) {
+            $payload['to'] = $payload['local'] ?? null;
+        }
+
+        if (empty($from)) {
+            Log::warning('[WaCaraka/Personal Webhook] Missing "from" field', [
+                'payload_keys' => array_keys($payload),
+            ]);
+            return response()->json(['ok' => false, 'error' => 'Missing "from" field.'], 422);
+        }
+
+        if ($this->wa->shouldIgnoreInboundPayload($payload)) {
+            return response()->json(['ok' => true, 'skipped' => true, 'reason' => 'synthetic-health-check'], 202);
+        }
+
+        try {
+            $message = $this->wa->handleInbound($payload);
+
+            return response()->json([
+                'ok'        => true,
+                'messageId' => $message->id,
+                'stored'    => $message->wasRecentlyCreated,
+                'duplicate' => !$message->wasRecentlyCreated,
+                'instance'  => 'personal',
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('[WaCaraka/Personal Webhook] handleInbound failed', [
+                'error'   => $e->getMessage(),
+                'payload' => array_keys($payload),
+            ]);
+            return response()->json(['ok' => false, 'error' => 'Internal error.'], 500);
+        }
+    }
+
+    private function verifyPersonalWebhookToken(Request $request)
+    {
+        $expectedToken = config('wa_caraka.personal_webhook_token', '');
+
+        // Terima token dari berbagai header yang mungkin dikirim runtime:
+        // 1. x-webhook-token        (dikirim oleh WaCaraka Personal WSL runtime)
+        // 2. Authorization: Bearer  (alternatif dari runtime yang sama)
+        // 3. X-WA-V2-Token          (format lama / fallback)
+        $receivedToken = $request->header('x-webhook-token', '')
+            ?: $this->extractBearerToken($request)
+            ?: $request->header('X-WA-V2-Token', '');
+
+        if ($expectedToken === '') {
+            // Token belum dikonfigurasi — tolak semua request untuk keamanan
+            Log::warning('[WaCaraka/Personal Webhook] Token belum dikonfigurasi (WA_WEBHOOK_TOKEN_PERSONAL kosong). Request ditolak dari ' . $request->ip());
+            return response()->json(['ok' => false, 'error' => 'Webhook personal belum dikonfigurasi.'], 503);
+        }
+
+        if (!hash_equals($expectedToken, $receivedToken)) {
+            Log::warning('[WaCaraka/Personal Webhook] Token mismatch dari ' . $request->ip(), [
+                'header_present' => [
+                    'x-webhook-token'  => $request->hasHeader('x-webhook-token'),
+                    'authorization'    => $request->hasHeader('authorization'),
+                    'x-wa-v2-token'    => $request->hasHeader('X-WA-V2-Token'),
+                ],
+            ]);
+            return response()->json(['ok' => false, 'error' => 'Unauthorized.'], 401);
+        }
+
+        return null;
+    }
+
+    /**
+     * Ekstrak token dari header Authorization: Bearer <token>
+     */
+    private function extractBearerToken(Request $request): string
+    {
+        $auth = $request->header('Authorization', '');
+        if (str_starts_with($auth, 'Bearer ')) {
+            return trim(substr($auth, 7));
+        }
+        return '';
     }
 
     private function verifyWebhookToken(Request $request)

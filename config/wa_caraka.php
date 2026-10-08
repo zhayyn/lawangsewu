@@ -10,6 +10,9 @@ return [
     | module inside Lawangsewu. SSO is handled by the Lawangsewu auth layer.
     | This config controls connection to the Node.js runtime process.
     |
+    | Instance 'default' = Nomor kantor (server Proxmox / runtime utama)
+    | Instance 'personal' = Nomor pribadi superadmin (runtime di WSL via Tailscale)
+    |
     */
 
     // Base URL of the local WA runtime (Node.js, e.g. Baileys-based server)
@@ -71,4 +74,32 @@ return [
 
     // Rate limiting per IP (requests per minute)
     'webhook_rate_limit_ip' => (int) env('WA_WEBHOOK_RATE_LIMIT_IP', 500),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Personal Instance Configuration (Nomor Pribadi Superadmin)
+    |--------------------------------------------------------------------------
+    |
+    | Instance ke-2 untuk nomor WA pribadi superadmin.
+    | Runtime berjalan di WSL PC lokal yang terhubung via Tailscale.
+    |
+    */
+
+    // Apakah instance personal aktif
+    'personal_enabled' => (bool) env('WA_CARAKA_PERSONAL_ENABLED', false),
+
+    // Base URL runtime personal (IP Tailscale WSL + port 8791)
+    'personal_base_url' => env('LW_WA_V2_BASE_PERSONAL', 'http://127.0.0.1:8791'),
+
+    // Token autentikasi runtime personal
+    'personal_token' => env('LW_WA_V2_TOKEN_PERSONAL', ''),
+
+    // HTTP timeout untuk runtime personal (detik) — sedikit lebih toleran karena via Tailscale
+    'personal_timeout' => (int) env('LW_WA_V2_TIMEOUT_PERSONAL', 30),
+
+    // Token webhook yang dikirim dari runtime personal ke Laravel
+    'personal_webhook_token' => env('WA_WEBHOOK_TOKEN_PERSONAL', ''),
+
+    // Label tampilan di UI
+    'personal_label' => env('WA_CARAKA_PERSONAL_LABEL', 'WA Personal'),
 ];

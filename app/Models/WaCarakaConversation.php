@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,6 +21,12 @@ class WaCarakaConversation extends WaCarakaModel
 {
     use HasFactory;
 
+    /**
+     * Set globally by WaCarakaController or WaCarakaPersonalController
+     * to automatically filter all queries by source ('office' or 'personal').
+     */
+    public static ?string $activeSource = null;
+
     protected $fillable = [
         'conversation_id',
         'remote_number',
@@ -32,6 +39,7 @@ class WaCarakaConversation extends WaCarakaModel
         'claimed_at',
         'last_activity_at',
         'unread_count',
+        'source',
     ];
 
     protected $casts = [
@@ -94,7 +102,29 @@ class WaCarakaConversation extends WaCarakaModel
     }
 
     // ──────────────────────────────────────────────
-    // Helpers
+    // Booted
+    // ──────────────────────────────────────────────
+
+    protected static function booted()
+    {
+        static::addGlobalScope('source_filter', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            if (static::$activeSource) {
+                $builder->where(function ($q) use ($builder) {
+                    $q->where($builder->getModel()->getTable() . '.source', static::$activeSource)
+                      ->orWhereHas('messages');
+                });
+            }
+        });
+
+        static::creating(function (WaCarakaConversation $conversation) {
+            if (static::$activeSource && empty($conversation->source)) {
+                $conversation->source = static::$activeSource;
+            }
+        });
+    }
+
+    // ──────────────────────────────────────────────
+    // Helper Methods
     // ──────────────────────────────────────────────
 
     public function isUnclaimed(): bool

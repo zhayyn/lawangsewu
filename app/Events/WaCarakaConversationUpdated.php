@@ -19,7 +19,11 @@ class WaCarakaConversationUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('lawangsewu.wacaraka.inbox')];
+        $channel = $this->conversation->source === 'personal' 
+            ? 'lawangsewu.wa-personal.inbox' 
+            : 'lawangsewu.wacaraka.inbox';
+            
+        return [new PrivateChannel($channel)];
     }
 
     public function broadcastAs(): string

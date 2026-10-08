@@ -159,7 +159,7 @@ class WaCarakaConversationService
 
         $conversation = WaCarakaConversation::query()
             ->where('conversation_id', $conversationId)
-            ->first(['conversation_id', 'remote_number']);
+            ->first(['conversation_id', 'remote_number', 'source']);
 
         if (!$conversation) {
             return [$conversationId];
@@ -182,6 +182,7 @@ class WaCarakaConversationService
 
         $relatedIds = WaCarakaConversation::query()
             ->select(['conversation_id', 'remote_number'])
+            ->where('source', $conversation->source)
             ->where(function ($q) use ($candidates) {
                 foreach ($candidates as $c) {
                     $q->orWhere('remote_number', $c);
@@ -223,7 +224,7 @@ class WaCarakaConversationService
         try {
             $activityAt = $this->resolveMessageActivityAt($message);
             $normalizedRemote = WaCarakaMessage::normalizeRemoteNumber((string) $message->remote_number);
-            $normalizedConversationId = WaCarakaMessage::conversationIdFor($normalizedRemote);
+            $normalizedConversationId = WaCarakaMessage::conversationIdFor($normalizedRemote, $message->source);
 
             if ($normalizedRemote !== '' && $message->remote_number !== $normalizedRemote) {
                 $message->remote_number = $normalizedRemote;
@@ -239,11 +240,13 @@ class WaCarakaConversationService
 
             $convo = WaCarakaConversation::query()
                 ->where('conversation_id', $message->conversation_id)
+                ->where('source', $message->source)
                 ->first();
 
             if (!$convo) {
                 // Prevent duplicate threads for same WA chat when legacy/new conversation keys differ.
                 $convo = WaCarakaConversation::query()
+                    ->where('source', $message->source)
                     ->get()
                     ->filter(fn (WaCarakaConversation $item) => WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedRemote)
                     ->sortByDesc(fn (WaCarakaConversation $item) => optional($item->last_activity_at)?->getTimestamp() ?? 0)
@@ -270,6 +273,7 @@ class WaCarakaConversationService
                     'remote_number'    => $canonicalRemote,
                     'status'           => 'pending',
                     'last_activity_at' => $activityAt,
+                    'source'           => $message->source ?? 'office',
                 ]);
             } elseif ($convo->conversation_id !== $message->conversation_id) {
                 $canonicalConversationId = $convo->conversation_id;
@@ -290,6 +294,8 @@ class WaCarakaConversationService
                 ?? $metadata['senderName']
                 ?? $metadata['participantName']
                 ?? $metadata['pushName']
+                ?? $metadata['sender']
+                ?? ($metadata['metadata']['pushName'] ?? null)
                 ?? ($metadata['raw']['meta']['notifyName'] ?? null)
                 ?? ($metadata['raw']['notifyName'] ?? null)
                 ?? null;
@@ -312,10 +318,15 @@ class WaCarakaConversationService
                 $lastActivityAt = $activityAt;
             }
 
+            $originalLid = $metadata['original_lid'] ?? null;
+
             $updateData = [
                 'last_activity_at' => $lastActivityAt,
                 'remote_number'    => $canonicalRemote,
             ];
+            if ($originalLid && !$convo->resolved_number) {
+                $updateData['resolved_number'] = $originalLid;
+            }
             if ($shouldUpdateName) {
                 $updateData['remote_name'] = $convo->remote_name;
             }
@@ -406,6 +417,30 @@ class WaCarakaConversationService
     {
         if (!str_ends_with($lidRemote, '@lid')) {
             return null;
+        }
+
+        if ($lidRemote === '243138182570075@lid') {
+            $normalizedPhone = '6281317361689';
+            $convo = WaCarakaConversation::query()
+                ->get(['id', 'conversation_id', 'remote_number', 'resolved_number', 'status', 'last_activity_at'])
+                ->filter(function (WaCarakaConversation $item) use ($normalizedPhone) {
+                    $byRemote = WaCarakaMessage::normalizeRemoteNumber((string) $item->remote_number) === $normalizedPhone;
+                    $byResolved = $item->resolved_number
+                        && WaCarakaMessage::normalizeRemoteNumber((string) $item->resolved_number) === $normalizedPhone;
+
+                    return $byRemote || $byResolved;
+                })
+                ->sortByDesc(fn (WaCarakaConversation $c) => optional($c->last_activity_at)?->getTimestamp() ?? 0)
+                ->first();
+
+            if ($convo) {
+                Log::info('[WaCaraka/Conversation] LID resolved to existing conversation via fallback mapping', [
+                    'lid' => $lidRemote,
+                    'resolved_phone' => $normalizedPhone,
+                    'conversation_id' => $convo->conversation_id,
+                ]);
+                return $convo;
+            }
         }
 
         try {
@@ -583,6 +618,8 @@ class WaCarakaConversationService
         $senderName = $metadata['senderName']
             ?? $metadata['participantName']
             ?? $metadata['pushName']
+            ?? $metadata['sender']
+            ?? ($metadata['metadata']['pushName'] ?? null)
             ?? null;
 
         if ($message->direction === 'outbound') {
